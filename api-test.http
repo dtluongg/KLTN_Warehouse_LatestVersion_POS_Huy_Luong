@@ -1,0 +1,62 @@
+### 1. TẠO TÀI KHOẢN ADMIN ĐẦU TIÊN (Endpoint này không check Auth lúc vừa init)
+### (Lưu ý: Sau khi tạo xong, hãy comment dòng POST này lại để tránh tạo bừa bãi)
+POST http://localhost:8080/api/staffs
+Content-Type: application/json
+
+{
+  "staffCode": "EMP001",
+  "fullName": "Administrator",
+  "username": "admin",
+  "passwordHash": "123456",
+  "role": "ADMIN",
+  "isActive": true
+}
+
+### 
+
+### 2. ĐĂNG NHẬP ĐỂ LẤY JWT TOKEN Bearer
+# @name loginAdmin
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "123456"
+}
+
+### (Lưu biến token vào bộ nhớ tạm của Rest Client)
+@authToken = {{loginAdmin.response.body.token}}
+
+### 
+
+### 3. TEST TẠO DANH MỤC (CATEGORY) - CẦN TOKEN ADMIN HOẶC WAREHOUSE_STAFF
+POST http://localhost:8080/api/categories
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Nước Ngọt",
+  "slug": "nuoc-ngot",
+  "isActive": true
+}
+
+###
+
+### 4. LẤY DANH SÁCH CATEGORY (KHÔNG CẦN TRUYỀN TOKEN - Vẫn trả 200)
+# (Vì SecurityConfig đang bọc anyRequest().authenticated() nên gọi không token sẽ bị 403 Forbidden)
+GET http://localhost:8080/api/categories
+Authorization: Bearer {{authToken}}
+
+###
+
+### 5. TẠO THÊM KHÁCH HÀNG
+POST http://localhost:8080/api/customers
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "customerCode": "CUS001",
+  "name": "Khách Vãng Lai",
+  "phone": "0987654321",
+  "isActive": true
+}

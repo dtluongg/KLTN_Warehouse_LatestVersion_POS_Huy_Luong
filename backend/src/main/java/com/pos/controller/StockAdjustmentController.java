@@ -1,0 +1,40 @@
+package com.pos.controller;
+
+import com.pos.dto.CreateStockAdjustmentDto;
+import com.pos.entity.StockAdjustment;
+import com.pos.service.StockAdjustmentService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/stock-adjustments")
+@RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+public class StockAdjustmentController {
+
+    private final StockAdjustmentService adjustService;
+
+    @GetMapping
+    public ResponseEntity<List<StockAdjustment>> getAllAdjustments() {
+        return ResponseEntity.ok(adjustService.getAllAdjustments());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<StockAdjustment> getAdjustmentById(@PathVariable Long id) {
+        return ResponseEntity.ok(adjustService.getAdjustmentById(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<StockAdjustment> createAdjustment(@RequestBody CreateStockAdjustmentDto dto) {
+        return ResponseEntity.ok(adjustService.createAdjustment(dto));
+    }
+
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<StockAdjustment> completeAdjustment(@PathVariable Long id) {
+        return ResponseEntity.ok(adjustService.completeAdjustment(id));
+    }
+}
