@@ -2,6 +2,7 @@ package com.pos.service.impl;
 
 import com.pos.dto.CreatePurchaseOrderDto;
 import com.pos.entity.*;
+import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
 import com.pos.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
     private final StaffRepository staffRepository;
+    private final WarehouseRepository warehouseRepository;
 
     @Override
     public List<PurchaseOrder> getAllPurchaseOrders() {
@@ -42,18 +44,27 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         Staff staff = staffRepository.findById(dto.getCreatedByStaffId())
                 .orElseThrow(() -> new RuntimeException("Staff not found"));
 
+        Warehouse warehouse = dto.getWarehouseId() != null 
+                ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null) 
+                : null;
+
         PurchaseOrder po = PurchaseOrder.builder()
-                .poNo(dto.getPoNo())
                 .supplier(supplier)
+                .warehouse(warehouse)
                 .orderDate(LocalDate.now())
                 .expectedDate(dto.getExpectedDate() != null ? LocalDate.parse(dto.getExpectedDate()) : null)
-                .status("DRAFT")
+                .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
+                .totalAmount(dto.getTotalAmount())
+                .totalVat(dto.getTotalVat())
+                .totalAmountPayable(dto.getTotalAmountPayable())
                 .createdBy(staff)
                 .build();
 
-        po = poRepository.save(po);
-
+        poRepository.saveAndFlush(po);
+        String generatedPoNo = poRepository.findPoNoById(po.getId());
+        po.setPoNo(generatedPoNo);
+        
         for (CreatePurchaseOrderDto.PoItemDto itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -79,7 +90,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     public PurchaseOrder updateStatus(Long id, String newStatus) {
         PurchaseOrder po = getPurchaseOrderById(id);
         // Có thể thêm logic lưu Audit Log ở đây khi change status
-        po.setStatus(newStatus);
+        po.setStatus(DocumentStatus.valueOf(newStatus));
         return poRepository.save(po);
     }
 }

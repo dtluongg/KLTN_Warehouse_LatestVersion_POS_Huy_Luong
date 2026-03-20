@@ -23,7 +23,7 @@
 
 Cong thuc cap nhat gia von khi nhap:
 
-avg_cost_new = ((qty_on_hand _ avg_cost_old) + (qty_in _ unit_cost_in)) / (qty_on_hand + qty_in)
+avg*cost_new = ((qty_on_hand * avg*cost_old) + (qty_in * unit_cost_in)) / (qty_on_hand + qty_in)
 
 ---
 
@@ -362,9 +362,8 @@ Ghi chu:
   - warehouse_id (FK -> warehouse.id)
   - movement_type (PURCHASE_IN, SALE_OUT, RETURN_IN, RETURN_OUT, TRANSFER_IN, TRANSFER_OUT, CONVERSION_IN, CONVERSION_OUT, ADJUST_IN, ADJUST_OUT)
   - qty (luon duong)
-  - unit_cost (nullable cho SALE_OUT/RETURN_OUT)
-  - ref_type (GOODS_RECEIPT_ITEM, ORDER_ITEM, CUSTOMER_RETURN_ITEM, SUPPLIER_RETURN_ITEM, ADJUSTMENT_ITEM)
-  - ref_id
+  - ref_table (orders, goods_receipts, customer_returns, supplier_returns, stock_adjustments)
+  - ref_id (Mã chứng từ - document no)
   - note
   - created_at
   - created_by
@@ -372,8 +371,8 @@ Ghi chu:
 Index/rang buoc de xuat:
 
 - index(product_id, created_at)
-- index(ref_type, ref_id)
-- unique(ref_type, ref_id) de chong ghi movement trung.
+- index(ref_table, ref_id)
+- unique(ref_table, ref_id, product_id) de chong ghi movement trung cua 1 san pham tren 1 phieu.
 
 Ghi chu:
 
@@ -519,7 +518,7 @@ Ghi chu:
 
 - Moi thao tac POSTED/COMPLETED phai chay trong transaction.
 - Khong update on_hand truc tiep tu API ngoai movement service.
-- Dung unique(ref_type, ref_id) de dam bao idempotent.
+- Dung unique(ref_table, ref_id, product_id) de dam bao idempotent.
 - Khong cho on_hand am neu khong bat che do ban am.
 - So chung tu auto-generate theo ngay.
 - Validate role FK:
@@ -582,7 +581,7 @@ Ghi chu:
 - Loi nhuan gop theo don va theo san pham: dua tren cost_at_sale.
 - Danh sach don ban no tam thoi: loc orders co payment_method = CREDIT.
 - Bao cao tra hang: customer*returns, supplier_returns va inventory_movements theo movement_type RETURN*\*.
-- Bao cao transfer va conversion: inventory*movements theo movement_type TRANSFER*_ va CONVERSION\__.
+- Bao cao transfer va conversion: inventory*movements theo movement_type TRANSFER*\_ va CONVERSION\_\_.
 
 ---
 

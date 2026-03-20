@@ -2,6 +2,7 @@ package com.pos.service.impl;
 
 import com.pos.dto.CreateStockAdjustmentDto;
 import com.pos.entity.*;
+import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
 import com.pos.service.StockAdjustmentService;
 import lombok.RequiredArgsConstructor;
@@ -42,17 +43,18 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
                 .orElseThrow(() -> new RuntimeException("Staff not found"));
 
         StockAdjustment adjust = StockAdjustment.builder()
-                .adjustNo(dto.getAdjustNo())
                 .warehouse(warehouse)
                 .adjustDate(LocalDate.now())
-                .status("DRAFT")
+                .status(DocumentStatus.DRAFT)
                 .reason(dto.getReason())
                 .note(dto.getNote())
                 .createdBy(staff)
                 .build();
 
-        adjust = adjustRepository.save(adjust);
-
+        adjustRepository.saveAndFlush(adjust);
+        String generatedAdjustNo = adjustRepository.findAdjustNoById(adjust.getId());
+        adjust.setAdjustNo(generatedAdjustNo);
+        
         for (CreateStockAdjustmentDto.AdjustmentItemDto itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -80,11 +82,11 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
     public StockAdjustment completeAdjustment(Long id) {
         StockAdjustment adjust = getAdjustmentById(id);
         
-        if ("COMPLETED".equals(adjust.getStatus())) {
+        if (adjust.getStatus() == DocumentStatus.POSTED) {
             throw new RuntimeException("Adjustment already completed");
         }
         
-        adjust.setStatus("COMPLETED");
+        adjust.setStatus(DocumentStatus.POSTED);
         adjustRepository.save(adjust);
 
         List<StockAdjustmentItem> items = adjustItemRepository.findAll();
@@ -96,21 +98,16 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
                 // Nếu không có khác biệt, bỏ qua
                 if (item.getDiffQty() == 0) continue;
 
-                // Set tồn kho về đúng số Actual đếm được
-                product.setOnHand(item.getActualQty());
-                productRepository.save(product);
-
                 // Inventory Movement (Nếu lệch dương thì IN, lệch âm thì OUT)
-                String type = item.getDiffQty() > 0 ? "IN" : "OUT";
+                com.pos.enums.InventoryMovementType type = item.getDiffQty() > 0 ? com.pos.enums.InventoryMovementType.ADJUST_IN : com.pos.enums.InventoryMovementType.ADJUST_OUT;
                 
                 InventoryMovement act = InventoryMovement.builder()
                         .product(product)
                         .warehouse(adjust.getWarehouse())
                         .movementType(type)
-                        .qty(item.getDiffQty()) // Sẽ dương hoặc âm
-                        .unitCost(item.getUnitCostSnapshot()) 
-                        .refType("ADJUSTMENT")
-                        .refId(String.valueOf(adjust.getId()))
+                        .qty(Math.abs(item.getDiffQty())) // Luôn dương để DB Trigger tính TOÁN
+                        .refTable("stock_adjustments")
+                        .refId(adjust.getAdjustNo())
                         .createdBy(adjust.getCreatedBy())
                         .build();
 

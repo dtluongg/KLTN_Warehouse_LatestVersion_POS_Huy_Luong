@@ -1,5 +1,6 @@
 package com.pos.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -15,23 +16,24 @@ public class InventoryMovement {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Product product;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "warehouse_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Warehouse warehouse;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "movement_type", nullable = false)
-    private String movementType;
+    private com.pos.enums.InventoryMovementType movementType;
 
     @Column(nullable = false)
     private Integer qty;
 
-    @Column(name = "unit_cost")
-    private BigDecimal unitCost;
 
-    @Column(name = "ref_type", nullable = false)
-    private String refType;
+    @Column(name = "ref_table", nullable = false)
+    private String refTable;
 
     @Column(name = "ref_id", nullable = false)
     private String refId;
@@ -40,6 +42,7 @@ public class InventoryMovement {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "passwordHash"})
     private Staff createdBy;
 
     @Column(name = "created_at", insertable = false, updatable = false)

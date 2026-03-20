@@ -12,6 +12,7 @@ public class CreateStockAdjustmentDto {
     private String note;
     private Long createdByStaffId;
 
+
     private List<AdjustmentItemDto> items;
 
     @Data

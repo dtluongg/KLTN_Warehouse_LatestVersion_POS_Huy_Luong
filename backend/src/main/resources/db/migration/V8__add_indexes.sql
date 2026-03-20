@@ -1,7 +1,7 @@
 -- Inventory Movements Constraints & Indexes
-ALTER TABLE inventory_movements ADD CONSTRAINT uq_inv_mov_ref UNIQUE (ref_type, ref_id);
+ALTER TABLE inventory_movements ADD CONSTRAINT uq_inv_mov_ref UNIQUE (ref_table, ref_id, product_id);
 CREATE INDEX idx_inv_mov_prod_date ON inventory_movements(product_id, created_at);
-CREATE INDEX idx_inv_mov_ref ON inventory_movements(ref_type, ref_id);
+CREATE INDEX idx_inv_mov_ref ON inventory_movements(ref_table, ref_id);
 
 -- Reporting & Search Indexes
 CREATE INDEX idx_orders_date ON orders(order_time);

@@ -3,6 +3,7 @@ CREATE TABLE orders (
     order_no VARCHAR(50) UNIQUE NOT NULL,
     sales_channel VARCHAR(50) NOT NULL,
     customer_id UUID REFERENCES customers(id),
+    warehouse_id BIGINT REFERENCES warehouse(id) NOT NULL,
     order_time TIMESTAMP NOT NULL,
     status VARCHAR(50) NOT NULL,
     gross_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,

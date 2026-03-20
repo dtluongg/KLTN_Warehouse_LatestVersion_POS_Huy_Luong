@@ -56,6 +56,7 @@ CREATE TABLE products (
     last_purchase_cost DECIMAL(15, 2),
     vat_rate DECIMAL(5, 2) DEFAULT 0,
     on_hand INT NOT NULL DEFAULT 0,
+    image_url VARCHAR(500),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

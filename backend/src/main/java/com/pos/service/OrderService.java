@@ -1,6 +1,8 @@
 package com.pos.service;
 
 import com.pos.dto.CreateOrderDto;
+import com.pos.dto.OrderRequestDTO;
+import com.pos.dto.OrderResponseDTO;
 import com.pos.entity.Order;
 
 import java.util.List;
@@ -8,6 +10,5 @@ import java.util.List;
 public interface OrderService {
     List<Order> getAllOrders();
     Order getOrderById(Long id);
-    Order createOrder(CreateOrderDto dto);
-    Order completeOrder(Long id);
+    OrderResponseDTO createOrder(OrderRequestDTO req);
 }

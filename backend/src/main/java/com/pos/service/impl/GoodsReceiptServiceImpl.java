@@ -2,6 +2,7 @@ package com.pos.service.impl;
 
 import com.pos.dto.CreateGoodsReceiptDto;
 import com.pos.entity.*;
+import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
 import com.pos.service.GoodsReceiptService;
 import lombok.RequiredArgsConstructor;
@@ -52,18 +53,22 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
                 .orElseThrow(() -> new RuntimeException("Staff not found"));
 
         GoodsReceipt gr = GoodsReceipt.builder()
-                .grNo(dto.getGrNo())
                 .purchaseOrder(po)
                 .supplier(supplier)
                 .warehouse(warehouse)
                 .receiptDate(LocalDate.now())
-                .status("DRAFT")
+                .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
+                .totalAmount(dto.getTotalAmount())
+                .totalVat(dto.getTotalVat())
+                .totalAmountPayable(dto.getTotalAmountPayable())
                 .createdBy(staff)
                 .build();
 
-        gr = grRepository.save(gr);
-
+        grRepository.saveAndFlush(gr);
+        String generatedGrNo = grRepository.findGrNoById(gr.getId());
+        gr.setGrNo(generatedGrNo);
+        
         for (CreateGoodsReceiptDto.GrItemDto itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -93,12 +98,12 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
     public GoodsReceipt completeGoodsReceipt(Long id) {
         GoodsReceipt gr = getGoodsReceiptById(id);
         
-        if ("COMPLETED".equals(gr.getStatus())) {
+        if (gr.getStatus() == DocumentStatus.POSTED) {
             throw new RuntimeException("Goods Receipt is already completed.");
         }
 
         // 1. Cập nhật trạng thái GR
-        gr.setStatus("COMPLETED");
+        gr.setStatus(DocumentStatus.POSTED);
         grRepository.save(gr);
 
         // Lấy danh sách items để update kho bằng custom query (tạm fix fetch N+1 nếu cần)
@@ -126,18 +131,16 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
                 // 3. Cập nhật Product
                 product.setAvgCost(newAvgCost);
                 product.setLastPurchaseCost(incomingUnitCost);
-                product.setOnHand(newTotalQty.intValue());
                 productRepository.save(product);
 
                 // 4. Ghi nhận Inventory Movement
                 InventoryMovement movement = InventoryMovement.builder()
                         .product(product)
                         .warehouse(gr.getWarehouse())
-                        .movementType("IN")
+                        .movementType(com.pos.enums.InventoryMovementType.PURCHASE_IN)
                         .qty(item.getReceivedQty())
-                        .unitCost(incomingUnitCost)
-                        .refType("GOODS_RECEIPT")
-                        .refId(String.valueOf(gr.getId()))
+                        .refTable("goods_receipts")
+                        .refId(gr.getGrNo())
                         .createdBy(gr.getCreatedBy())
                         .build();
 
@@ -147,7 +150,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
 
         // Tự động chuyển PO sang trạng thái DELIVERED nếu trùng khớp (Có thể check qty sau)
         PurchaseOrder po = gr.getPurchaseOrder();
-        po.setStatus("DELIVERED");
+        po.setStatus(DocumentStatus.POSTED);
         poRepository.save(po);
 
         return gr;

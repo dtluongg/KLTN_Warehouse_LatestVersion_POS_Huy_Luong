@@ -1,7 +1,9 @@
 package com.pos.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
+import com.pos.enums.DocumentStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -18,22 +20,34 @@ public class CustomerReturn {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Customer customer;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Order order;
 
     @Column(name = "return_date", nullable = false)
     private LocalDate returnDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private DocumentStatus status;
 
     private String note;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Warehouse warehouse;
+
+    @Column(name = "total_refund", nullable = false)
+    private java.math.BigDecimal totalRefund;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "passwordHash"})
     private Staff createdBy;
 
     @Column(name = "created_at", insertable = false, updatable = false)

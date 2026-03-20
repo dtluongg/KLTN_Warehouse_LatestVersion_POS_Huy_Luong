@@ -27,6 +27,7 @@ public class Product {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Category category;
 
     @Column(name = "sale_price", nullable = false)
@@ -47,6 +48,9 @@ public class Product {
     @Column(name = "on_hand", nullable = false)
     @Builder.Default
     private Integer onHand = 0;
+
+    @Column(name = "image_url")
+    private String imageUrl;
 
     @Column(name = "is_active")
     @Builder.Default

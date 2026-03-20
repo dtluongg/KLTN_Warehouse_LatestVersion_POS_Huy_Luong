@@ -2,6 +2,7 @@ CREATE TABLE stock_adjustments (
     id BIGSERIAL PRIMARY KEY,
     adjust_no VARCHAR(50) UNIQUE NOT NULL,
     warehouse_id BIGINT REFERENCES warehouse(id) NOT NULL,
+
     adjust_date DATE NOT NULL,
     status VARCHAR(50) NOT NULL,
     reason TEXT,

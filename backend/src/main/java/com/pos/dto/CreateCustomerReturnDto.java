@@ -12,6 +12,9 @@ public class CreateCustomerReturnDto {
     private String note;
     private Long createdByStaffId;
 
+    private Long warehouseId;
+    private BigDecimal totalRefund;
+
     private List<ReturnItemDto> items;
 
     @Data

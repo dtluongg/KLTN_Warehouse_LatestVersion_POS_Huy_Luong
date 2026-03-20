@@ -2,6 +2,7 @@ package com.pos.service.impl;
 
 import com.pos.dto.CreateCustomerReturnDto;
 import com.pos.entity.*;
+import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
 import com.pos.service.CustomerReturnService;
 import lombok.RequiredArgsConstructor;
@@ -50,18 +51,24 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
             order = orderRepository.findById(dto.getOrderId()).orElse(null);
         }
 
+        Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
+                .orElseThrow(() -> new RuntimeException("Warehouse not found"));
+
         CustomerReturn cr = CustomerReturn.builder()
-                .returnNo(dto.getReturnNo())
                 .customer(customer)
                 .order(order)
+                .warehouse(warehouse)
                 .returnDate(LocalDate.now())
-                .status("DRAFT")
+                .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
+                .totalRefund(dto.getTotalRefund())
                 .createdBy(staff)
                 .build();
 
-        cr = crRepository.save(cr);
-
+        crRepository.saveAndFlush(cr);
+        String generatedReturnNo = crRepository.findReturnNoById(cr.getId());
+        cr.setReturnNo(generatedReturnNo);
+        
         for (CreateCustomerReturnDto.ReturnItemDto itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -90,15 +97,12 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
     public CustomerReturn completeCustomerReturn(Long id) {
         CustomerReturn cr = getCustomerReturnById(id);
         
-        if ("COMPLETED".equals(cr.getStatus())) {
+        if (cr.getStatus() == DocumentStatus.POSTED) {
             throw new RuntimeException("Return already completed");
         }
         
-        cr.setStatus("COMPLETED");
+        cr.setStatus(DocumentStatus.POSTED);
         crRepository.save(cr);
-
-        Warehouse mainWh = warehouseRepository.findAll().stream().findFirst()
-                .orElseThrow(() -> new RuntimeException("No Warehouse found"));
 
         List<CustomerReturnItem> items = crItemRepository.findAll();
         
@@ -107,21 +111,18 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 Product product = item.getProduct();
                 
                 // Khách trả hàng -> Hàng nhập lại vào kho
-                int newQty = product.getOnHand() + item.getQty();
-                product.setOnHand(newQty);
                 // Ghi chú: Có thể tính lại Moving Average nếu muốn, nhưng thông thường hàng trả lại 
                 // giữ nguyên hoặc lấy lại avgCost cũ. Ở MVP này tạm thời giữ nguyên giá avgCost.
-                productRepository.save(product);
+                // productRepository.save(product); // Tồn kho do DB Trigger tự động Update
 
                 // Inventory Movement
                 InventoryMovement act = InventoryMovement.builder()
                         .product(product)
-                        .warehouse(mainWh) // Nhập lại vào MAIN_WH
-                        .movementType("IN") // IN vì hàng từ tay KH quay về KHO
+                        .warehouse(cr.getWarehouse()) // Dùng kho đã gắn vào phiếu
+                        .movementType(com.pos.enums.InventoryMovementType.RETURN_IN) // IN vì hàng từ tay KH quay về KHO
                         .qty(item.getQty()) 
-                        .unitCost(product.getAvgCost()) // Book giá trị bằng AvgCost hiện tại
-                        .refType("CUSTOMER_RETURN")
-                        .refId(String.valueOf(cr.getId()))
+                        .refTable("customer_returns")
+                        .refId(cr.getReturnNo())
                         .createdBy(cr.getCreatedBy())
                         .build();
 

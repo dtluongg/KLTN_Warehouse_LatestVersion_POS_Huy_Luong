@@ -1,7 +1,12 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateOrderDto;
+import com.pos.dto.OrderItemRequestDTO;
+import com.pos.dto.OrderRequestDTO;
+import com.pos.dto.OrderResponseDTO;
 import com.pos.entity.*;
+import com.pos.enums.OrderStatus;
+import com.pos.enums.PaymentMethod;
+import com.pos.enums.SalesChannel;
 import com.pos.repository.*;
 import com.pos.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -10,8 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,9 +27,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
     private final StaffRepository staffRepository;
-    private final CouponRepository couponRepository;
     private final InventoryMovementRepository movementRepository;
-    // Tạm lấy Warehouse đầu tiên cho bán lẻ (Sau này phát triển đa kho sẽ select từ token/request)
     private final WarehouseRepository warehouseRepository;
 
     @Override
@@ -35,132 +38,109 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order getOrderById(Long id) {
         return orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new RuntimeException("Order not found: " + id));
     }
 
     @Override
     @Transactional
-    public Order createOrder(CreateOrderDto dto) {
-        Customer customer = null;
-        if (dto.getCustomerId() != null && !dto.getCustomerId().isEmpty()) {
-            customer = customerRepository.findById(UUID.fromString(dto.getCustomerId())).orElse(null);
-        }
-        Staff staff = staffRepository.findById(dto.getCreatedByStaffId())
-                .orElseThrow(() -> new RuntimeException("Staff not found"));
+    public OrderResponseDTO createOrder(OrderRequestDTO req) {
+        // Lấy Staff mặc định (Trong thực tế sẽ parse JWT Token)
+        Staff staff = staffRepository.findAll().stream().findFirst()
+                .orElseThrow(() -> new RuntimeException("No staff found in system"));
 
+        Customer customer = null;
+        if (req.getCustomerId() != null) {
+            customer = customerRepository.findById(req.getCustomerId())
+                    .orElseThrow(() -> new RuntimeException("Customer not found"));
+        }
+
+        // Lấy kho từ request (bắt buộc)
+        Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
+                .orElseThrow(() -> new RuntimeException("Warehouse not found: " + req.getWarehouseId()));
+
+        // Tạo Order Entity
         Order order = Order.builder()
-                .orderNo(dto.getOrderNo())
-                .salesChannel(dto.getSalesChannel())
+                .salesChannel(SalesChannel.POS)
                 .customer(customer)
+                .warehouse(warehouse)
                 .orderTime(LocalDateTime.now())
-                .status("DRAFT")
-                .paymentMethod(dto.getPaymentMethod())
-                .note(dto.getNote())
+                .status(OrderStatus.COMPLETED) // Bán POS là Hoàn Thành ngay
+                .discountAmount(req.getDiscountAmount() != null ? req.getDiscountAmount() : BigDecimal.ZERO)
+                .couponCode(req.getCouponCode())
+                .couponDiscountAmount(req.getCouponDiscountAmount() != null ? req.getCouponDiscountAmount() : BigDecimal.ZERO)
+                .surchargeAmount(req.getSurchargeAmount() != null ? req.getSurchargeAmount() : BigDecimal.ZERO)
+                .paymentMethod(req.getPaymentMethod() != null ? req.getPaymentMethod() : PaymentMethod.CASH)
+                .note(req.getNote())
                 .createdBy(staff)
                 .build();
 
-        // 1. Lưu Order (DRAFT)
-        order = orderRepository.save(order);
-        
         BigDecimal grossAmount = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new ArrayList<>();
 
-        // 2. Lưu Order Items (Chụp avgCost khoảnh khắc bán)
-        for (CreateOrderDto.OrderItemDto itemDto : dto.getItems()) {
-            Product product = productRepository.findById(itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
+        for (OrderItemRequestDTO itemReq : req.getItems()) {
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
 
-            BigDecimal lineRevenue = itemDto.getSalePrice().multiply(BigDecimal.valueOf(itemDto.getQty()));
-            // Snapshot giá vốn: Nếu chưa nhập bao giờ (0) thì lineCogs t= 0, nếu có avgCost thì lấy nó làm Cogs.
-            BigDecimal costAtSale = product.getAvgCost(); 
-            BigDecimal lineCogs = costAtSale.multiply(BigDecimal.valueOf(itemDto.getQty()));
+            // Tính doanh thu, vốn, lãi
+            BigDecimal lineRevenue = itemReq.getSalePrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+            BigDecimal lineCogs = product.getAvgCost().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
             BigDecimal lineProfit = lineRevenue.subtract(lineCogs);
 
-            OrderItem item = OrderItem.builder()
+            grossAmount = grossAmount.add(lineRevenue);
+
+            OrderItem orderItem = OrderItem.builder()
                     .order(order)
                     .product(product)
-                    .qty(itemDto.getQty())
-                    .salePrice(itemDto.getSalePrice())
-                    .costAtSale(costAtSale)
+                    .qty(itemReq.getQuantity())
+                    .salePrice(itemReq.getSalePrice())
+                    .costAtSale(product.getAvgCost())
                     .lineRevenue(lineRevenue)
                     .lineCogs(lineCogs)
                     .lineProfit(lineProfit)
                     .build();
 
-            orderItemRepository.save(item);
-            grossAmount = grossAmount.add(lineRevenue);
+            orderItems.add(orderItem);
+
+
         }
 
         order.setGrossAmount(grossAmount);
         
-        // 3. Tính toán Discount & Coupon
-        BigDecimal finalDiscount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
-        BigDecimal couponAmount = BigDecimal.ZERO;
-
-        if (dto.getDiscountCouponCode() != null && !dto.getDiscountCouponCode().isEmpty()) {
-            Coupon coupon = couponRepository.findByCode(dto.getDiscountCouponCode()).orElse(null);
-            if (coupon != null && Boolean.TRUE.equals(coupon.getIsActive())) {
-                // Giả định logic đơn giản tính PERCENT hoặc FIXED (Ở MVP coi như FIXED)
-                couponAmount = coupon.getDiscountValue();
-                order.setCouponCode(coupon.getCode());
-                // Increment use count
-                coupon.setUsedCount(coupon.getUsedCount() + 1);
-                couponRepository.save(coupon);
-            }
-        }
-
-        BigDecimal finalSurcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
-        order.setDiscountAmount(finalDiscount);
-        order.setCouponDiscountAmount(couponAmount);
-        order.setSurchargeAmount(finalSurcharge);
-        
-        // Net = Gross - Discount - Coupon + Surcharge
-        BigDecimal netAmount = grossAmount.subtract(finalDiscount).subtract(couponAmount).add(finalSurcharge);
+        // Tính tổng phải trả NetAmount
+        BigDecimal netAmount = grossAmount
+                .subtract(order.getDiscountAmount())
+                .subtract(order.getCouponDiscountAmount())
+                .add(order.getSurchargeAmount());
+                
         order.setNetAmount(netAmount);
 
-        return orderRepository.save(order);
-    }
-
-    @Override
-    @Transactional
-    public Order completeOrder(Long id) {
-        Order order = getOrderById(id);
-        if ("COMPLETED".equals(order.getStatus())) {
-            throw new RuntimeException("Order already completed");
-        }
+        orderRepository.saveAndFlush(order);
+        String generatedOrderNo = orderRepository.findOrderNoById(order.getId());
         
-        order.setStatus("COMPLETED");
-        orderRepository.save(order);
+        List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
 
-        // Giả sử có 1 kho duy nhất tên 'MAIN_WH' để trừ tồn. Nếu có nhiều có thể lấy kho từ Session
-        Warehouse mainWh = warehouseRepository.findAll().stream().findFirst()
-                .orElseThrow(() -> new RuntimeException("No Warehouse found"));
-
-        List<OrderItem> items = orderItemRepository.findAll();
-
-        for (OrderItem item : items) {
-            if (item.getOrder().getId().equals(order.getId())) {
-                Product product = item.getProduct();
-                
-                // Trừ tồn kho
-                int newQty = product.getOnHand() - item.getQty();
-                product.setOnHand(newQty);
-                productRepository.save(product);
-
-                // Ghi nhận Movement OUT
-                InventoryMovement act = InventoryMovement.builder()
-                        .product(product)
-                        .warehouse(mainWh)
-                        .movementType("OUT")
-                        .qty(-item.getQty()) // OUT thì lữu số âm hoặc quy ước OUT
-                        .unitCost(item.getCostAtSale()) // Giá xuất kho là avgCost được snapshot vào lúc sale
-                        .refType("ORDER")
-                        .refId(String.valueOf(order.getId()))
-                        .createdBy(order.getCreatedBy())
-                        .build();
-
-                movementRepository.save(act);
-            }
+        // Sinh Movement (dùng lại warehouse đã lấy từ request)
+        for (OrderItem savedItem : savedItems) {
+            InventoryMovement movement = InventoryMovement.builder()
+                    .product(savedItem.getProduct())
+                    .warehouse(warehouse)
+                    .movementType(com.pos.enums.InventoryMovementType.SALE_OUT)
+                    .qty(savedItem.getQty()) 
+                    .refTable("orders")
+                    .refId(generatedOrderNo)
+                    .createdBy(staff)
+                    .build();
+            movementRepository.save(movement);
         }
-        return order;
+
+        // Chuyển Type sang DTO trả về cho Frontend
+        OrderResponseDTO res = new OrderResponseDTO();
+        res.setId(order.getId());
+        res.setOrderNo(generatedOrderNo);
+        res.setStatus(order.getStatus());
+        res.setNetAmount(order.getNetAmount());
+        res.setPaymentMethod(order.getPaymentMethod());
+
+        return res;
     }
 }
