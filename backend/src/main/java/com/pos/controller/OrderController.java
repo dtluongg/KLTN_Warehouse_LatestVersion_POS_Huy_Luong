@@ -2,6 +2,7 @@ package com.pos.controller;
 
 import com.pos.dto.OrderRequestDTO;
 import com.pos.dto.OrderResponseDTO;
+import com.pos.dto.OrderItemDetailDTO;
 import com.pos.entity.Order;
 import com.pos.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,11 @@ public class OrderController {
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getOrderById(id));
+    }
+
+    @GetMapping("/{id}/items")
+    public ResponseEntity<List<OrderItemDetailDTO>> getOrderItems(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.getOrderItems(id));
     }
 
     @PostMapping

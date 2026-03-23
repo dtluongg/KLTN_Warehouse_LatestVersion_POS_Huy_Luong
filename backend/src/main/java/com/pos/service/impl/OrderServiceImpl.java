@@ -3,6 +3,7 @@ package com.pos.service.impl;
 import com.pos.dto.OrderItemRequestDTO;
 import com.pos.dto.OrderRequestDTO;
 import com.pos.dto.OrderResponseDTO;
+import com.pos.dto.OrderItemDetailDTO;
 import com.pos.entity.*;
 import com.pos.enums.OrderStatus;
 import com.pos.enums.PaymentMethod;
@@ -20,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +43,27 @@ public class OrderServiceImpl implements OrderService {
     public Order getOrderById(Long id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found: " + id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderItemDetailDTO> getOrderItems(Long orderId) {
+        // Ensure the order exists before fetching items.
+        getOrderById(orderId);
+        return orderItemRepository.findByOrderId(orderId)
+                .stream()
+                .map(item -> OrderItemDetailDTO.builder()
+                        .id(item.getId())
+                        .qty(item.getQty())
+                        .salePrice(item.getSalePrice())
+                        .lineRevenue(item.getLineRevenue())
+                        .product(OrderItemDetailDTO.ProductLiteDTO.builder()
+                                .id(item.getProduct().getId())
+                                .sku(item.getProduct().getSku())
+                                .name(item.getProduct().getName())
+                                .build())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     @Override

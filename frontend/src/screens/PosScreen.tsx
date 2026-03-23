@@ -713,7 +713,7 @@ export const PosScreen = () => {
                                     styles.numericInput,
                                     { textAlign: "left" },
                                 ]}
-                                placeholder="Giao siêu tốc..."
+                                placeholder="Nhập ghi chú..."
                                 value={note}
                                 onChangeText={setNote}
                             />

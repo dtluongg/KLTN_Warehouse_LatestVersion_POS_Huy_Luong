@@ -1,13 +1,32 @@
 import React from "react";
-import DataTableScreen, {
-    StatusBadge,
-    formatMoney,
-} from "../components/DataTableScreen";
+import { Alert } from "react-native";
+import { DataTableScreen, StatusBadge, formatMoney } from "../components";
 
 const CouponListScreen = () => (
     <DataTableScreen
         apiUrl="/coupons"
+        title="Mã giảm giá"
         searchPlaceholder="Tìm mã giảm giá..."
+        hideDefaultDetailAction
+        createAction={{
+            label: "Thêm coupon",
+            onPress: () =>
+                Alert.alert(
+                    "Thêm coupon",
+                    "Sẽ mở form thêm coupon ở bước tiếp theo.",
+                ),
+        }}
+        rowActions={[
+            {
+                label: "Sửa",
+                tone: "neutral",
+                onPress: (row) =>
+                    Alert.alert(
+                        "Sửa coupon",
+                        `Sẽ mở màn hình sửa cho ${row?.code || "coupon"}.`,
+                    ),
+            },
+        ]}
         columns={[
             { key: "code", label: "Mã coupon", width: 130 },
             { key: "discountType", label: "Loại", width: 90 },

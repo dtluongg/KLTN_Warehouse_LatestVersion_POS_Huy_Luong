@@ -6,12 +6,14 @@ import {
     RefreshControl,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+
 import { axiosClient } from "../api/axiosClient";
+import { EmptyState, ScreenHeader, SearchBar } from "../components/ui";
+import { useResponsive } from "../utils/responsive";
 import { theme } from "../utils/theme";
 
 type Warehouse = {
@@ -26,12 +28,7 @@ type ProductStock = {
     sku: string;
     barcode?: string;
     name: string;
-    shortName?: string;
-    categoryId?: number;
-    salePrice?: number;
-    avgCost?: number;
     onHand: number;
-    imageUrl?: string;
 };
 
 type WarehouseBreakdown = {
@@ -47,6 +44,8 @@ type InventoryRow = ProductStock & {
 type SelectedWarehouse = "SYSTEM" | number;
 
 const InventoryStockScreen = () => {
+    const { isDesktop } = useResponsive();
+
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [stocksByWarehouse, setStocksByWarehouse] = useState<
         Record<number, ProductStock[]>
@@ -106,7 +105,6 @@ const InventoryStockScreen = () => {
         if (selectedWarehouse === "SYSTEM") {
             const merged = new Map<number, InventoryRow>();
 
-            // Giu thu tu breakdown theo danh sach kho hien tai (kho dau tien dung truoc).
             warehouses.forEach((warehouse) => {
                 const rows = stocksByWarehouse[warehouse.id] || [];
                 rows.forEach((row) => {
@@ -211,7 +209,7 @@ const InventoryStockScreen = () => {
                             setShowWarehouseModal(false);
                         }}
                     >
-                        <View style={{ flex: 1 }}>
+                        <View style={styles.warehouseItemTextBox}>
                             <Text
                                 style={[
                                     styles.warehouseItemName,
@@ -248,7 +246,7 @@ const InventoryStockScreen = () => {
                                     setShowWarehouseModal(false);
                                 }}
                             >
-                                <View style={{ flex: 1 }}>
+                                <View style={styles.warehouseItemTextBox}>
                                     <Text
                                         style={[
                                             styles.warehouseItemName,
@@ -292,30 +290,17 @@ const InventoryStockScreen = () => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.topBar}>
-                <View style={styles.searchBox}>
-                    <Feather
-                        name="search"
-                        size={16}
-                        color={theme.colors.mutedForeground}
-                    />
-                    <TextInput
-                        value={searchKeyword}
-                        onChangeText={setSearchKeyword}
-                        placeholder="Tìm theo tên, SKU, mã vạch..."
-                        placeholderTextColor={theme.colors.mutedForeground}
-                        style={styles.searchInput}
-                    />
-                    {searchKeyword.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchKeyword("")}>
-                            <Feather
-                                name="x"
-                                size={16}
-                                color={theme.colors.mutedForeground}
-                            />
-                        </TouchableOpacity>
-                    )}
-                </View>
+            <ScreenHeader
+                title="Tồn kho"
+                subtitle={`${filteredRows.length} sản phẩm`}
+            />
+
+            <View style={styles.searchArea}>
+                <SearchBar
+                    value={searchKeyword}
+                    onChangeText={setSearchKeyword}
+                    placeholder="Tim theo ten, SKU, ma vach..."
+                />
             </View>
 
             <TouchableOpacity
@@ -337,7 +322,7 @@ const InventoryStockScreen = () => {
                 />
             </TouchableOpacity>
 
-            {errorMessage && (
+            {errorMessage ? (
                 <View style={styles.errorBox}>
                     <Text style={styles.errorText}>{errorMessage}</Text>
                     <TouchableOpacity
@@ -347,10 +332,12 @@ const InventoryStockScreen = () => {
                         <Text style={styles.retryButtonText}>Thu lai</Text>
                     </TouchableOpacity>
                 </View>
-            )}
+            ) : null}
 
             <FlatList
                 data={filteredRows}
+                numColumns={isDesktop ? 2 : 1}
+                key={isDesktop ? "inventory-desktop" : "inventory-mobile"}
                 keyExtractor={(item) => String(item.id)}
                 refreshControl={
                     <RefreshControl
@@ -360,45 +347,49 @@ const InventoryStockScreen = () => {
                     />
                 }
                 contentContainerStyle={styles.listContent}
-                renderItem={({ item }) => (
-                    <View style={styles.itemCard}>
-                        <View style={styles.itemHeader}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.productName}>
-                                    {item.name}
-                                </Text>
-                                <Text style={styles.productMeta}>
-                                    SKU: {item.sku || "-"}
-                                </Text>
+                columnWrapperStyle={
+                    isDesktop ? styles.desktopColumn : undefined
+                }
+                renderItem={({ item }) => {
+                    return (
+                        <View
+                            style={[
+                                styles.itemCard,
+                                isDesktop && styles.itemCardDesktop,
+                            ]}
+                        >
+                            <View style={styles.itemHeader}>
+                                <View style={styles.itemTitleBox}>
+                                    <Text style={styles.productName}>
+                                        {item.name}
+                                    </Text>
+                                    <Text style={styles.productMeta}>
+                                        SKU: {item.sku || "-"}
+                                    </Text>
+                                </View>
+                                <View style={styles.quantityBadge}>
+                                    <Text style={styles.quantityValue}>
+                                        {item.onHand.toLocaleString("vi-VN")}
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={styles.quantityBadge}>
-                                <Text style={styles.quantityValue}>
-                                    {item.onHand.toLocaleString("vi-VN")}
-                                </Text>
-                            </View>
-                        </View>
 
-                        <Text style={styles.breakdownText}>
-                            {item.breakdown
-                                .map(
-                                    (line) =>
-                                        `${line.warehouseName}: ${line.onHand.toLocaleString("vi-VN")}`,
-                                )
-                                .join(" | ")}
-                        </Text>
-                    </View>
-                )}
+                            <Text style={styles.breakdownText}>
+                                {item.breakdown
+                                    .map(
+                                        (line) =>
+                                            `${line.warehouseName}: ${line.onHand.toLocaleString("vi-VN")}`,
+                                    )
+                                    .join(" | ")}
+                            </Text>
+                        </View>
+                    );
+                }}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Feather
-                            name="inbox"
-                            size={36}
-                            color={theme.colors.mutedForeground}
-                        />
-                        <Text style={styles.emptyText}>
-                            Không có dữ liệu tồn kho phù hợp.
-                        </Text>
-                    </View>
+                    <EmptyState
+                        title="Không có dữ liệu tồn kho"
+                        description="Thử đổi từ khóa tìm kiếm hoặc chọn kho khác."
+                    />
                 }
             />
 
@@ -418,32 +409,16 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
-        gap: 12,
+        gap: 10,
     },
     loadingText: {
         color: theme.colors.mutedForeground,
         fontSize: 14,
     },
-    topBar: {
+    searchArea: {
         paddingHorizontal: theme.spacing.md,
-        paddingTop: theme.spacing.md,
+        paddingTop: theme.spacing.sm,
         paddingBottom: theme.spacing.sm,
-    },
-    searchBox: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        backgroundColor: "#fff",
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.md,
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-    },
-    searchInput: {
-        flex: 1,
-        color: theme.colors.foreground,
-        fontSize: 14,
     },
     warehouseBanner: {
         marginHorizontal: theme.spacing.md,
@@ -497,18 +472,27 @@ const styles = StyleSheet.create({
         paddingHorizontal: theme.spacing.md,
         paddingBottom: theme.spacing.lg,
     },
+    desktopColumn: {
+        gap: 10,
+    },
     itemCard: {
-        backgroundColor: "#fff",
+        backgroundColor: theme.colors.surface,
         borderWidth: 1,
         borderColor: theme.colors.border,
         borderRadius: theme.borderRadius.md,
         padding: theme.spacing.sm,
-        marginBottom: 8,
+        marginBottom: 10,
+    },
+    itemCardDesktop: {
+        flex: 1,
     },
     itemHeader: {
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
+    },
+    itemTitleBox: {
+        flex: 1,
     },
     productName: {
         color: theme.colors.foreground,
@@ -521,7 +505,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
     quantityBadge: {
-        minWidth: 80,
+        minWidth: 84,
         alignItems: "center",
         paddingVertical: 8,
         paddingHorizontal: 10,
@@ -537,25 +521,17 @@ const styles = StyleSheet.create({
         marginTop: 8,
         color: theme.colors.mutedForeground,
         fontSize: 12,
-        lineHeight: 17,
+        lineHeight: 18,
     },
-    emptyContainer: {
-        paddingVertical: 50,
-        alignItems: "center",
-        gap: 10,
-    },
-    emptyText: {
-        color: theme.colors.mutedForeground,
-        fontSize: 14,
-    },
+
     modalOverlay: {
         flex: 1,
-        backgroundColor: "rgba(2, 6, 23, 0.45)",
+        backgroundColor: theme.colors.overlay,
         justifyContent: "center",
         paddingHorizontal: theme.spacing.md,
     },
     modalBox: {
-        backgroundColor: "#fff",
+        backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.lg,
         padding: theme.spacing.md,
         borderWidth: 1,
@@ -586,6 +562,9 @@ const styles = StyleSheet.create({
     warehouseItemActive: {
         borderColor: "#86efac",
         backgroundColor: "#f0fdf4",
+    },
+    warehouseItemTextBox: {
+        flex: 1,
     },
     warehouseItemName: {
         color: theme.colors.foreground,

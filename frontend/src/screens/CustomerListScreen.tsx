@@ -1,10 +1,34 @@
 import React from "react";
-import DataTableScreen, { StatusBadge } from "../components/DataTableScreen";
+import { Alert } from "react-native";
+import { DataTableScreen, StatusBadge } from "../components";
 
 const CustomerListScreen = () => (
     <DataTableScreen
         apiUrl="/customers"
+        title="Khách hàng"
         searchPlaceholder="Tìm mã, tên, SĐT khách hàng..."
+        hideDefaultDetailAction
+        createAction={{
+            label: "Thêm KH",
+            onPress: () =>
+                Alert.alert(
+                    "Thêm khách hàng",
+                    "Sẽ mở form thêm khách hàng ở bước tiếp theo.",
+                ),
+        }}
+        rowActions={[
+            {
+                label: "Sửa",
+                tone: "neutral",
+                showOnDesktop: true,
+                showOnMobile: true,
+                onPress: (row) =>
+                    Alert.alert(
+                        "Sửa khách hàng",
+                        `Sẽ mở màn hình sửa cho ${row?.name || "khách hàng"}.`,
+                    ),
+            },
+        ]}
         columns={[
             { key: "customerCode", label: "Mã KH", width: 100 },
             { key: "name", label: "Tên khách hàng", flex: 2 },

@@ -1,11 +1,13 @@
 import React from "react";
 import { Text } from "react-native";
-import DataTableScreen from "../components/DataTableScreen";
+import { DataTableScreen } from "../components";
 
 const InventoryMovementListScreen = () => (
     <DataTableScreen
         apiUrl="/inventory-movements"
+        title="Lịch sử nhập xuất kho"
         searchPlaceholder="Tìm theo sản phẩm, kho, loại..."
+        hideDefaultDetailAction
         columns={[
             { key: "id", label: "ID", width: 60 },
             { key: "product.sku", label: "SKU", width: 120 },

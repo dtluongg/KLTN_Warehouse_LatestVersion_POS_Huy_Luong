@@ -21,12 +21,13 @@ import ProductListScreen from "../screens/ProductListScreen";
 import CategoryListScreen from "../screens/CategoryListScreen";
 import CouponListScreen from "../screens/CouponListScreen";
 import StaffListScreen from "../screens/StaffListScreen";
+import { BREAKPOINTS } from "../utils/responsive";
 
 const Drawer = createDrawerNavigator();
 
 export default function MainDrawerNavigator() {
     const { width } = useWindowDimensions();
-    const isLargeScreen = width >= 1024;
+    const isLargeScreen = width >= BREAKPOINTS.desktop;
 
     return (
         <Drawer.Navigator

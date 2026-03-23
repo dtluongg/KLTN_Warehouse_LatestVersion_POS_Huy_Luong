@@ -1,13 +1,32 @@
 import React from "react";
-import DataTableScreen, {
-    StatusBadge,
-    formatMoney,
-} from "../components/DataTableScreen";
+import { Alert } from "react-native";
+import { DataTableScreen, StatusBadge, formatMoney } from "../components";
 
 const ProductListScreen = () => (
     <DataTableScreen
         apiUrl="/products"
+        title="Sản phẩm"
         searchPlaceholder="Tìm theo SKU, tên sản phẩm..."
+        hideDefaultDetailAction
+        createAction={{
+            label: "Thêm sản phẩm",
+            onPress: () =>
+                Alert.alert(
+                    "Thêm sản phẩm",
+                    "Sẽ mở form thêm sản phẩm ở bước tiếp theo.",
+                ),
+        }}
+        rowActions={[
+            {
+                label: "Sửa",
+                tone: "neutral",
+                onPress: (row) =>
+                    Alert.alert(
+                        "Sửa sản phẩm",
+                        `Sẽ mở màn hình sửa cho ${row?.name || "sản phẩm"}.`,
+                    ),
+            },
+        ]}
         columns={[
             { key: "sku", label: "SKU", width: 120 },
             { key: "barcode", label: "Barcode", width: 130 },

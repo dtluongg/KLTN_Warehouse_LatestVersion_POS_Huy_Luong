@@ -1,10 +1,32 @@
 import React from "react";
-import DataTableScreen, { StatusBadge } from "../components/DataTableScreen";
+import { Alert } from "react-native";
+import { DataTableScreen, StatusBadge } from "../components";
 
 const StaffListScreen = () => (
     <DataTableScreen
         apiUrl="/staffs"
+        title="Nhân viên"
         searchPlaceholder="Tìm mã, tên nhân viên..."
+        hideDefaultDetailAction
+        createAction={{
+            label: "Thêm NV",
+            onPress: () =>
+                Alert.alert(
+                    "Thêm nhân viên",
+                    "Sẽ mở form thêm nhân viên ở bước tiếp theo.",
+                ),
+        }}
+        rowActions={[
+            {
+                label: "Sửa",
+                tone: "neutral",
+                onPress: (row) =>
+                    Alert.alert(
+                        "Sửa nhân viên",
+                        `Sẽ mở màn hình sửa cho ${row?.fullName || "nhân viên"}.`,
+                    ),
+            },
+        ]}
         columns={[
             { key: "staffCode", label: "Mã NV", width: 100 },
             { key: "fullName", label: "Họ tên", flex: 2 },
