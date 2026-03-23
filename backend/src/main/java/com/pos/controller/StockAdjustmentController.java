@@ -1,6 +1,7 @@
 package com.pos.controller;
 
 import com.pos.dto.CreateStockAdjustmentDto;
+import com.pos.dto.StockAdjustmentResponseDTO;
 import com.pos.entity.StockAdjustment;
 import com.pos.service.StockAdjustmentService;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,12 @@ public class StockAdjustmentController {
     }
 
     @PostMapping
-    public ResponseEntity<StockAdjustment> createAdjustment(@RequestBody CreateStockAdjustmentDto dto) {
+    public ResponseEntity<StockAdjustmentResponseDTO> createAdjustment(@RequestBody CreateStockAdjustmentDto dto) {
         return ResponseEntity.ok(adjustService.createAdjustment(dto));
     }
 
     @PostMapping("/{id}/complete")
-    public ResponseEntity<StockAdjustment> completeAdjustment(@PathVariable Long id) {
+    public ResponseEntity<StockAdjustmentResponseDTO> completeAdjustment(@PathVariable Long id) {
         return ResponseEntity.ok(adjustService.completeAdjustment(id));
     }
 }

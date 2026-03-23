@@ -1,6 +1,7 @@
 package com.pos.controller;
 
 import com.pos.dto.CreatePurchaseOrderDto;
+import com.pos.dto.PurchaseOrderResponseDTO;
 import com.pos.entity.PurchaseOrder;
 import com.pos.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,12 @@ public class PurchaseOrderController {
     }
 
     @PostMapping
-    public ResponseEntity<PurchaseOrder> createPO(@RequestBody CreatePurchaseOrderDto dto) {
+    public ResponseEntity<PurchaseOrderResponseDTO> createPO(@RequestBody CreatePurchaseOrderDto dto) {
         return ResponseEntity.ok(poService.createPurchaseOrder(dto));
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<PurchaseOrder> updatePOStatus(@PathVariable Long id, @RequestParam String status) {
+    public ResponseEntity<PurchaseOrderResponseDTO> updatePOStatus(@PathVariable Long id, @RequestParam String status) {
         return ResponseEntity.ok(poService.updateStatus(id, status));
     }
 }

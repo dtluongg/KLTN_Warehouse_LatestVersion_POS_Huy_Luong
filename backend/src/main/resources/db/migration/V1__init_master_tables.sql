@@ -55,7 +55,6 @@ CREATE TABLE products (
     avg_cost DECIMAL(15, 2) NOT NULL DEFAULT 0,
     last_purchase_cost DECIMAL(15, 2),
     vat_rate DECIMAL(5, 2) DEFAULT 0,
-    on_hand INT NOT NULL DEFAULT 0,
     image_url VARCHAR(500),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -82,18 +81,5 @@ CREATE TABLE coupons (
     usage_limit INT,
     used_count INT DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE audit_logs (
-    id BIGSERIAL PRIMARY KEY,
-    entity_type VARCHAR(50) NOT NULL,
-    entity_id VARCHAR(50) NOT NULL,
-    action VARCHAR(50) NOT NULL,
-    old_status VARCHAR(50),
-    new_status VARCHAR(50),
-    reason TEXT,
-    payload_json JSONB,
-    actor_staff_id BIGINT REFERENCES staff(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

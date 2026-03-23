@@ -45,10 +45,6 @@ public class Product {
     @Builder.Default
     private BigDecimal vatRate = BigDecimal.ZERO;
 
-    @Column(name = "on_hand", nullable = false)
-    @Builder.Default
-    private Integer onHand = 0;
-
     @Column(name = "image_url")
     private String imageUrl;
 

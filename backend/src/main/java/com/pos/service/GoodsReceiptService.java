@@ -1,6 +1,7 @@
 package com.pos.service;
 
 import com.pos.dto.CreateGoodsReceiptDto;
+import com.pos.dto.GoodsReceiptResponseDTO;
 import com.pos.entity.GoodsReceipt;
 
 import java.util.List;
@@ -8,6 +9,6 @@ import java.util.List;
 public interface GoodsReceiptService {
     List<GoodsReceipt> getAllGoodsReceipts();
     GoodsReceipt getGoodsReceiptById(Long id);
-    GoodsReceipt createGoodsReceipt(CreateGoodsReceiptDto dto);
-    GoodsReceipt completeGoodsReceipt(Long id);
+    GoodsReceiptResponseDTO createGoodsReceipt(CreateGoodsReceiptDto dto);
+    GoodsReceiptResponseDTO completeGoodsReceipt(Long id);
 }

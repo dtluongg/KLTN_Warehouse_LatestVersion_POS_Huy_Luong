@@ -20,6 +20,11 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public List<ProductRepository.ProductStockByWarehouseProjection> getStockByWarehouse(Long warehouseId) {
+        return productRepository.findStockByWarehouseId(warehouseId);
+    }
+
+    @Override
     public Product getProductById(Long id) {
         return productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -41,7 +46,7 @@ public class ProductServiceImpl implements ProductService {
         product.setVatRate(productDetails.getVatRate());
         product.setIsActive(productDetails.getIsActive());
         
-        // Không cho phép user cập nhật trực tiếp `avgCost` hay `onHand` qua HTTP body
+        // Không cho phép user cập nhật trực tiếp `avgCost` qua HTTP body
         // product.setAvgCost(...) 
         
         if(productDetails.getCategory() != null) {

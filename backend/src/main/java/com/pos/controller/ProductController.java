@@ -1,6 +1,7 @@
 package com.pos.controller;
 
 import com.pos.entity.Product;
+import com.pos.repository.ProductRepository;
 import com.pos.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,12 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<List<Product>> getAllProducts() {
         return ResponseEntity.ok(productService.getAllProducts());
+    }
+
+    @GetMapping("/stock-by-warehouse")
+    public ResponseEntity<List<ProductRepository.ProductStockByWarehouseProjection>> getStockByWarehouse(
+            @RequestParam Long warehouseId) {
+        return ResponseEntity.ok(productService.getStockByWarehouse(warehouseId));
     }
 
     @GetMapping("/{id}")

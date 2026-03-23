@@ -13,10 +13,6 @@ public class CreateGoodsReceiptDto {
     private String note;
     private Long createdByStaffId;
 
-    private BigDecimal totalAmount;
-    private BigDecimal totalVat;
-    private BigDecimal totalAmountPayable;
-
     private List<GrItemDto> items;
 
     @Data

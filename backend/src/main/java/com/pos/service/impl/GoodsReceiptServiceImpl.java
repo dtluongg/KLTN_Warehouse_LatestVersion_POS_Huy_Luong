@@ -1,6 +1,7 @@
 package com.pos.service.impl;
 
 import com.pos.dto.CreateGoodsReceiptDto;
+import com.pos.dto.GoodsReceiptResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
@@ -42,7 +43,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
 
     @Override
     @Transactional
-    public GoodsReceipt createGoodsReceipt(CreateGoodsReceiptDto dto) {
+    public GoodsReceiptResponseDTO createGoodsReceipt(CreateGoodsReceiptDto dto) {
         PurchaseOrder po = poRepository.findById(dto.getPoId())
                 .orElseThrow(() -> new RuntimeException("PO not found"));
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
@@ -52,6 +53,23 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         Staff staff = staffRepository.findById(dto.getCreatedByStaffId())
                 .orElseThrow(() -> new RuntimeException("Staff not found"));
 
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal totalVat = BigDecimal.ZERO;
+
+        for (CreateGoodsReceiptDto.GrItemDto itemDto : dto.getItems()) {
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            BigDecimal lineTotal = itemDto.getUnitCost().multiply(BigDecimal.valueOf(itemDto.getReceivedQty()));
+            BigDecimal vatRate = product.getVatRate() == null ? BigDecimal.ZERO : product.getVatRate();
+            BigDecimal lineVat = lineTotal.multiply(vatRate).divide(BigDecimal.valueOf(100));
+
+            totalAmount = totalAmount.add(lineTotal);
+            totalVat = totalVat.add(lineVat);
+        }
+
+        BigDecimal totalAmountPayable = totalAmount.add(totalVat);
+
         GoodsReceipt gr = GoodsReceipt.builder()
                 .purchaseOrder(po)
                 .supplier(supplier)
@@ -59,9 +77,9 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
                 .receiptDate(LocalDate.now())
                 .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
-                .totalAmount(dto.getTotalAmount())
-                .totalVat(dto.getTotalVat())
-                .totalAmountPayable(dto.getTotalAmountPayable())
+                .totalAmount(totalAmount)
+                .totalVat(totalVat)
+                .totalAmountPayable(totalAmountPayable)
                 .createdBy(staff)
                 .build();
 
@@ -90,12 +108,12 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
             grItemRepository.save(item);
         }
 
-        return gr;
+        return toResponseDTO(gr);
     }
 
     @Override
     @Transactional
-    public GoodsReceipt completeGoodsReceipt(Long id) {
+    public GoodsReceiptResponseDTO completeGoodsReceipt(Long id) {
         GoodsReceipt gr = getGoodsReceiptById(id);
         
         if (gr.getStatus() == DocumentStatus.POSTED) {
@@ -114,7 +132,8 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
                 Product product = item.getProduct();
                 
                 // 2. Tính toán Moving Average Cost
-                BigDecimal oldQty = BigDecimal.valueOf(product.getOnHand());
+                BigDecimal oldQty = BigDecimal.valueOf(
+                    productRepository.calculateGlobalOnHandByProductId(product.getId()));
                 BigDecimal oldAvgCost = product.getAvgCost();
                 
                 BigDecimal receivedQty = BigDecimal.valueOf(item.getReceivedQty());
@@ -153,6 +172,17 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         po.setStatus(DocumentStatus.POSTED);
         poRepository.save(po);
 
-        return gr;
+        return toResponseDTO(gr);
+    }
+
+    private GoodsReceiptResponseDTO toResponseDTO(GoodsReceipt gr) {
+        GoodsReceiptResponseDTO res = new GoodsReceiptResponseDTO();
+        res.setId(gr.getId());
+        res.setGrNo(gr.getGrNo());
+        res.setStatus(gr.getStatus());
+        res.setTotalAmount(gr.getTotalAmount());
+        res.setTotalVat(gr.getTotalVat());
+        res.setTotalAmountPayable(gr.getTotalAmountPayable());
+        return res;
     }
 }

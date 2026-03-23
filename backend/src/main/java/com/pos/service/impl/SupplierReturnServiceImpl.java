@@ -1,6 +1,7 @@
 package com.pos.service.impl;
 
 import com.pos.dto.CreateSupplierReturnDto;
+import com.pos.dto.SupplierReturnResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
 import com.pos.enums.InventoryMovementType;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -41,7 +43,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
 
     @Override
     @Transactional
-    public SupplierReturn createSupplierReturn(CreateSupplierReturnDto dto) {
+    public SupplierReturnResponseDTO createSupplierReturn(CreateSupplierReturnDto dto) {
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
         Staff staff = staffRepository.findById(dto.getCreatedByStaffId())
@@ -54,6 +56,23 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             goodsReceipt = grRepository.findById(dto.getGoodsReceiptId()).orElse(null);
         }
 
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal totalVat = BigDecimal.ZERO;
+
+        for (CreateSupplierReturnDto.ReturnItemDto itemDto : dto.getItems()) {
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            BigDecimal lineAmount = itemDto.getReturnAmount();
+            BigDecimal vatRate = product.getVatRate() == null ? BigDecimal.ZERO : product.getVatRate();
+            BigDecimal lineVat = lineAmount.multiply(vatRate).divide(BigDecimal.valueOf(100));
+
+            totalAmount = totalAmount.add(lineAmount);
+            totalVat = totalVat.add(lineVat);
+        }
+
+        BigDecimal totalAmountPayable = totalAmount.add(totalVat);
+
         SupplierReturn sr = SupplierReturn.builder()
                 .supplier(supplier)
                 .goodsReceipt(goodsReceipt)
@@ -61,13 +80,15 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
                 .returnDate(LocalDate.now())
                 .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
-                .totalAmount(dto.getTotalAmount())
-                .totalVat(dto.getTotalVat())
-                .totalAmountPayable(dto.getTotalAmountPayable())
+                .totalAmount(totalAmount)
+                .totalVat(totalVat)
+                .totalAmountPayable(totalAmountPayable)
                 .createdBy(staff)
                 .build();
 
         srRepository.saveAndFlush(sr);
+        String generatedReturnNo = srRepository.findReturnNoById(sr.getId());
+        sr.setReturnNo(generatedReturnNo);
 
         for (CreateSupplierReturnDto.ReturnItemDto itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
@@ -90,12 +111,12 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             srItemRepository.save(item);
         }
 
-        return sr;
+        return toResponseDTO(sr);
     }
 
     @Override
     @Transactional
-    public SupplierReturn completeSupplierReturn(Long id) {
+    public SupplierReturnResponseDTO completeSupplierReturn(Long id) {
         SupplierReturn sr = getSupplierReturnById(id);
 
         if (sr.getStatus() == DocumentStatus.POSTED) {
@@ -125,6 +146,17 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             }
         }
 
-        return sr;
+        return toResponseDTO(sr);
+    }
+
+    private SupplierReturnResponseDTO toResponseDTO(SupplierReturn sr) {
+        SupplierReturnResponseDTO res = new SupplierReturnResponseDTO();
+        res.setId(sr.getId());
+        res.setReturnNo(sr.getReturnNo());
+        res.setStatus(sr.getStatus());
+        res.setTotalAmount(sr.getTotalAmount());
+        res.setTotalVat(sr.getTotalVat());
+        res.setTotalAmountPayable(sr.getTotalAmountPayable());
+        return res;
     }
 }

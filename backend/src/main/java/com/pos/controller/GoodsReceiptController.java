@@ -1,6 +1,7 @@
 package com.pos.controller;
 
 import com.pos.dto.CreateGoodsReceiptDto;
+import com.pos.dto.GoodsReceiptResponseDTO;
 import com.pos.entity.GoodsReceipt;
 import com.pos.service.GoodsReceiptService;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,12 @@ public class GoodsReceiptController {
     }
 
     @PostMapping
-    public ResponseEntity<GoodsReceipt> createReceipt(@RequestBody CreateGoodsReceiptDto dto) {
+    public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(@RequestBody CreateGoodsReceiptDto dto) {
         return ResponseEntity.ok(grService.createGoodsReceipt(dto));
     }
 
     @PostMapping("/{id}/complete")
-    public ResponseEntity<GoodsReceipt> completeReceipt(@PathVariable Long id) {
+    public ResponseEntity<GoodsReceiptResponseDTO> completeReceipt(@PathVariable Long id) {
         return ResponseEntity.ok(grService.completeGoodsReceipt(id));
     }
 }

@@ -13,9 +13,6 @@ public class CreatePurchaseOrderDto {
     private Long createdByStaffId;
     
     private Long warehouseId;
-    private BigDecimal totalAmount;
-    private BigDecimal totalVat;
-    private BigDecimal totalAmountPayable;
     
     private List<PoItemDto> items;
 

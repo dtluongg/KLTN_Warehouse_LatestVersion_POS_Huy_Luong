@@ -13,7 +13,6 @@ public class CreateCustomerReturnDto {
     private Long createdByStaffId;
 
     private Long warehouseId;
-    private BigDecimal totalRefund;
 
     private List<ReturnItemDto> items;
 

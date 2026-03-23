@@ -33,25 +33,24 @@ INSERT INTO suppliers (supplier_code, name, phone, tax_code, address, is_active)
 
 
 -- ═══════════════════════════ 5. SẢN PHẨM (products) ═════════════════════════
--- on_hand = 0 vì tồn kho sẽ được cập nhật qua inventory_movements trigger
-INSERT INTO products (sku, barcode, name, short_name, category_id, sale_price, avg_cost, vat_rate, on_hand, image_url, is_active) VALUES 
+INSERT INTO products (sku, barcode, name, short_name, category_id, sale_price, avg_cost, vat_rate, image_url, is_active) VALUES 
 ('NPK-PM-01', '8930000100010', 'Phân bón NPK Phú Mỹ 20-20-15 (Bao 50kg)', 'NPK Phú Mỹ', 
-  (SELECT id FROM categories WHERE slug = 'phan-bon'), 1550000, 1400000, 5, 0, 
+  (SELECT id FROM categories WHERE slug = 'phan-bon'), 1550000, 1400000, 5,
   'https://images.unsplash.com/photo-1628183204961-3315a0cbb0f1?w=800&q=80', true),
 ('RAD-60SC', '8930000200020', 'Thuốc trừ sâu sinh học Radiant 60SC (Chai 100ml)', 'Radiant 60SC', 
-  (SELECT id FROM categories WHERE slug = 'thuoc-bvtv'), 125000, 100000, 5, 0, 
+  (SELECT id FROM categories WHERE slug = 'thuoc-bvtv'), 125000, 100000, 5,
   'https://images.unsplash.com/photo-1584478335025-a136ebdb49c1?w=800&q=80', true),
 ('AA-LEAF', '8930000300030', 'Phân bón lá Amino Acid (Chai 500ml)', 'Amino Acid', 
-  (SELECT id FROM categories WHERE slug = 'phan-bon'), 85000, 60000, 5, 0, 
+  (SELECT id FROM categories WHERE slug = 'phan-bon'), 85000, 60000, 5,
   'https://plus.unsplash.com/premium_photo-1664110696956-61bd58e7ab2f?w=800&q=80', true),
 ('SEED-WM', '8930000400040', 'Hạt giống Dưa hấu Mặt trời đỏ (Gói 20g)', 'HG Dưa hấu', 
-  (SELECT id FROM categories WHERE slug = 'hat-giong'), 40000, 30000, 0, 0, 
+  (SELECT id FROM categories WHERE slug = 'hat-giong'), 40000, 30000, 0,
   'https://images.unsplash.com/photo-1587049352847-4d4b1ed7adbf?w=800&q=80', true),
 ('GLY-480', '8930000500050', 'Thuốc diệt cỏ lưu dẫn Glyphosate (Chai 1L)', 'Glyphosate', 
-  (SELECT id FROM categories WHERE slug = 'thuoc-bvtv'), 95000, 75000, 5, 0, 
+  (SELECT id FROM categories WHERE slug = 'thuoc-bvtv'), 95000, 75000, 5,
   'https://plus.unsplash.com/premium_photo-1678344161962-43bb2227d8db?w=800&q=80', true),
 ('KIM-BAM', '8930000600060', 'Kềm cắt cành Fujiya', 'Kềm cắt cành', 
-  (SELECT id FROM categories WHERE slug = 'dung-cu'), 250000, 180000, 10, 0, 
+  (SELECT id FROM categories WHERE slug = 'dung-cu'), 250000, 180000, 10,
   'https://images.unsplash.com/photo-1416879598056-cb82b0e79782?w=800&q=80', true);
 
 
@@ -112,7 +111,6 @@ INSERT INTO goods_receipt_items (gr_id, po_item_id, product_id, received_qty, un
 
 
 -- ═══════════════════════════ 9. INVENTORY MOVEMENTS (từ nhập hàng) ═══════════
--- Trigger update_inventory_on_hand sẽ tự động cộng on_hand khi INSERT movement
 INSERT INTO inventory_movements (product_id, warehouse_id, movement_type, qty, ref_table, ref_id, created_by) VALUES
 -- Từ GR#1
 ((SELECT id FROM products WHERE sku = 'NPK-PM-01'), 1, 'PURCHASE_IN', 150, 'goods_receipts', 'GR-SEED-001', 1),

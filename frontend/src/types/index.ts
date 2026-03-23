@@ -1,23 +1,23 @@
 export interface Staff {
-  id: number;
-  staffCode: string;
-  fullName: string;
-  username: string;
-  role: 'ADMIN' | 'SALES_STAFF' | 'WAREHOUSE_STAFF';
-  isActive: boolean;
+    id: number;
+    staffCode: string;
+    fullName: string;
+    username: string;
+    role: "ADMIN" | "SALES_STAFF" | "WAREHOUSE_STAFF";
+    isActive: boolean;
 }
 
 export interface AuthResponse {
-  token: string;
-  username: string;
-  role: string;
+    token: string;
+    username: string;
+    role: string;
 }
 
 export interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  isActive: boolean;
+    id: number;
+    name: string;
+    slug: string;
+    isActive: boolean;
 }
 
 export interface Product {
@@ -29,6 +29,5 @@ export interface Product {
     category: Category;
     salePrice: number;
     avgCost: number;
-    onHand: number;
     isActive: boolean;
 }

@@ -1,6 +1,7 @@
 package com.pos.service;
 
 import com.pos.dto.CreatePurchaseOrderDto;
+import com.pos.dto.PurchaseOrderResponseDTO;
 import com.pos.entity.PurchaseOrder;
 
 import java.util.List;
@@ -8,6 +9,6 @@ import java.util.List;
 public interface PurchaseOrderService {
     List<PurchaseOrder> getAllPurchaseOrders();
     PurchaseOrder getPurchaseOrderById(Long id);
-    PurchaseOrder createPurchaseOrder(CreatePurchaseOrderDto dto);
-    PurchaseOrder updateStatus(Long id, String newStatus);
+    PurchaseOrderResponseDTO createPurchaseOrder(CreatePurchaseOrderDto dto);
+    PurchaseOrderResponseDTO updateStatus(Long id, String newStatus);
 }

@@ -1,6 +1,7 @@
 package com.pos.service.impl;
 
 import com.pos.dto.CreateStockAdjustmentDto;
+import com.pos.dto.StockAdjustmentResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
@@ -36,7 +37,7 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
     @Override
     @Transactional
-    public StockAdjustment createAdjustment(CreateStockAdjustmentDto dto) {
+    public StockAdjustmentResponseDTO createAdjustment(CreateStockAdjustmentDto dto) {
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
         Staff staff = staffRepository.findById(dto.getCreatedByStaffId())
@@ -59,7 +60,8 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
-            int systemQty = product.getOnHand();
+            int systemQty = productRepository.calculateOnHandByWarehouseAndProductId(
+                warehouse.getId(), product.getId());
             int diffQty = itemDto.getActualQty() - systemQty;
 
             StockAdjustmentItem item = StockAdjustmentItem.builder()
@@ -74,12 +76,12 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
             adjustItemRepository.save(item);
         }
 
-        return adjust;
+        return toResponseDTO(adjust);
     }
 
     @Override
     @Transactional
-    public StockAdjustment completeAdjustment(Long id) {
+    public StockAdjustmentResponseDTO completeAdjustment(Long id) {
         StockAdjustment adjust = getAdjustmentById(id);
         
         if (adjust.getStatus() == DocumentStatus.POSTED) {
@@ -114,6 +116,14 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
                 movementRepository.save(act);
             }
         }
-        return adjust;
+        return toResponseDTO(adjust);
+    }
+
+    private StockAdjustmentResponseDTO toResponseDTO(StockAdjustment adjust) {
+        StockAdjustmentResponseDTO res = new StockAdjustmentResponseDTO();
+        res.setId(adjust.getId());
+        res.setAdjustNo(adjust.getAdjustNo());
+        res.setStatus(adjust.getStatus());
+        return res;
     }
 }

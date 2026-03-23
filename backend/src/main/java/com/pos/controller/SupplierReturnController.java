@@ -1,6 +1,7 @@
 package com.pos.controller;
 
 import com.pos.dto.CreateSupplierReturnDto;
+import com.pos.dto.SupplierReturnResponseDTO;
 import com.pos.entity.SupplierReturn;
 import com.pos.service.SupplierReturnService;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,12 @@ public class SupplierReturnController {
     }
 
     @PostMapping
-    public ResponseEntity<SupplierReturn> createReturn(@RequestBody CreateSupplierReturnDto dto) {
+    public ResponseEntity<SupplierReturnResponseDTO> createReturn(@RequestBody CreateSupplierReturnDto dto) {
         return ResponseEntity.ok(srService.createSupplierReturn(dto));
     }
 
     @PostMapping("/{id}/complete")
-    public ResponseEntity<SupplierReturn> completeReturn(@PathVariable Long id) {
+    public ResponseEntity<SupplierReturnResponseDTO> completeReturn(@PathVariable Long id) {
         return ResponseEntity.ok(srService.completeSupplierReturn(id));
     }
 }

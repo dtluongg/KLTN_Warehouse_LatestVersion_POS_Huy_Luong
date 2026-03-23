@@ -1,6 +1,7 @@
 package com.pos.service.impl;
 
 import com.pos.dto.CreatePurchaseOrderDto;
+import com.pos.dto.PurchaseOrderResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
@@ -38,7 +39,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     @Transactional
-    public PurchaseOrder createPurchaseOrder(CreatePurchaseOrderDto dto) {
+        public PurchaseOrderResponseDTO createPurchaseOrder(CreatePurchaseOrderDto dto) {
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
         Staff staff = staffRepository.findById(dto.getCreatedByStaffId())
@@ -48,6 +49,23 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null) 
                 : null;
 
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal totalVat = BigDecimal.ZERO;
+
+        for (CreatePurchaseOrderDto.PoItemDto itemDto : dto.getItems()) {
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            BigDecimal lineTotal = itemDto.getExpectedUnitCost().multiply(BigDecimal.valueOf(itemDto.getOrderedQty()));
+            BigDecimal vatRate = product.getVatRate() == null ? BigDecimal.ZERO : product.getVatRate();
+            BigDecimal lineVat = lineTotal.multiply(vatRate).divide(BigDecimal.valueOf(100));
+
+            totalAmount = totalAmount.add(lineTotal);
+            totalVat = totalVat.add(lineVat);
+        }
+
+        BigDecimal totalAmountPayable = totalAmount.add(totalVat);
+
         PurchaseOrder po = PurchaseOrder.builder()
                 .supplier(supplier)
                 .warehouse(warehouse)
@@ -55,9 +73,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .expectedDate(dto.getExpectedDate() != null ? LocalDate.parse(dto.getExpectedDate()) : null)
                 .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
-                .totalAmount(dto.getTotalAmount())
-                .totalVat(dto.getTotalVat())
-                .totalAmountPayable(dto.getTotalAmountPayable())
+                .totalAmount(totalAmount)
+                .totalVat(totalVat)
+                .totalAmountPayable(totalAmountPayable)
                 .createdBy(staff)
                 .build();
 
@@ -82,15 +100,26 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             poItemRepository.save(item);
         }
 
-        return po;
+                return toResponseDTO(po);
     }
 
     @Override
     @Transactional
-    public PurchaseOrder updateStatus(Long id, String newStatus) {
+        public PurchaseOrderResponseDTO updateStatus(Long id, String newStatus) {
         PurchaseOrder po = getPurchaseOrderById(id);
         // Có thể thêm logic lưu Audit Log ở đây khi change status
         po.setStatus(DocumentStatus.valueOf(newStatus));
-        return poRepository.save(po);
+                return toResponseDTO(poRepository.save(po));
     }
+
+        private PurchaseOrderResponseDTO toResponseDTO(PurchaseOrder po) {
+                PurchaseOrderResponseDTO res = new PurchaseOrderResponseDTO();
+                res.setId(po.getId());
+                res.setPoNo(po.getPoNo());
+                res.setStatus(po.getStatus());
+                res.setTotalAmount(po.getTotalAmount());
+                res.setTotalVat(po.getTotalVat());
+                res.setTotalAmountPayable(po.getTotalAmountPayable());
+                return res;
+        }
 }

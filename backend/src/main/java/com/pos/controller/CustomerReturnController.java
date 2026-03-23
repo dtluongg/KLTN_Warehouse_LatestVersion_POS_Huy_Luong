@@ -1,6 +1,7 @@
 package com.pos.controller;
 
 import com.pos.dto.CreateCustomerReturnDto;
+import com.pos.dto.CustomerReturnResponseDTO;
 import com.pos.entity.CustomerReturn;
 import com.pos.service.CustomerReturnService;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,12 @@ public class CustomerReturnController {
     }
 
     @PostMapping
-    public ResponseEntity<CustomerReturn> createReturn(@RequestBody CreateCustomerReturnDto dto) {
+    public ResponseEntity<CustomerReturnResponseDTO> createReturn(@RequestBody CreateCustomerReturnDto dto) {
         return ResponseEntity.ok(returnService.createCustomerReturn(dto));
     }
 
     @PostMapping("/{id}/complete")
-    public ResponseEntity<CustomerReturn> completeReturn(@PathVariable Long id) {
+    public ResponseEntity<CustomerReturnResponseDTO> completeReturn(@PathVariable Long id) {
         return ResponseEntity.ok(returnService.completeCustomerReturn(id));
     }
 }

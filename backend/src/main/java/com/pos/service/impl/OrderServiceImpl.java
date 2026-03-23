@@ -8,8 +8,11 @@ import com.pos.enums.OrderStatus;
 import com.pos.enums.PaymentMethod;
 import com.pos.enums.SalesChannel;
 import com.pos.repository.*;
+import com.pos.security.CustomUserDetails;
 import com.pos.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +29,6 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
-    private final StaffRepository staffRepository;
     private final InventoryMovementRepository movementRepository;
     private final WarehouseRepository warehouseRepository;
 
@@ -44,15 +46,17 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponseDTO createOrder(OrderRequestDTO req) {
-        // Lấy Staff mặc định (Trong thực tế sẽ parse JWT Token)
-        Staff staff = staffRepository.findAll().stream().findFirst()
-                .orElseThrow(() -> new RuntimeException("No staff found in system"));
+                Staff staff = getAuthenticatedStaff();
 
         Customer customer = null;
         if (req.getCustomerId() != null) {
             customer = customerRepository.findById(req.getCustomerId())
                     .orElseThrow(() -> new RuntimeException("Customer not found"));
         }
+
+                if (req.getPaymentMethod() == PaymentMethod.DEBT && customer == null) {
+                        throw new RuntimeException("Customer is required for DEBT payment");
+                }
 
         // Lấy kho từ request (bắt buộc)
         Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
@@ -143,4 +147,12 @@ public class OrderServiceImpl implements OrderService {
 
         return res;
     }
+
+        private Staff getAuthenticatedStaff() {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                        throw new RuntimeException("Unauthenticated request");
+                }
+                return userDetails.getStaff();
+        }
 }

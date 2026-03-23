@@ -1,6 +1,7 @@
 package com.pos.service.impl;
 
 import com.pos.dto.CreateCustomerReturnDto;
+import com.pos.dto.CustomerReturnResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.*;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -40,7 +42,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
 
     @Override
     @Transactional
-    public CustomerReturn createCustomerReturn(CreateCustomerReturnDto dto) {
+    public CustomerReturnResponseDTO createCustomerReturn(CreateCustomerReturnDto dto) {
         Customer customer = customerRepository.findById(UUID.fromString(dto.getCustomerId()))
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
         Staff staff = staffRepository.findById(dto.getCreatedByStaffId())
@@ -54,6 +56,11 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
 
+        BigDecimal totalRefund = BigDecimal.ZERO;
+        for (CreateCustomerReturnDto.ReturnItemDto itemDto : dto.getItems()) {
+            totalRefund = totalRefund.add(itemDto.getRefundAmount());
+        }
+
         CustomerReturn cr = CustomerReturn.builder()
                 .customer(customer)
                 .order(order)
@@ -61,7 +68,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 .returnDate(LocalDate.now())
                 .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
-                .totalRefund(dto.getTotalRefund())
+                .totalRefund(totalRefund)
                 .createdBy(staff)
                 .build();
 
@@ -89,12 +96,12 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
             crItemRepository.save(item);
         }
 
-        return cr;
+        return toResponseDTO(cr);
     }
 
     @Override
     @Transactional
-    public CustomerReturn completeCustomerReturn(Long id) {
+    public CustomerReturnResponseDTO completeCustomerReturn(Long id) {
         CustomerReturn cr = getCustomerReturnById(id);
         
         if (cr.getStatus() == DocumentStatus.POSTED) {
@@ -129,6 +136,15 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 movementRepository.save(act);
             }
         }
-        return cr;
+        return toResponseDTO(cr);
+    }
+
+    private CustomerReturnResponseDTO toResponseDTO(CustomerReturn cr) {
+        CustomerReturnResponseDTO res = new CustomerReturnResponseDTO();
+        res.setId(cr.getId());
+        res.setReturnNo(cr.getReturnNo());
+        res.setStatus(cr.getStatus());
+        res.setTotalRefund(cr.getTotalRefund());
+        return res;
     }
 }
