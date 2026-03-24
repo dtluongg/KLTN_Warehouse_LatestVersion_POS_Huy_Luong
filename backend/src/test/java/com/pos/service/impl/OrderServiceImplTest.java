@@ -81,7 +81,7 @@ class OrderServiceImplTest {
 
         when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
-        when(couponRepository.findByCode("INVALID")).thenReturn(Optional.empty());
+        when(couponRepository.findByCodeAndDeletedAtIsNull("INVALID")).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> service.createOrder(req));
     }
@@ -111,7 +111,7 @@ class OrderServiceImplTest {
 
         when(warehouseRepository.findById(1L)).thenReturn(Optional.of(warehouse));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
-        when(couponRepository.findByCode("SAVE10")).thenReturn(Optional.of(coupon));
+        when(couponRepository.findByCodeAndDeletedAtIsNull("SAVE10")).thenReturn(Optional.of(coupon));
         when(orderRepository.findOrderNoById(1L)).thenReturn("SO-0001");
         when(orderItemRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -138,7 +138,7 @@ class OrderServiceImplTest {
 
     @Test
     void previewCoupon_shouldReturnInvalidWhenNotFound() {
-        when(couponRepository.findByCode("NOTFOUND")).thenReturn(Optional.empty());
+        when(couponRepository.findByCodeAndDeletedAtIsNull("NOTFOUND")).thenReturn(Optional.empty());
 
         CouponPreviewResponseDTO response = service.previewCoupon("NOTFOUND", new BigDecimal("200"));
 
