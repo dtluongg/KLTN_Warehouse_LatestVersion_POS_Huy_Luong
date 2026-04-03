@@ -32,6 +32,11 @@ const HomeScreen = () => {
             route: "GoodsReceipt",
             icon: "download" as const,
         },
+        {
+            label: "AI Chat SQL",
+            route: "AiSqlChat",
+            icon: "message-circle" as const,
+        },
     ];
 
     return (

@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Data
-public class CreateGoodsReceiptDto {
+public class GoodsReceiptRequestDTO {
     private String grNo;
     private Long poId;
     private String supplierId;
@@ -13,10 +13,10 @@ public class CreateGoodsReceiptDto {
     private String note;
     private Long createdByStaffId;
 
-    private List<GrItemDto> items;
+    private List<GrItemRequestDTO> items;
 
     @Data
-    public static class GrItemDto {
+    public static class GrItemRequestDTO {
         private Long poItemId;
         private Long productId;
         private Integer receivedQty;

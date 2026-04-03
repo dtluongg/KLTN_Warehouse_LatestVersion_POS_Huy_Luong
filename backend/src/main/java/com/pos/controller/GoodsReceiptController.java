@@ -1,6 +1,6 @@
 package com.pos.controller;
 
-import com.pos.dto.CreateGoodsReceiptDto;
+import com.pos.dto.GoodsReceiptRequestDTO;
 import com.pos.dto.GoodsReceiptResponseDTO;
 import com.pos.entity.GoodsReceipt;
 import com.pos.service.GoodsReceiptService;
@@ -30,13 +30,13 @@ public class GoodsReceiptController {
     }
 
     @PostMapping
-    public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(@RequestBody CreateGoodsReceiptDto dto) {
+    public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(@RequestBody GoodsReceiptRequestDTO dto) {
         return ResponseEntity.ok(grService.createGoodsReceipt(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<GoodsReceiptResponseDTO> updateDraftReceipt(@PathVariable Long id,
-                                                                       @RequestBody CreateGoodsReceiptDto dto) {
+                                                                       @RequestBody GoodsReceiptRequestDTO dto) {
         return ResponseEntity.ok(grService.updateDraftGoodsReceipt(id, dto));
     }
 

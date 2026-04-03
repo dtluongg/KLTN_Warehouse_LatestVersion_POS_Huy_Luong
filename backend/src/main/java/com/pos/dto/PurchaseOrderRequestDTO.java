@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Data
-public class CreatePurchaseOrderDto {
+public class PurchaseOrderRequestDTO {
     private String poNo;
     private String supplierId;
     private String expectedDate;
@@ -14,10 +14,10 @@ public class CreatePurchaseOrderDto {
     
     private Long warehouseId;
     
-    private List<PoItemDto> items;
+    private List<PoItemRequestDTO> items;
 
     @Data
-    public static class PoItemDto {
+    public static class PoItemRequestDTO {
         private Long productId;
         private Integer orderedQty;
         private BigDecimal expectedUnitCost;

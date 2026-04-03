@@ -1,6 +1,6 @@
 package com.pos.controller;
 
-import com.pos.dto.CreateStockAdjustmentDto;
+import com.pos.dto.StockAdjustmentRequestDTO;
 import com.pos.dto.StockAdjustmentResponseDTO;
 import com.pos.entity.StockAdjustment;
 import com.pos.service.StockAdjustmentService;
@@ -30,13 +30,13 @@ public class StockAdjustmentController {
     }
 
     @PostMapping
-    public ResponseEntity<StockAdjustmentResponseDTO> createAdjustment(@RequestBody CreateStockAdjustmentDto dto) {
+    public ResponseEntity<StockAdjustmentResponseDTO> createAdjustment(@RequestBody StockAdjustmentRequestDTO dto) {
         return ResponseEntity.ok(adjustService.createAdjustment(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<StockAdjustmentResponseDTO> updateDraftAdjustment(@PathVariable Long id,
-                                                                             @RequestBody CreateStockAdjustmentDto dto) {
+                                                                             @RequestBody StockAdjustmentRequestDTO dto) {
         return ResponseEntity.ok(adjustService.updateDraftAdjustment(id, dto));
     }
 

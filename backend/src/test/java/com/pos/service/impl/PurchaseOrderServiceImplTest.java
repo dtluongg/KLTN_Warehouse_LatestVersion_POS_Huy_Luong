@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreatePurchaseOrderDto;
+import com.pos.dto.PurchaseOrderRequestDTO;
 import com.pos.entity.PurchaseOrder;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.ProductRepository;
@@ -43,8 +43,8 @@ class PurchaseOrderServiceImplTest {
 
     @Test
     void updateDraftPurchaseOrder_shouldRejectWhenNotDraft() {
-        CreatePurchaseOrderDto dto = new CreatePurchaseOrderDto();
-        CreatePurchaseOrderDto.PoItemDto item = new CreatePurchaseOrderDto.PoItemDto();
+        PurchaseOrderRequestDTO dto = new PurchaseOrderRequestDTO();
+        PurchaseOrderRequestDTO.PoItemRequestDTO item = new PurchaseOrderRequestDTO.PoItemRequestDTO();
         item.setProductId(1L);
         item.setOrderedQty(1);
         item.setExpectedUnitCost(BigDecimal.ONE);

@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateCustomerReturnDto;
+import com.pos.dto.CustomerReturnRequestDTO;
 import com.pos.dto.CustomerReturnResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
@@ -42,7 +42,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
 
     @Override
     @Transactional
-    public CustomerReturnResponseDTO createCustomerReturn(CreateCustomerReturnDto dto) {
+    public CustomerReturnResponseDTO createCustomerReturn(CustomerReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
         Customer customer = customerRepository.findById(UUID.fromString(dto.getCustomerId()))
@@ -75,7 +75,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         String generatedReturnNo = crRepository.findReturnNoById(cr.getId());
         cr.setReturnNo(generatedReturnNo);
         
-        for (CreateCustomerReturnDto.ReturnItemDto itemDto : dto.getItems()) {
+        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -100,7 +100,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
 
     @Override
     @Transactional
-    public CustomerReturnResponseDTO updateDraftCustomerReturn(Long id, CreateCustomerReturnDto dto) {
+    public CustomerReturnResponseDTO updateDraftCustomerReturn(Long id, CustomerReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
         CustomerReturn cr = getCustomerReturnById(id);
@@ -126,7 +126,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         cr.setTotalRefund(calculateTotalRefund(dto.getItems()));
 
         crItemRepository.deleteByCustomerReturnId(cr.getId());
-        for (CreateCustomerReturnDto.ReturnItemDto itemDto : dto.getItems()) {
+        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -184,11 +184,11 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         return toResponseDTO(cr);
     }
 
-    private void validateItemList(List<CreateCustomerReturnDto.ReturnItemDto> items) {
+    private void validateItemList(List<CustomerReturnRequestDTO.ReturnItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Customer return items are required");
         }
-        for (CreateCustomerReturnDto.ReturnItemDto itemDto : items) {
+        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
             if (itemDto.getQty() == null || itemDto.getQty() <= 0) {
                 throw new RuntimeException("qty must be greater than 0");
             }
@@ -198,9 +198,9 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         }
     }
 
-    private BigDecimal calculateTotalRefund(List<CreateCustomerReturnDto.ReturnItemDto> items) {
+    private BigDecimal calculateTotalRefund(List<CustomerReturnRequestDTO.ReturnItemRequestDTO> items) {
         BigDecimal totalRefund = BigDecimal.ZERO;
-        for (CreateCustomerReturnDto.ReturnItemDto itemDto : items) {
+        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
             totalRefund = totalRefund.add(itemDto.getRefundAmount());
         }
         return totalRefund;

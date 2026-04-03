@@ -23,6 +23,7 @@ import CategoryListScreen from "../screens/CategoryListScreen";
 import CouponListScreen from "../screens/CouponListScreen";
 import StaffListScreen from "../screens/StaffListScreen";
 import WarehouseListScreen from "../screens/WarehouseListScreen";
+import AiSqlChatScreen from "../screens/AiSqlChatScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -137,6 +138,11 @@ export default function AppNavigator() {
                             name="Warehouse"
                             component={WarehouseListScreen}
                             options={{ title: "Kho hàng" }}
+                        />
+                        <Stack.Screen
+                            name="AiSqlChat"
+                            component={AiSqlChatScreen}
+                            options={{ title: "AI Chat SQL" }}
                         />
                     </>
                 )}

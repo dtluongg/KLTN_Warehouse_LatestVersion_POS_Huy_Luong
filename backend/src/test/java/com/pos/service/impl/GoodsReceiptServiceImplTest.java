@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateGoodsReceiptDto;
+import com.pos.dto.GoodsReceiptRequestDTO;
 import com.pos.entity.GoodsReceipt;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.GoodsReceiptItemRepository;
@@ -52,8 +52,8 @@ class GoodsReceiptServiceImplTest {
 
     @Test
     void updateDraftGoodsReceipt_shouldRejectWhenNotDraft() {
-        CreateGoodsReceiptDto dto = new CreateGoodsReceiptDto();
-        CreateGoodsReceiptDto.GrItemDto item = new CreateGoodsReceiptDto.GrItemDto();
+        GoodsReceiptRequestDTO dto = new GoodsReceiptRequestDTO();
+        GoodsReceiptRequestDTO.GrItemRequestDTO item = new GoodsReceiptRequestDTO.GrItemRequestDTO();
         item.setProductId(1L);
         item.setReceivedQty(1);
         item.setUnitCost(BigDecimal.ONE);

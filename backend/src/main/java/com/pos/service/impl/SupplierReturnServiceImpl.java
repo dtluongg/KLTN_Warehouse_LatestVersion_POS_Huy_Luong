@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateSupplierReturnDto;
+import com.pos.dto.SupplierReturnRequestDTO;
 import com.pos.dto.SupplierReturnResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
@@ -43,7 +43,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
 
     @Override
     @Transactional
-    public SupplierReturnResponseDTO createSupplierReturn(CreateSupplierReturnDto dto) {
+    public SupplierReturnResponseDTO createSupplierReturn(SupplierReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
@@ -77,7 +77,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         String generatedReturnNo = srRepository.findReturnNoById(sr.getId());
         sr.setReturnNo(generatedReturnNo);
 
-        for (CreateSupplierReturnDto.ReturnItemDto itemDto : dto.getItems()) {
+        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -103,7 +103,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
 
     @Override
     @Transactional
-    public SupplierReturnResponseDTO updateDraftSupplierReturn(Long id, CreateSupplierReturnDto dto) {
+    public SupplierReturnResponseDTO updateDraftSupplierReturn(Long id, SupplierReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
         SupplierReturn sr = getSupplierReturnById(id);
@@ -132,7 +132,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         sr.setTotalAmountPayable(totals.totalAmountPayable);
 
         srItemRepository.deleteBySupplierReturnId(sr.getId());
-        for (CreateSupplierReturnDto.ReturnItemDto itemDto : dto.getItems()) {
+        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -190,11 +190,11 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         return toResponseDTO(sr);
     }
 
-    private void validateItemList(List<CreateSupplierReturnDto.ReturnItemDto> items) {
+    private void validateItemList(List<SupplierReturnRequestDTO.ReturnItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Supplier return items are required");
         }
-        for (CreateSupplierReturnDto.ReturnItemDto itemDto : items) {
+        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
             if (itemDto.getQty() == null || itemDto.getQty() <= 0) {
                 throw new RuntimeException("qty must be greater than 0");
             }
@@ -204,11 +204,11 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         }
     }
 
-    private Totals calculateTotals(List<CreateSupplierReturnDto.ReturnItemDto> items) {
+    private Totals calculateTotals(List<SupplierReturnRequestDTO.ReturnItemRequestDTO> items) {
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalVat = BigDecimal.ZERO;
 
-        for (CreateSupplierReturnDto.ReturnItemDto itemDto : items) {
+        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 

@@ -1,7 +1,10 @@
 package com.pos.dto;
 
 import com.pos.enums.PaymentMethod;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -15,5 +18,15 @@ public class OrderRequestDTO {
     private BigDecimal surchargeAmount;
     private PaymentMethod paymentMethod;
     private String note;
-    private List<OrderItemRequestDTO> items;
+    private List<ItemRequestDTO> items;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ItemRequestDTO {
+        private Long productId;
+        private Integer quantity;
+        private BigDecimal salePrice;
+    }
 }

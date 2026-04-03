@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateStockAdjustmentDto;
+import com.pos.dto.StockAdjustmentRequestDTO;
 import com.pos.dto.StockAdjustmentResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
@@ -37,7 +37,7 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
     @Override
     @Transactional
-    public StockAdjustmentResponseDTO createAdjustment(CreateStockAdjustmentDto dto) {
+    public StockAdjustmentResponseDTO createAdjustment(StockAdjustmentRequestDTO dto) {
         validateItemList(dto.getItems());
 
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
@@ -58,7 +58,7 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
         String generatedAdjustNo = adjustRepository.findAdjustNoById(adjust.getId());
         adjust.setAdjustNo(generatedAdjustNo);
         
-        for (CreateStockAdjustmentDto.AdjustmentItemDto itemDto : dto.getItems()) {
+        for (StockAdjustmentRequestDTO.AdjustmentItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -83,7 +83,7 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
     @Override
     @Transactional
-    public StockAdjustmentResponseDTO updateDraftAdjustment(Long id, CreateStockAdjustmentDto dto) {
+    public StockAdjustmentResponseDTO updateDraftAdjustment(Long id, StockAdjustmentRequestDTO dto) {
         validateItemList(dto.getItems());
 
         StockAdjustment adjust = getAdjustmentById(id);
@@ -99,7 +99,7 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
         adjust.setNote(dto.getNote());
 
         adjustItemRepository.deleteByAdjustmentId(adjust.getId());
-        for (CreateStockAdjustmentDto.AdjustmentItemDto itemDto : dto.getItems()) {
+        for (StockAdjustmentRequestDTO.AdjustmentItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -166,11 +166,11 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
         return toResponseDTO(adjust);
     }
 
-    private void validateItemList(List<CreateStockAdjustmentDto.AdjustmentItemDto> items) {
+    private void validateItemList(List<StockAdjustmentRequestDTO.AdjustmentItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Stock adjustment items are required");
         }
-        for (CreateStockAdjustmentDto.AdjustmentItemDto itemDto : items) {
+        for (StockAdjustmentRequestDTO.AdjustmentItemRequestDTO itemDto : items) {
             if (itemDto.getActualQty() == null || itemDto.getActualQty() < 0) {
                 throw new RuntimeException("actualQty must be >= 0");
             }

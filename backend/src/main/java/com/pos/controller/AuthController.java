@@ -1,7 +1,7 @@
 package com.pos.controller;
 
-import com.pos.dto.AuthRequest;
-import com.pos.dto.AuthResponse;
+import com.pos.dto.AuthRequestDTO;
+import com.pos.dto.AuthResponseDTO;
 import com.pos.security.CustomUserDetails;
 import com.pos.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ public class AuthController {
     private final JwtTokenProvider tokenProvider;
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> authenticateUser(@RequestBody AuthRequest loginRequest) {
+    public ResponseEntity<AuthResponseDTO> authenticateUser(@RequestBody AuthRequestDTO loginRequest) {
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -35,7 +35,7 @@ public class AuthController {
         String jwt = tokenProvider.generateToken(authentication);
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
-        return ResponseEntity.ok(AuthResponse.builder()
+        return ResponseEntity.ok(AuthResponseDTO.builder()
                 .token(jwt)
                 .username(userDetails.getUsername())
                 .role(userDetails.getStaff().getRole())

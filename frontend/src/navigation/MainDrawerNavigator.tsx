@@ -21,6 +21,7 @@ import ProductListScreen from "../screens/ProductListScreen";
 import CategoryListScreen from "../screens/CategoryListScreen";
 import CouponListScreen from "../screens/CouponListScreen";
 import StaffListScreen from "../screens/StaffListScreen";
+import AiSqlChatScreen from "../screens/AiSqlChatScreen";
 import { BREAKPOINTS } from "../utils/responsive";
 
 const Drawer = createDrawerNavigator();
@@ -138,6 +139,13 @@ export default function MainDrawerNavigator() {
                 name="Warehouse"
                 component={WarehouseListScreen}
                 options={{ title: "Kho hàng" }}
+            />
+
+            {/* ── AI & HỖ TRỢ ── */}
+            <Drawer.Screen
+                name="AiSqlChat"
+                component={AiSqlChatScreen}
+                options={{ title: "AI Chat SQL" }}
             />
         </Drawer.Navigator>
     );

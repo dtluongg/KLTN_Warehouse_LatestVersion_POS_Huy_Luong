@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateGoodsReceiptDto;
+import com.pos.dto.GoodsReceiptRequestDTO;
 import com.pos.dto.GoodsReceiptResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
@@ -43,7 +43,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
 
     @Override
     @Transactional
-    public GoodsReceiptResponseDTO createGoodsReceipt(CreateGoodsReceiptDto dto) {
+    public GoodsReceiptResponseDTO createGoodsReceipt(GoodsReceiptRequestDTO dto) {
         PurchaseOrder po = poRepository.findById(dto.getPoId())
                 .orElseThrow(() -> new RuntimeException("PO not found"));
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
@@ -73,7 +73,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         String generatedGrNo = grRepository.findGrNoById(gr.getId());
         gr.setGrNo(generatedGrNo);
         
-        for (CreateGoodsReceiptDto.GrItemDto itemDto : dto.getItems()) {
+        for (GoodsReceiptRequestDTO.GrItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -99,7 +99,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
 
     @Override
     @Transactional
-    public GoodsReceiptResponseDTO updateDraftGoodsReceipt(Long id, CreateGoodsReceiptDto dto) {
+    public GoodsReceiptResponseDTO updateDraftGoodsReceipt(Long id, GoodsReceiptRequestDTO dto) {
         validateItemList(dto.getItems());
 
         GoodsReceipt gr = getGoodsReceiptById(id);
@@ -125,7 +125,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         gr.setTotalAmountPayable(totals.totalAmountPayable);
 
         grItemRepository.deleteByGoodsReceiptId(gr.getId());
-        for (CreateGoodsReceiptDto.GrItemDto itemDto : dto.getItems()) {
+        for (GoodsReceiptRequestDTO.GrItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -213,11 +213,11 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         return toResponseDTO(gr);
     }
 
-    private Totals calculateTotals(List<CreateGoodsReceiptDto.GrItemDto> items) {
+    private Totals calculateTotals(List<GoodsReceiptRequestDTO.GrItemRequestDTO> items) {
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalVat = BigDecimal.ZERO;
 
-        for (CreateGoodsReceiptDto.GrItemDto itemDto : items) {
+        for (GoodsReceiptRequestDTO.GrItemRequestDTO itemDto : items) {
             if (itemDto.getReceivedQty() == null || itemDto.getReceivedQty() <= 0) {
                 throw new RuntimeException("receivedQty must be greater than 0");
             }
@@ -239,7 +239,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         return new Totals(totalAmount, totalVat, totalAmount.add(totalVat));
     }
 
-    private void validateItemList(List<CreateGoodsReceiptDto.GrItemDto> items) {
+    private void validateItemList(List<GoodsReceiptRequestDTO.GrItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Goods receipt items are required");
         }

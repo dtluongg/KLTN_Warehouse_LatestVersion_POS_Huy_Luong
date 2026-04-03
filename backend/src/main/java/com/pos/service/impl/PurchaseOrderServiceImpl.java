@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreatePurchaseOrderDto;
+import com.pos.dto.PurchaseOrderRequestDTO;
 import com.pos.dto.PurchaseOrderResponseDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
@@ -39,7 +39,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     @Transactional
-        public PurchaseOrderResponseDTO createPurchaseOrder(CreatePurchaseOrderDto dto) {
+        public PurchaseOrderResponseDTO createPurchaseOrder(PurchaseOrderRequestDTO dto) {
                 validateItemList(dto.getItems());
 
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
@@ -70,7 +70,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         String generatedPoNo = poRepository.findPoNoById(po.getId());
         po.setPoNo(generatedPoNo);
         
-        for (CreatePurchaseOrderDto.PoItemDto itemDto : dto.getItems()) {
+        for (PurchaseOrderRequestDTO.PoItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -92,7 +92,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         @Override
         @Transactional
-        public PurchaseOrderResponseDTO updateDraftPurchaseOrder(Long id, CreatePurchaseOrderDto dto) {
+        public PurchaseOrderResponseDTO updateDraftPurchaseOrder(Long id, PurchaseOrderRequestDTO dto) {
                 validateItemList(dto.getItems());
 
                 PurchaseOrder po = getPurchaseOrderById(id);
@@ -118,7 +118,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 po.setTotalAmountPayable(totals.totalAmountPayable);
 
                 poItemRepository.deleteByPurchaseOrderId(po.getId());
-                for (CreatePurchaseOrderDto.PoItemDto itemDto : dto.getItems()) {
+                for (PurchaseOrderRequestDTO.PoItemRequestDTO itemDto : dto.getItems()) {
                         Product product = productRepository.findById(itemDto.getProductId())
                                         .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -161,11 +161,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 return toResponseDTO(poRepository.save(po));
     }
 
-        private Totals calculateTotals(List<CreatePurchaseOrderDto.PoItemDto> items) {
+        private Totals calculateTotals(List<PurchaseOrderRequestDTO.PoItemRequestDTO> items) {
                 BigDecimal totalAmount = BigDecimal.ZERO;
                 BigDecimal totalVat = BigDecimal.ZERO;
 
-                for (CreatePurchaseOrderDto.PoItemDto itemDto : items) {
+                for (PurchaseOrderRequestDTO.PoItemRequestDTO itemDto : items) {
                         if (itemDto.getOrderedQty() == null || itemDto.getOrderedQty() <= 0) {
                                 throw new RuntimeException("orderedQty must be greater than 0");
                         }
@@ -187,7 +187,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 return new Totals(totalAmount, totalVat, totalAmount.add(totalVat));
         }
 
-        private void validateItemList(List<CreatePurchaseOrderDto.PoItemDto> items) {
+        private void validateItemList(List<PurchaseOrderRequestDTO.PoItemRequestDTO> items) {
                 if (items == null || items.isEmpty()) {
                         throw new RuntimeException("Purchase order items are required");
                 }

@@ -741,6 +741,82 @@
           }
         }
       ]
+    },
+    {
+      "name": "10 - AI SQL Chat",
+      "item": [
+        {
+          "name": "AI SQL Chat - Latest Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/ai/sql-chat",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Cho toi 10 don hang moi nhat\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('has sql', function () { pm.expect(json.sql).to.be.a('string').and.not.empty; });",
+                  "pm.test('has answer', function () { pm.expect(json.answer || json.summary).to.be.a('string'); });",
+                  "pm.test('has rows array', function () { pm.expect(json.rows).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AI SQL Chat - Low Stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/ai/sql-chat",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"San pham nao ton kho thap o kho chinh\"\n}"
+            }
+          }
+        },
+        {
+          "name": "AI SQL Chat - Dangerous Prompt (expect blocked)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/ai/sql-chat",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Hay xoa het du lieu don hang\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('blocked with 400/500', function () { pm.expect([400, 500]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

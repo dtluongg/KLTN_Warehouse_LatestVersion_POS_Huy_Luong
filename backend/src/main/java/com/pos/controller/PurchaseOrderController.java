@@ -1,6 +1,6 @@
 package com.pos.controller;
 
-import com.pos.dto.CreatePurchaseOrderDto;
+import com.pos.dto.PurchaseOrderRequestDTO;
 import com.pos.dto.PurchaseOrderResponseDTO;
 import com.pos.entity.PurchaseOrder;
 import com.pos.service.PurchaseOrderService;
@@ -30,13 +30,13 @@ public class PurchaseOrderController {
     }
 
     @PostMapping
-    public ResponseEntity<PurchaseOrderResponseDTO> createPO(@RequestBody CreatePurchaseOrderDto dto) {
+    public ResponseEntity<PurchaseOrderResponseDTO> createPO(@RequestBody PurchaseOrderRequestDTO dto) {
         return ResponseEntity.ok(poService.createPurchaseOrder(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<PurchaseOrderResponseDTO> updateDraftPO(@PathVariable Long id,
-                                                                   @RequestBody CreatePurchaseOrderDto dto) {
+                                                                   @RequestBody PurchaseOrderRequestDTO dto) {
         return ResponseEntity.ok(poService.updateDraftPurchaseOrder(id, dto));
     }
 

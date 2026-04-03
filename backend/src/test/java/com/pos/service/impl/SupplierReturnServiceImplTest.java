@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateSupplierReturnDto;
+import com.pos.dto.SupplierReturnRequestDTO;
 import com.pos.entity.SupplierReturn;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.GoodsReceiptItemRepository;
@@ -52,8 +52,8 @@ class SupplierReturnServiceImplTest {
 
     @Test
     void updateDraftSupplierReturn_shouldRejectWhenNotDraft() {
-        CreateSupplierReturnDto dto = new CreateSupplierReturnDto();
-        CreateSupplierReturnDto.ReturnItemDto item = new CreateSupplierReturnDto.ReturnItemDto();
+        SupplierReturnRequestDTO dto = new SupplierReturnRequestDTO();
+        SupplierReturnRequestDTO.ReturnItemRequestDTO item = new SupplierReturnRequestDTO.ReturnItemRequestDTO();
         item.setProductId(1L);
         item.setQty(1);
         item.setReturnAmount(BigDecimal.ONE);

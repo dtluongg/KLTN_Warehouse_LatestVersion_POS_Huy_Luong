@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateStockAdjustmentDto;
+import com.pos.dto.StockAdjustmentRequestDTO;
 import com.pos.entity.StockAdjustment;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.InventoryMovementRepository;
@@ -42,8 +42,8 @@ class StockAdjustmentServiceImplTest {
 
     @Test
     void updateDraftAdjustment_shouldRejectWhenNotDraft() {
-        CreateStockAdjustmentDto dto = new CreateStockAdjustmentDto();
-        CreateStockAdjustmentDto.AdjustmentItemDto item = new CreateStockAdjustmentDto.AdjustmentItemDto();
+        StockAdjustmentRequestDTO dto = new StockAdjustmentRequestDTO();
+        StockAdjustmentRequestDTO.AdjustmentItemRequestDTO item = new StockAdjustmentRequestDTO.AdjustmentItemRequestDTO();
         item.setProductId(1L);
         item.setActualQty(1);
         dto.setItems(List.of(item));

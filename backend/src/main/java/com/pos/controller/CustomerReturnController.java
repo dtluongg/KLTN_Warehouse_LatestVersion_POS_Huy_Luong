@@ -1,6 +1,6 @@
 package com.pos.controller;
 
-import com.pos.dto.CreateCustomerReturnDto;
+import com.pos.dto.CustomerReturnRequestDTO;
 import com.pos.dto.CustomerReturnResponseDTO;
 import com.pos.entity.CustomerReturn;
 import com.pos.service.CustomerReturnService;
@@ -30,13 +30,13 @@ public class CustomerReturnController {
     }
 
     @PostMapping
-    public ResponseEntity<CustomerReturnResponseDTO> createReturn(@RequestBody CreateCustomerReturnDto dto) {
+    public ResponseEntity<CustomerReturnResponseDTO> createReturn(@RequestBody CustomerReturnRequestDTO dto) {
         return ResponseEntity.ok(returnService.createCustomerReturn(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CustomerReturnResponseDTO> updateDraftReturn(@PathVariable Long id,
-                                                                        @RequestBody CreateCustomerReturnDto dto) {
+                                                                        @RequestBody CustomerReturnRequestDTO dto) {
         return ResponseEntity.ok(returnService.updateDraftCustomerReturn(id, dto));
     }
 

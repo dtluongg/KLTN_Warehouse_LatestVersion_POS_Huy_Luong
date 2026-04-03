@@ -1,6 +1,6 @@
 package com.pos.controller;
 
-import com.pos.dto.CreateSupplierReturnDto;
+import com.pos.dto.SupplierReturnRequestDTO;
 import com.pos.dto.SupplierReturnResponseDTO;
 import com.pos.entity.SupplierReturn;
 import com.pos.service.SupplierReturnService;
@@ -30,13 +30,13 @@ public class SupplierReturnController {
     }
 
     @PostMapping
-    public ResponseEntity<SupplierReturnResponseDTO> createReturn(@RequestBody CreateSupplierReturnDto dto) {
+    public ResponseEntity<SupplierReturnResponseDTO> createReturn(@RequestBody SupplierReturnRequestDTO dto) {
         return ResponseEntity.ok(srService.createSupplierReturn(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<SupplierReturnResponseDTO> updateDraftReturn(@PathVariable Long id,
-                                                                        @RequestBody CreateSupplierReturnDto dto) {
+                                                                        @RequestBody SupplierReturnRequestDTO dto) {
         return ResponseEntity.ok(srService.updateDraftSupplierReturn(id, dto));
     }
 

@@ -1,7 +1,6 @@
 package com.pos.service.impl;
 
 import com.pos.dto.CouponPreviewResponseDTO;
-import com.pos.dto.OrderItemRequestDTO;
 import com.pos.dto.OrderRequestDTO;
 import com.pos.dto.OrderResponseDTO;
 import com.pos.entity.Coupon;
@@ -165,7 +164,7 @@ class OrderServiceImplTest {
     }
 
     private OrderRequestDTO buildBasicOrderRequest() {
-        OrderItemRequestDTO item = new OrderItemRequestDTO();
+        OrderRequestDTO.ItemRequestDTO item = new OrderRequestDTO.ItemRequestDTO();
         item.setProductId(1L);
         item.setQuantity(2);
         item.setSalePrice(new BigDecimal("100"));

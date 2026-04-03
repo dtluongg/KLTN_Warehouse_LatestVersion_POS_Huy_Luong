@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Data
-public class CreateSupplierReturnDto {
+public class SupplierReturnRequestDTO {
     private Long goodsReceiptId; // Phiếu nhập gốc (có thể null nếu trả tự do)
     private String supplierId;   // UUID
     private String note;
@@ -13,10 +13,10 @@ public class CreateSupplierReturnDto {
 
     private Long warehouseId;
 
-    private List<ReturnItemDto> items;
+    private List<ReturnItemRequestDTO> items;
 
     @Data
-    public static class ReturnItemDto {
+    public static class ReturnItemRequestDTO {
         private Long goodsReceiptItemId; // Có thể null
         private Long productId;
         private Integer qty;

@@ -1,6 +1,6 @@
 package com.pos.service.impl;
 
-import com.pos.dto.CreateCustomerReturnDto;
+import com.pos.dto.CustomerReturnRequestDTO;
 import com.pos.entity.CustomerReturn;
 import com.pos.enums.DocumentStatus;
 import com.pos.repository.CustomerRepository;
@@ -52,8 +52,8 @@ class CustomerReturnServiceImplTest {
 
     @Test
     void updateDraftCustomerReturn_shouldRejectWhenNotDraft() {
-        CreateCustomerReturnDto dto = new CreateCustomerReturnDto();
-        CreateCustomerReturnDto.ReturnItemDto item = new CreateCustomerReturnDto.ReturnItemDto();
+        CustomerReturnRequestDTO dto = new CustomerReturnRequestDTO();
+        CustomerReturnRequestDTO.ReturnItemRequestDTO item = new CustomerReturnRequestDTO.ReturnItemRequestDTO();
         item.setProductId(1L);
         item.setQty(1);
         item.setRefundAmount(BigDecimal.ONE);

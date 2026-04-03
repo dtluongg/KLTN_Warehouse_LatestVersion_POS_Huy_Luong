@@ -98,6 +98,16 @@ const MENU_SECTIONS: MenuSection[] = [
             { label: "Kho hàng", icon: "home", route: "Warehouse" },
         ],
     },
+    {
+        section: "AI & HỖ TRỢ",
+        items: [
+            {
+                label: "AI Chat SQL",
+                icon: "message-circle",
+                route: "AiSqlChat",
+            },
+        ],
+    },
 ];
 
 export const CustomDrawerContent = (props: any) => {

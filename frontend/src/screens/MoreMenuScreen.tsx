@@ -21,6 +21,16 @@ type MenuGroup = {
 
 const MENU_GROUPS: MenuGroup[] = [
     {
+        section: "AI & Hỗ trợ",
+        items: [
+            {
+                label: "AI Chat SQL",
+                route: "AiSqlChat",
+                icon: "message-circle",
+            },
+        ],
+    },
+    {
         section: "Bán hàng",
         items: [{ label: "Khách hàng", route: "Customers", icon: "users" }],
     },

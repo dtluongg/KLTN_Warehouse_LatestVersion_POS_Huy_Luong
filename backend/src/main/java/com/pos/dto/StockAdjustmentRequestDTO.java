@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Data
-public class CreateStockAdjustmentDto {
+public class StockAdjustmentRequestDTO {
     private String adjustNo;
     private Long warehouseId;
     private String reason;
@@ -13,10 +13,10 @@ public class CreateStockAdjustmentDto {
     private Long createdByStaffId;
 
 
-    private List<AdjustmentItemDto> items;
+    private List<AdjustmentItemRequestDTO> items;
 
     @Data
-    public static class AdjustmentItemDto {
+    public static class AdjustmentItemRequestDTO {
         private Long productId;
         private Integer actualQty; // Số lượng thực tế kiểm đếm được
     }

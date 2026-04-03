@@ -1,10 +1,8 @@
 package com.pos.service.impl;
 
 import com.pos.dto.CouponPreviewResponseDTO;
-import com.pos.dto.OrderItemRequestDTO;
 import com.pos.dto.OrderRequestDTO;
 import com.pos.dto.OrderResponseDTO;
-import com.pos.dto.OrderItemDetailDTO;
 import com.pos.entity.*;
 import com.pos.enums.DocumentStatus;
 import com.pos.enums.PaymentMethod;
@@ -50,17 +48,17 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderItemDetailDTO> getOrderItems(Long orderId) {
+        public List<OrderResponseDTO.ItemResponseDTO> getOrderItems(Long orderId) {
         // Ensure the order exists before fetching items.
         getOrderById(orderId);
         return orderItemRepository.findByOrderId(orderId)
                 .stream()
-                .map(item -> OrderItemDetailDTO.builder()
+            .map(item -> OrderResponseDTO.ItemResponseDTO.builder()
                         .id(item.getId())
                         .qty(item.getQty())
                         .salePrice(item.getSalePrice())
                         .lineRevenue(item.getLineRevenue())
-                        .product(OrderItemDetailDTO.ProductLiteDTO.builder()
+                .product(OrderResponseDTO.ProductLiteDTO.builder()
                                 .id(item.getProduct().getId())
                                 .sku(item.getProduct().getSku())
                                 .name(item.getProduct().getName())
@@ -121,7 +119,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal grossAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for (OrderItemRequestDTO itemReq : req.getItems()) {
+        for (OrderRequestDTO.ItemRequestDTO itemReq : req.getItems()) {
             if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
                 throw new RuntimeException("quantity must be greater than 0");
             }
