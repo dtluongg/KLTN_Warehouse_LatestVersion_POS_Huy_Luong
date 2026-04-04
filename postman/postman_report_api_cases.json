@@ -1,0 +1,239 @@
+{
+  "info": {
+    "_postman_id": "69db4c4d-3c5a-4f96-9fd8-d9e3161d4864",
+    "name": "POS Warehouse - Report API Cases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Test collection for new report APIs: current inventory, stock movement by period, and daily revenue-profit."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:6591/api" },
+    { "key": "token", "value": "" },
+    { "key": "warehouseId", "value": "1" },
+    { "key": "fromDate", "value": "2026-04-01" },
+    { "key": "toDate", "value": "2026-04-30" }
+  ],
+  "item": [
+    {
+      "name": "00 - Auth",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login success', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.token || '');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Current Inventory",
+      "item": [
+        {
+          "name": "Current Inventory by Warehouse",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/current-inventory?warehouseId={{warehouseId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const arr = pm.response.json();",
+                  "pm.test('Response is array', function () { pm.expect(arr).to.be.an('array'); });",
+                  "if (Array.isArray(arr) && arr.length > 0) {",
+                  "  pm.test('Has stock fields', function () {",
+                  "    pm.expect(arr[0]).to.have.property('productId');",
+                  "    pm.expect(arr[0]).to.have.property('onHand');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current Inventory - Missing warehouseId (expect fail)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/current-inventory"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected 4xx', function () { pm.expect(pm.response.code).to.be.oneOf([400, 500]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Stock Movement By Period",
+      "item": [
+        {
+          "name": "Stock Movement by Period (with warehouseId)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/stock-movement?warehouseId={{warehouseId}}&fromDate={{fromDate}}&toDate={{toDate}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const arr = pm.response.json();",
+                  "pm.test('Response is array', function () { pm.expect(arr).to.be.an('array'); });",
+                  "if (Array.isArray(arr) && arr.length > 0) {",
+                  "  pm.test('Has NXT fields', function () {",
+                  "    pm.expect(arr[0]).to.have.property('openingQty');",
+                  "    pm.expect(arr[0]).to.have.property('inQty');",
+                  "    pm.expect(arr[0]).to.have.property('outQty');",
+                  "    pm.expect(arr[0]).to.have.property('closingQty');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stock Movement by Period (all warehouses)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/stock-movement?fromDate={{fromDate}}&toDate={{toDate}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stock Movement - Invalid date range (expect fail)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/stock-movement?warehouseId={{warehouseId}}&fromDate=2026-04-30&toDate=2026-04-01"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected 400', function () { pm.expect(pm.response.code).to.eql(400); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Daily Revenue Profit",
+      "item": [
+        {
+          "name": "Daily Revenue Profit (with warehouseId)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/daily-revenue-profit?warehouseId={{warehouseId}}&fromDate={{fromDate}}&toDate={{toDate}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const arr = pm.response.json();",
+                  "pm.test('Response is array', function () { pm.expect(arr).to.be.an('array'); });",
+                  "if (Array.isArray(arr) && arr.length > 0) {",
+                  "  pm.test('Has KPI fields', function () {",
+                  "    pm.expect(arr[0]).to.have.property('reportDate');",
+                  "    pm.expect(arr[0]).to.have.property('ordersCount');",
+                  "    pm.expect(arr[0]).to.have.property('revenue');",
+                  "    pm.expect(arr[0]).to.have.property('profit');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Daily Revenue Profit - Missing fromDate (expect fail)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/daily-revenue-profit?warehouseId={{warehouseId}}&toDate={{toDate}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected 4xx', function () { pm.expect(pm.response.code).to.be.oneOf([400, 500]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
