@@ -1,0 +1,11 @@
+- đặt hàng từ NCC (PO)
+- nhận hàng từ NCC (GR)
+- trả hàng từ khách tới kho
+- trả hàng từ kho tới NCC
+- kiểm kho -> cập nhật tồn kho
+- thông tin nhà cung cấp
+- thông tin sản phẩm
+- danh mục sản phẩm
+- mã giảm giá 
+- khách hàng
+- nhân viên

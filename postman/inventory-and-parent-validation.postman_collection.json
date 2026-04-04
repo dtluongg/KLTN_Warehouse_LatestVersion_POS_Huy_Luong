@@ -1,0 +1,253 @@
+{
+  "info": {
+    "name": "Backend Refactor - Validation Regression Tests",
+    "description": "Test collection for 2 updated areas:\n1) Oversell protection in POST /api/orders\n2) Cross-parent item validation in POST /api/goods-receipts\n\nThis collection includes both LEGACY (before update) and CURRENT (after update) expectations so you can see behavior differences.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:6591"
+    },
+    {
+      "key": "jwtToken",
+      "value": "PASTE_YOUR_JWT_HERE"
+    },
+    {
+      "key": "warehouseId",
+      "value": "1"
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "lowStockProductId",
+      "value": "1"
+    },
+    {
+      "key": "salePrice",
+      "value": "10000"
+    },
+    {
+      "key": "targetPoId",
+      "value": "10"
+    },
+    {
+      "key": "poItemIdFromOtherPo",
+      "value": "8"
+    },
+    {
+      "key": "supplierId",
+      "value": "00000000-0000-0000-0000-000000000001"
+    },
+    {
+      "key": "grProductId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Oversell Validation (Order)",
+      "item": [
+        {
+          "name": "BEFORE update (legacy expected): oversell allowed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": null,\n  \"warehouseId\": {{warehouseId}},\n  \"discountAmount\": 0,\n  \"couponCode\": null,\n  \"surchargeAmount\": 0,\n  \"paymentMethod\": \"CASH\",\n  \"note\": \"legacy oversell check\",\n  \"items\": [\n    {\n      \"productId\": {{lowStockProductId}},\n      \"quantity\": 999999,\n      \"salePrice\": {{salePrice}}\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Legacy behavior (before fix): request could pass even when quantity > on_hand."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('LEGACY expected status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AFTER update (current expected): oversell blocked",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": null,\n  \"warehouseId\": {{warehouseId}},\n  \"discountAmount\": 0,\n  \"couponCode\": null,\n  \"surchargeAmount\": 0,\n  \"paymentMethod\": \"CASH\",\n  \"note\": \"current oversell check\",\n  \"items\": [\n    {\n      \"productId\": {{lowStockProductId}},\n      \"quantity\": 999999,\n      \"salePrice\": {{salePrice}}\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Current behavior (after fix): should reject oversell request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('CURRENT expected status is 4xx', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 401, 403, 409, 422]);",
+                  "});",
+                  "pm.test('Response contains message', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.message || '').to.not.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Cross-Parent Validation (Goods Receipt)",
+      "item": [
+        {
+          "name": "BEFORE update (legacy expected): mismatched poItemId allowed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grNo\": null,\n  \"poId\": {{targetPoId}},\n  \"supplierId\": \"{{supplierId}}\",\n  \"warehouseId\": {{warehouseId}},\n  \"note\": \"legacy cross-parent check\",\n  \"items\": [\n    {\n      \"poItemId\": {{poItemIdFromOtherPo}},\n      \"productId\": {{grProductId}},\n      \"receivedQty\": 1,\n      \"unitCost\": 1000\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/goods-receipts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "goods-receipts"
+              ]
+            },
+            "description": "Legacy behavior (before fix): poItemId from another PO could be accepted."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('LEGACY expected status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AFTER update (current expected): mismatched poItemId blocked",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grNo\": null,\n  \"poId\": {{targetPoId}},\n  \"supplierId\": \"{{supplierId}}\",\n  \"warehouseId\": {{warehouseId}},\n  \"note\": \"current cross-parent check\",\n  \"items\": [\n    {\n      \"poItemId\": {{poItemIdFromOtherPo}},\n      \"productId\": {{grProductId}},\n      \"receivedQty\": 1,\n      \"unitCost\": 1000\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/goods-receipts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "goods-receipts"
+              ]
+            },
+            "description": "Current behavior (after fix): should reject poItemId that does not belong to poId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('CURRENT expected status is 4xx', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 401, 403, 409, 422]);",
+                  "});",
+                  "pm.test('Response contains message', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.message || '').to.not.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+{
+  "info": {
+    "_postman_id": "f4b8f260-03c2-4692-9b38-cf46e94a9d08",
+    "name": "POS Warehouse - User Management Cases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Test cases for user management (staff) and role authorization."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:6591/api" },
+    { "key": "adminToken", "value": "" },
+    { "key": "userToken", "value": "" },
+    { "key": "adminUsername", "value": "admin" },
+    { "key": "adminPassword", "value": "123456" },
+    { "key": "userUsername", "value": "sales1" },
+    { "key": "userPassword", "value": "123456" },
+    { "key": "createdStaffId", "value": "" },
+    { "key": "createdStaffUsername", "value": "staff{{$timestamp}}" }
+  ],
+  "item": [
+    {
+      "name": "00 - Login",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Admin login success', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('adminToken', json.token || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Non-Admin (optional for authz test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{userUsername}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('userToken', json.token || '');",
+                  "}",
+                  "pm.test('Non-admin login optional: 200 or 401 is acceptable', function () {",
+                  "  pm.expect([200, 401]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Admin Can Manage Users",
+      "item": [
+        {
+          "name": "Get All Staffs (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/staffs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Staff (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/staffs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staffCode\": \"STF{{$timestamp}}\",\n  \"fullName\": \"Staff Test User\",\n  \"phone\": \"0909999999\",\n  \"email\": \"staff{{$timestamp}}@mail.com\",\n  \"taxCode\": \"TAX{{$timestamp}}\",\n  \"address\": \"HCM\",\n  \"hireDate\": \"2026-04-04\",\n  \"isActive\": true,\n  \"username\": \"{{createdStaffUsername}}\",\n  \"passwordHash\": \"123456\",\n  \"role\": \"SALES_STAFF\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Create staff success', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('createdStaffId', json.id || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Staff Role (ADMIN)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/staffs/{{createdStaffId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staffCode\": \"STF-UPD{{$timestamp}}\",\n  \"fullName\": \"Staff Test User Updated\",\n  \"phone\": \"0908888888\",\n  \"email\": \"staff-upd{{$timestamp}}@mail.com\",\n  \"taxCode\": \"TAX-UPD{{$timestamp}}\",\n  \"address\": \"HCM Updated\",\n  \"hireDate\": \"2026-04-04\",\n  \"isActive\": true,\n  \"username\": \"{{createdStaffUsername}}\",\n  \"passwordHash\": \"123456\",\n  \"role\": \"WAREHOUSE_STAFF\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Update staff success', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Role changed', function () { pm.expect(json.role).to.eql('WAREHOUSE_STAFF'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Staff (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/staffs/{{createdStaffId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delete staff success', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Non-Admin Cannot Manage Users",
+      "item": [
+        {
+          "name": "Get Staffs with non-admin token (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "url": "{{baseUrl}}/staffs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('userToken')) {",
+                  "  pm.test('Skipped: userToken not available', function () { pm.expect(true).to.eql(true); });",
+                  "} else {",
+                  "  pm.test('Forbidden for non-admin', function () { pm.expect(pm.response.code).to.be.oneOf([401, 403]); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

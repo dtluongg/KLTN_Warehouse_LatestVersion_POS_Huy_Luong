@@ -1,0 +1,137 @@
+{
+  "info": {
+    "_postman_id": "4f6f5c3f-90e6-4f5b-b09b-bf8e74dbde16",
+    "name": "POS Warehouse - Auth Login Logout Cases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Test login/logout flow and post-logout behavior with JWT token."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:6591/api" },
+    { "key": "username", "value": "admin" },
+    { "key": "password", "value": "123456" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Login Success",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Login 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test('Has token', function () { pm.expect(json.token).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('token', json.token || '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Login Validation Fail (blank username)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"\",\n  \"password\": \"123456\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Validation 400', function () { pm.response.to.have.status(400); });",
+              "const json = pm.response.json();",
+              "pm.test('Has fieldErrors', function () { pm.expect(json.fieldErrors).to.be.an('object'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Logout Success",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Logout 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test('Has message', function () { pm.expect(json.message).to.eql('Logged out successfully'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Access Protected API with token (still valid in stateless JWT)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/staffs/me"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Stateless behavior: token may still work until expired', function () {",
+              "  pm.expect([200, 401, 403]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Logout without token (expect unauthorized)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Unauthorized/Forbidden expected', function () {",
+              "  pm.expect([401, 403]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
