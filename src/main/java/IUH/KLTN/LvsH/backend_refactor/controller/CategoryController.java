@@ -5,8 +5,9 @@ import IUH.KLTN.LvsH.backend_refactor.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
@@ -28,13 +29,13 @@ public class CategoryController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
-    public ResponseEntity<Category> createCategory(@RequestBody Category category) {
+    public ResponseEntity<Category> createCategory(@Valid @RequestBody Category category) {
         return ResponseEntity.ok(categoryService.createCategory(category));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
-    public ResponseEntity<Category> updateCategory(@PathVariable Long id, @RequestBody Category category) {
+    public ResponseEntity<Category> updateCategory(@PathVariable Long id, @Valid @RequestBody Category category) {
         return ResponseEntity.ok(categoryService.updateCategory(id, category));
     }
 

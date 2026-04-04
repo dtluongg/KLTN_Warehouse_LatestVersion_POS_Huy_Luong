@@ -1,0 +1,178 @@
+{
+  "info": {
+    "_postman_id": "f45b85de-0f84-4f2b-8e76-a7f3f89ac2f0",
+    "name": "Validation Diff - Quick Cases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Quick tests to show behavior differences after adding @Valid + DTO constraints.\nCase names include BEFORE/AFTER expectations for comparison."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:6591/api" },
+    { "key": "token", "value": "" },
+    { "key": "warehouseId", "value": "1" },
+    { "key": "productId", "value": "1" },
+    { "key": "supplierSeedId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "00 - Login",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login success', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.token || '');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Auth Validation",
+      "item": [
+        {
+          "name": "BEFORE: may pass to service | AFTER: fail username blank",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"\",\n  \"password\": \"123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected 400 after validation update', function () { pm.expect(pm.response.code).to.eql(400); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Has fieldErrors', function () { pm.expect(json.fieldErrors).to.be.an('object'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Order Validation",
+      "item": [
+        {
+          "name": "BEFORE: items empty could reach service | AFTER: fail @NotEmpty",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"warehouseId\": {{warehouseId}},\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"paymentMethod\": \"CASH\",\n  \"items\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected 400', function () { pm.expect(pm.response.code).to.eql(400); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Has fieldErrors.items', function () { pm.expect(json.fieldErrors).to.have.property('items'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BEFORE: invalid nested qty | AFTER: fail nested validation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"warehouseId\": {{warehouseId}},\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"paymentMethod\": \"CASH\",\n  \"items\": [\n    {\n      \"productId\": {{productId}},\n      \"quantity\": 0,\n      \"salePrice\": 10000\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected 400', function () { pm.expect(pm.response.code).to.eql(400); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Has fieldErrors for nested item', function () {",
+                  "  const keys = Object.keys(json.fieldErrors || {});",
+                  "  pm.expect(keys.some(k => k.includes('items'))).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Goods Receipt Validation",
+      "item": [
+        {
+          "name": "BEFORE: missing supplierId could reach service | AFTER: fail @NotBlank",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/goods-receipts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"poId\": 1,\n  \"supplierId\": \"\",\n  \"warehouseId\": {{warehouseId}},\n  \"note\": \"validate test\",\n  \"items\": [\n    {\n      \"poItemId\": 1,\n      \"productId\": {{productId}},\n      \"receivedQty\": 1,\n      \"unitCost\": 1000\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected 400', function () { pm.expect(pm.response.code).to.eql(400); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Has fieldErrors.supplierId', function () { pm.expect(json.fieldErrors).to.have.property('supplierId'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

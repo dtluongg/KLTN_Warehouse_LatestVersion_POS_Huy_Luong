@@ -7,8 +7,9 @@ import IUH.KLTN.LvsH.backend_refactor.service.CustomerReturnService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
@@ -30,13 +31,13 @@ public class CustomerReturnController {
     }
 
     @PostMapping
-    public ResponseEntity<CustomerReturnResponseDTO> createReturn(@RequestBody CustomerReturnRequestDTO dto) {
+    public ResponseEntity<CustomerReturnResponseDTO> createReturn(@Valid @RequestBody CustomerReturnRequestDTO dto) {
         return ResponseEntity.ok(returnService.createCustomerReturn(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CustomerReturnResponseDTO> updateDraftReturn(@PathVariable Long id,
-                                                                        @RequestBody CustomerReturnRequestDTO dto) {
+                                                                        @Valid @RequestBody CustomerReturnRequestDTO dto) {
         return ResponseEntity.ok(returnService.updateDraftCustomerReturn(id, dto));
     }
 

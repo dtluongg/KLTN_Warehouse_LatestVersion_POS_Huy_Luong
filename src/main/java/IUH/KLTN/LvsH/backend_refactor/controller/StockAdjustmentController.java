@@ -7,8 +7,9 @@ import IUH.KLTN.LvsH.backend_refactor.service.StockAdjustmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
@@ -30,13 +31,13 @@ public class StockAdjustmentController {
     }
 
     @PostMapping
-    public ResponseEntity<StockAdjustmentResponseDTO> createAdjustment(@RequestBody StockAdjustmentRequestDTO dto) {
+    public ResponseEntity<StockAdjustmentResponseDTO> createAdjustment(@Valid @RequestBody StockAdjustmentRequestDTO dto) {
         return ResponseEntity.ok(adjustService.createAdjustment(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<StockAdjustmentResponseDTO> updateDraftAdjustment(@PathVariable Long id,
-                                                                             @RequestBody StockAdjustmentRequestDTO dto) {
+                                                                             @Valid @RequestBody StockAdjustmentRequestDTO dto) {
         return ResponseEntity.ok(adjustService.updateDraftAdjustment(id, dto));
     }
 

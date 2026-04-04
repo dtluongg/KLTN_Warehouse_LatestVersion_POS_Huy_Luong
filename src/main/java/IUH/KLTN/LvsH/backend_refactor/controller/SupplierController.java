@@ -5,8 +5,9 @@ import IUH.KLTN.LvsH.backend_refactor.service.SupplierService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,13 +30,13 @@ public class SupplierController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
-    public ResponseEntity<Supplier> createSupplier(@RequestBody Supplier supplier) {
+    public ResponseEntity<Supplier> createSupplier(@Valid @RequestBody Supplier supplier) {
         return ResponseEntity.ok(supplierService.createSupplier(supplier));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
-    public ResponseEntity<Supplier> updateSupplier(@PathVariable UUID id, @RequestBody Supplier supplier) {
+    public ResponseEntity<Supplier> updateSupplier(@PathVariable UUID id, @Valid @RequestBody Supplier supplier) {
         return ResponseEntity.ok(supplierService.updateSupplier(id, supplier));
     }
 

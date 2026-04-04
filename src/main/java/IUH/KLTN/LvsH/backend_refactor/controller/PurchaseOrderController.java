@@ -7,8 +7,9 @@ import IUH.KLTN.LvsH.backend_refactor.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
@@ -30,13 +31,13 @@ public class PurchaseOrderController {
     }
 
     @PostMapping
-    public ResponseEntity<PurchaseOrderResponseDTO> createPO(@RequestBody PurchaseOrderRequestDTO dto) {
+    public ResponseEntity<PurchaseOrderResponseDTO> createPO(@Valid @RequestBody PurchaseOrderRequestDTO dto) {
         return ResponseEntity.ok(poService.createPurchaseOrder(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<PurchaseOrderResponseDTO> updateDraftPO(@PathVariable Long id,
-                                                                   @RequestBody PurchaseOrderRequestDTO dto) {
+                                                                   @Valid @RequestBody PurchaseOrderRequestDTO dto) {
         return ResponseEntity.ok(poService.updateDraftPurchaseOrder(id, dto));
     }
 

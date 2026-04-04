@@ -7,8 +7,9 @@ import IUH.KLTN.LvsH.backend_refactor.service.GoodsReceiptService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
@@ -30,13 +31,13 @@ public class GoodsReceiptController {
     }
 
     @PostMapping
-    public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(@RequestBody GoodsReceiptRequestDTO dto) {
+    public ResponseEntity<GoodsReceiptResponseDTO> createReceipt(@Valid @RequestBody GoodsReceiptRequestDTO dto) {
         return ResponseEntity.ok(grService.createGoodsReceipt(dto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<GoodsReceiptResponseDTO> updateDraftReceipt(@PathVariable Long id,
-                                                                       @RequestBody GoodsReceiptRequestDTO dto) {
+                                                                       @Valid @RequestBody GoodsReceiptRequestDTO dto) {
         return ResponseEntity.ok(grService.updateDraftGoodsReceipt(id, dto));
     }
 
