@@ -22,6 +22,15 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 		BigDecimal getProfit();
 	}
 
+	interface TopSellingProductProjection {
+		Long getProductId();
+		String getSku();
+		String getProductName();
+		Long getSoldQty();
+		BigDecimal getRevenue();
+		BigDecimal getProfit();
+	}
+
 	@Query(value = """
 			SELECT
 				DATE(o.order_time) AS "reportDate",
@@ -41,4 +50,29 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 			@Param("warehouseId") Long warehouseId,
 			@Param("fromTime") LocalDateTime fromTime,
 			@Param("toTime") LocalDateTime toTime);
+
+	@Query(value = """
+			SELECT
+				oi.product_id AS "productId",
+				p.sku AS "sku",
+				p.name AS "productName",
+				COALESCE(SUM(oi.qty), 0) AS "soldQty",
+				COALESCE(SUM(oi.line_revenue), 0) AS "revenue",
+				COALESCE(SUM(oi.line_profit), 0) AS "profit"
+			FROM order_items oi
+			JOIN orders o ON o.id = oi.order_id
+			JOIN products p ON p.id = oi.product_id
+			WHERE o.status = 'POSTED'
+			  AND o.order_time >= :fromTime
+			  AND o.order_time < :toTime
+			  AND (:warehouseId IS NULL OR o.warehouse_id = :warehouseId)
+			GROUP BY oi.product_id, p.sku, p.name
+			ORDER BY "soldQty" DESC, p.name
+			LIMIT :topN
+			""", nativeQuery = true)
+	List<TopSellingProductProjection> getTopSellingProducts(
+			@Param("warehouseId") Long warehouseId,
+			@Param("fromTime") LocalDateTime fromTime,
+			@Param("toTime") LocalDateTime toTime,
+			@Param("topN") Integer topN);
 }

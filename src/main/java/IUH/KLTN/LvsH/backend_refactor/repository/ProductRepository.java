@@ -28,6 +28,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 		String getImageUrl();
 	}
 
+	interface LowStockProjection {
+		Long getWarehouseId();
+		Long getProductId();
+		String getSku();
+		String getProductName();
+		Integer getOnHand();
+	}
+
 	@Query(value = """
 			SELECT
 				p.id AS id,
@@ -49,6 +57,25 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			ORDER BY p.name
 			""", nativeQuery = true)
 	List<ProductStockByWarehouseProjection> findStockByWarehouseId(@Param("warehouseId") Long warehouseId);
+
+	@Query(value = """
+			SELECT
+				ib.warehouse_id AS "warehouseId",
+				p.id AS "productId",
+				p.sku AS "sku",
+				p.name AS "productName",
+				COALESCE(ib.on_hand, 0) AS "onHand"
+			FROM inventory_balance ib
+			JOIN products p ON p.id = ib.product_id
+			WHERE ib.warehouse_id = :warehouseId
+			  AND p.deleted_at IS NULL
+			  AND p.is_active = TRUE
+			  AND COALESCE(ib.on_hand, 0) <= :threshold
+			ORDER BY COALESCE(ib.on_hand, 0), p.name
+			""", nativeQuery = true)
+	List<LowStockProjection> findLowStockByWarehouseId(
+			@Param("warehouseId") Long warehouseId,
+			@Param("threshold") Integer threshold);
 
 	@Query(value = """
 			SELECT COALESCE(SUM(ib.on_hand), 0)

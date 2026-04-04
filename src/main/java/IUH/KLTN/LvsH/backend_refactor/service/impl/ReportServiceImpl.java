@@ -2,10 +2,14 @@ package IUH.KLTN.LvsH.backend_refactor.service.impl;
 
 import IUH.KLTN.LvsH.backend_refactor.dto.CurrentInventoryReportDTO;
 import IUH.KLTN.LvsH.backend_refactor.dto.DailyRevenueProfitReportDTO;
+import IUH.KLTN.LvsH.backend_refactor.dto.LowStockAlertReportDTO;
 import IUH.KLTN.LvsH.backend_refactor.dto.StockMovementPeriodReportDTO;
+import IUH.KLTN.LvsH.backend_refactor.dto.StockAdjustmentSummaryReportDTO;
+import IUH.KLTN.LvsH.backend_refactor.dto.TopSellingProductReportDTO;
 import IUH.KLTN.LvsH.backend_refactor.repository.InventoryMovementRepository;
 import IUH.KLTN.LvsH.backend_refactor.repository.OrderItemRepository;
 import IUH.KLTN.LvsH.backend_refactor.repository.ProductRepository;
+import IUH.KLTN.LvsH.backend_refactor.repository.StockAdjustmentRepository;
 import IUH.KLTN.LvsH.backend_refactor.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ public class ReportServiceImpl implements ReportService {
     private final ProductRepository productRepository;
     private final InventoryMovementRepository inventoryMovementRepository;
     private final OrderItemRepository orderItemRepository;
+    private final StockAdjustmentRepository stockAdjustmentRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -49,6 +54,31 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<LowStockAlertReportDTO> getLowStockAlerts(Long warehouseId, Integer threshold) {
+        if (warehouseId == null) {
+            throw new RuntimeException("warehouseId is required");
+        }
+        int safeThreshold = threshold == null ? 10 : threshold;
+        if (safeThreshold < 0) {
+            throw new RuntimeException("threshold must be >= 0");
+        }
+
+        return productRepository.findLowStockByWarehouseId(warehouseId, safeThreshold)
+                .stream()
+                .map(item -> LowStockAlertReportDTO.builder()
+                        .warehouseId(item.getWarehouseId())
+                        .productId(item.getProductId())
+                        .sku(item.getSku())
+                        .productName(item.getProductName())
+                        .onHand(item.getOnHand())
+                        .threshold(safeThreshold)
+                        .shortageQty(Math.max(0, safeThreshold - item.getOnHand()))
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<StockMovementPeriodReportDTO> getStockMovementByPeriod(Long warehouseId, LocalDate fromDate, LocalDate toDate) {
         validateDateRange(fromDate, toDate);
 
@@ -70,6 +100,29 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
     }
 
+            @Override
+            @Transactional(readOnly = true)
+            public List<StockAdjustmentSummaryReportDTO> getStockAdjustmentSummary(Long warehouseId, LocalDate fromDate, LocalDate toDate) {
+            validateDateRange(fromDate, toDate);
+
+            return stockAdjustmentRepository.getStockAdjustmentSummary(warehouseId, fromDate, toDate)
+                .stream()
+                .map(item -> StockAdjustmentSummaryReportDTO.builder()
+                    .adjustmentId(item.getAdjustmentId())
+                    .adjustNo(item.getAdjustNo())
+                    .adjustDate(item.getAdjustDate())
+                    .warehouseId(item.getWarehouseId())
+                    .warehouseName(item.getWarehouseName())
+                    .reason(item.getReason())
+                    .status(item.getStatus())
+                    .totalIncreaseQty(item.getTotalIncreaseQty())
+                    .totalDecreaseQty(item.getTotalDecreaseQty())
+                    .netDiffQty(item.getNetDiffQty())
+                    .estimatedValueImpact(item.getEstimatedValueImpact())
+                    .build())
+                .toList();
+            }
+
     @Override
     @Transactional(readOnly = true)
     public List<DailyRevenueProfitReportDTO> getDailyRevenueProfit(Long warehouseId, LocalDate fromDate, LocalDate toDate) {
@@ -83,6 +136,32 @@ public class ReportServiceImpl implements ReportService {
                 .map(item -> DailyRevenueProfitReportDTO.builder()
                         .reportDate(item.getReportDate())
                         .ordersCount(item.getOrdersCount())
+                        .revenue(item.getRevenue())
+                        .profit(item.getProfit())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TopSellingProductReportDTO> getTopSellingProducts(Long warehouseId, LocalDate fromDate, LocalDate toDate, Integer topN) {
+        validateDateRange(fromDate, toDate);
+
+        int safeTopN = topN == null ? 10 : topN;
+        if (safeTopN <= 0) {
+            throw new RuntimeException("topN must be greater than 0");
+        }
+
+        LocalDateTime fromTime = fromDate.atStartOfDay();
+        LocalDateTime toTime = toDate.plusDays(1).atStartOfDay();
+
+        return orderItemRepository.getTopSellingProducts(warehouseId, fromTime, toTime, safeTopN)
+                .stream()
+                .map(item -> TopSellingProductReportDTO.builder()
+                        .productId(item.getProductId())
+                        .sku(item.getSku())
+                        .productName(item.getProductName())
+                        .soldQty(item.getSoldQty())
                         .revenue(item.getRevenue())
                         .profit(item.getProfit())
                         .build())

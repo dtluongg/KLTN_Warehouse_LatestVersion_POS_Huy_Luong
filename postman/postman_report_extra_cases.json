@@ -1,0 +1,158 @@
+{
+  "info": {
+    "_postman_id": "8e6e6983-59de-4f3b-afdf-a3fc01f35f30",
+    "name": "POS Warehouse - Extra Report Cases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Test cases for 3 new reports: low stock alerts, top selling products, stock adjustment summary."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:6591/api" },
+    { "key": "token", "value": "" },
+    { "key": "warehouseId", "value": "1" },
+    { "key": "threshold", "value": "10" },
+    { "key": "fromDate", "value": "2026-04-01" },
+    { "key": "toDate", "value": "2026-04-30" },
+    { "key": "topN", "value": "10" }
+  ],
+  "item": [
+    {
+      "name": "00 - Auth",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.token || '');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Low Stock Alerts",
+      "item": [
+        {
+          "name": "Low Stock Alerts by Warehouse",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/low-stock-alerts?warehouseId={{warehouseId}}&threshold={{threshold}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const arr = pm.response.json();",
+                  "pm.test('Response is array', function () { pm.expect(arr).to.be.an('array'); });",
+                  "if (Array.isArray(arr) && arr.length > 0) {",
+                  "  pm.test('Has low-stock fields', function () {",
+                  "    pm.expect(arr[0]).to.have.property('onHand');",
+                  "    pm.expect(arr[0]).to.have.property('threshold');",
+                  "    pm.expect(arr[0]).to.have.property('shortageQty');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Top Selling Products",
+      "item": [
+        {
+          "name": "Top Selling by Period",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/top-selling-products?warehouseId={{warehouseId}}&fromDate={{fromDate}}&toDate={{toDate}}&topN={{topN}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const arr = pm.response.json();",
+                  "pm.test('Response is array', function () { pm.expect(arr).to.be.an('array'); });",
+                  "if (Array.isArray(arr) && arr.length > 0) {",
+                  "  pm.test('Has top-selling fields', function () {",
+                  "    pm.expect(arr[0]).to.have.property('soldQty');",
+                  "    pm.expect(arr[0]).to.have.property('revenue');",
+                  "    pm.expect(arr[0]).to.have.property('profit');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Stock Adjustment Summary",
+      "item": [
+        {
+          "name": "Stock Adjustments by Period",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reports/stock-adjustments?warehouseId={{warehouseId}}&fromDate={{fromDate}}&toDate={{toDate}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                  "const arr = pm.response.json();",
+                  "pm.test('Response is array', function () { pm.expect(arr).to.be.an('array'); });",
+                  "if (Array.isArray(arr) && arr.length > 0) {",
+                  "  pm.test('Has adjustment summary fields', function () {",
+                  "    pm.expect(arr[0]).to.have.property('adjustNo');",
+                  "    pm.expect(arr[0]).to.have.property('totalIncreaseQty');",
+                  "    pm.expect(arr[0]).to.have.property('totalDecreaseQty');",
+                  "    pm.expect(arr[0]).to.have.property('netDiffQty');",
+                  "    pm.expect(arr[0]).to.have.property('estimatedValueImpact');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

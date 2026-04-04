@@ -2,7 +2,10 @@ package IUH.KLTN.LvsH.backend_refactor.controller;
 
 import IUH.KLTN.LvsH.backend_refactor.dto.CurrentInventoryReportDTO;
 import IUH.KLTN.LvsH.backend_refactor.dto.DailyRevenueProfitReportDTO;
+import IUH.KLTN.LvsH.backend_refactor.dto.LowStockAlertReportDTO;
 import IUH.KLTN.LvsH.backend_refactor.dto.StockMovementPeriodReportDTO;
+import IUH.KLTN.LvsH.backend_refactor.dto.StockAdjustmentSummaryReportDTO;
+import IUH.KLTN.LvsH.backend_refactor.dto.TopSellingProductReportDTO;
 import IUH.KLTN.LvsH.backend_refactor.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -29,6 +32,14 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getCurrentInventory(warehouseId));
     }
 
+    @GetMapping("/low-stock-alerts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<LowStockAlertReportDTO>> getLowStockAlerts(
+            @RequestParam Long warehouseId,
+            @RequestParam(required = false) Integer threshold) {
+        return ResponseEntity.ok(reportService.getLowStockAlerts(warehouseId, threshold));
+    }
+
     @GetMapping("/stock-movement")
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
     public ResponseEntity<List<StockMovementPeriodReportDTO>> getStockMovementByPeriod(
@@ -38,6 +49,15 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getStockMovementByPeriod(warehouseId, fromDate, toDate));
     }
 
+    @GetMapping("/stock-adjustments")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<StockAdjustmentSummaryReportDTO>> getStockAdjustmentSummary(
+            @RequestParam(required = false) Long warehouseId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        return ResponseEntity.ok(reportService.getStockAdjustmentSummary(warehouseId, fromDate, toDate));
+    }
+
     @GetMapping("/daily-revenue-profit")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
     public ResponseEntity<List<DailyRevenueProfitReportDTO>> getDailyRevenueProfit(
@@ -45,5 +65,15 @@ public class ReportController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
         return ResponseEntity.ok(reportService.getDailyRevenueProfit(warehouseId, fromDate, toDate));
+    }
+
+    @GetMapping("/top-selling-products")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
+    public ResponseEntity<List<TopSellingProductReportDTO>> getTopSellingProducts(
+            @RequestParam(required = false) Long warehouseId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) Integer topN) {
+        return ResponseEntity.ok(reportService.getTopSellingProducts(warehouseId, fromDate, toDate, topN));
     }
 }
