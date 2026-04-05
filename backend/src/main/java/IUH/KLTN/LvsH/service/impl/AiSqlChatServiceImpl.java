@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class AiSqlChatServiceImpl implements AiSqlChatService {
 
-    private static final String VI_ACCENTED_CHARS = "ÃƒÂ ÃƒÂ¡Ã¡ÂºÂ¡Ã¡ÂºÂ£ÃƒÂ£ÃƒÂ¢Ã¡ÂºÂ§Ã¡ÂºÂ¥Ã¡ÂºÂ­Ã¡ÂºÂ©Ã¡ÂºÂ«Ã„Æ’Ã¡ÂºÂ±Ã¡ÂºÂ¯Ã¡ÂºÂ·Ã¡ÂºÂ³Ã¡ÂºÂµÃƒÂ¨ÃƒÂ©Ã¡ÂºÂ¹Ã¡ÂºÂ»Ã¡ÂºÂ½ÃƒÂªÃ¡Â»ÂÃ¡ÂºÂ¿Ã¡Â»â€¡Ã¡Â»Æ’Ã¡Â»â€¦ÃƒÂ¬ÃƒÂ­Ã¡Â»â€¹Ã¡Â»â€°Ã„Â©ÃƒÂ²ÃƒÂ³Ã¡Â»ÂÃ¡Â»ÂÃƒÂµÃƒÂ´Ã¡Â»â€œÃ¡Â»â€˜Ã¡Â»â„¢Ã¡Â»â€¢Ã¡Â»â€”Ã†Â¡Ã¡Â»ÂÃ¡Â»â€ºÃ¡Â»Â£Ã¡Â»Å¸Ã¡Â»Â¡ÃƒÂ¹ÃƒÂºÃ¡Â»Â¥Ã¡Â»Â§Ã…Â©Ã†Â°Ã¡Â»Â«Ã¡Â»Â©Ã¡Â»Â±Ã¡Â»Â­Ã¡Â»Â¯Ã¡Â»Â³ÃƒÂ½Ã¡Â»ÂµÃ¡Â»Â·Ã¡Â»Â¹Ã„â€˜";
+    private static final String VI_ACCENTED_CHARS = "àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ";
     private static final String VI_ASCII_CHARS = "aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiioooooooooooooooooouuuuuuuuuuuyyyyyd";
 
     private static final Pattern STRICT_TEXT_FILTER_PATTERN = Pattern.compile(
@@ -43,31 +43,31 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
     );
 
     private static final String SYSTEM_PROMPT = """
-            BÃ¡ÂºÂ¡n lÃƒÂ  trÃ¡Â»Â£ lÃƒÂ½ tÃ¡ÂºÂ¡o SQL cho hÃ¡Â»â€¡ thÃ¡Â»â€˜ng POS/kho.
+            Bạn là trợ lý tạo SQL cho hệ thống POS/kho.
 
-            NhiÃ¡Â»â€¡m vÃ¡Â»Â¥:
-            - ChuyÃ¡Â»Æ’n cÃƒÂ¢u hÃ¡Â»Âi tiÃ¡ÂºÂ¿ng ViÃ¡Â»â€¡t cÃ¡Â»Â§a nhÃƒÂ¢n viÃƒÂªn thÃƒÂ nh Ã„â€˜ÃƒÂºng 1 cÃƒÂ¢u SQL SELECT.
-            - ChÃ¡Â»â€° trÃ¡ÂºÂ£ vÃ¡Â»Â SQL, khÃƒÂ´ng giÃ¡ÂºÂ£i thÃƒÂ­ch, khÃƒÂ´ng markdown.
+            Nhiệm vụ:
+            - Chuyển câu hỏi tiếng Việt của nhân viên thành đúng 1 câu SQL SELECT.
+            - Chỉ trả về SQL, không giải thích, không markdown.
 
-            RÃƒÂ ng buÃ¡Â»â„¢c bÃ¡ÂºÂ¯t buÃ¡Â»â„¢c:
-            - ChÃ¡Â»â€° Ã„â€˜Ã†Â°Ã¡Â»Â£c dÃƒÂ¹ng SELECT.
-            - KhÃƒÂ´ng dÃƒÂ¹ng INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT, REVOKE, CALL.
-            - KhÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c trÃ¡ÂºÂ£ vÃ¡Â»Â nhiÃ¡Â»Âu hÃ†Â¡n 1 cÃƒÂ¢u lÃ¡Â»â€¡nh.
-            - NÃ¡ÂºÂ¿u truy vÃ¡ÂºÂ¥n cÃƒÂ³ thÃ¡Â»Æ’ trÃ¡ÂºÂ£ nhiÃ¡Â»Âu dÃƒÂ²ng, thÃƒÂªm LIMIT 20.
-            - ChÃ¡Â»â€° Ã„â€˜Ã†Â°Ã¡Â»Â£c dÃƒÂ¹ng Ã„â€˜ÃƒÂºng tÃƒÂªn bÃ¡ÂºÂ£ng vÃƒÂ  tÃƒÂªn cÃ¡Â»â„¢t trong schema bÃƒÂªn dÃ†Â°Ã¡Â»â€ºi.
-            - KhÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c query bÃ¡ÂºÂ£ng staff.
-            - Khi lÃ¡Â»Âc theo tÃƒÂªn hoÃ¡ÂºÂ·c mÃƒÂ£ (name, code, short_name), luÃƒÂ´n Ã†Â°u tiÃƒÂªn tÃƒÂ¬m gÃ¡ÂºÂ§n Ã„â€˜ÃƒÂºng bÃ¡ÂºÂ±ng ILIKE vÃ¡Â»â€ºi %%keyword%%; hÃ¡ÂºÂ¡n chÃ¡ÂºÂ¿ tÃ¡Â»â€˜i Ã„â€˜a so sÃƒÂ¡nh bÃ¡ÂºÂ±ng '='.
-            - MÃ¡ÂºÂ·c Ã„â€˜Ã¡Â»â€¹nh phÃ¡ÂºÂ£i tÃƒÂ¬m khÃƒÂ´ng dÃ¡ÂºÂ¥u ngay trong SQL cho name/code/short_name Ã„â€˜Ã¡Â»Æ’ user gÃƒÂµ khÃƒÂ´ng dÃ¡ÂºÂ¥u vÃ¡ÂºÂ«n khÃ¡Â»â€ºp dÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃƒÂ³ dÃ¡ÂºÂ¥u (vÃƒÂ­ dÃ¡Â»Â¥: 'kho chinh' khÃ¡Â»â€ºp 'Kho ChÃƒÂ­nh').
-                        - Quy tÃ¡ÂºÂ¯c thÃ¡Â»Âi gian/ngÃƒÂ y bÃ¡ÂºÂ¯t buÃ¡Â»â„¢c:
-                            + MÃƒÂºi giÃ¡Â»Â mÃ¡ÂºÂ·c Ã„â€˜Ã¡Â»â€¹nh khi hiÃ¡Â»Æ’u cÃƒÂ¢u hÃ¡Â»Âi lÃƒÂ  Asia/Ho_Chi_Minh.
-                            + VÃ¡Â»â€ºi cÃ¡Â»â„¢t TIMESTAMP (vÃƒÂ­ dÃ¡Â»Â¥: orders.order_time, goods_receipts.receipt_date, returns.return_date, purchase_orders.order_date): KHÃƒâ€NG dÃƒÂ¹ng kiÃ¡Â»Æ’u order_time::date = CURRENT_DATE.
-                            + VÃ¡Â»â€ºi cÃ¡Â»â„¢t TIMESTAMP, phÃ¡ÂºÂ£i lÃ¡Â»Âc theo khoÃ¡ÂºÂ£ng thÃ¡Â»Âi gian [Ã„â€˜Ã¡ÂºÂ§u kÃ¡Â»Â³, cuÃ¡Â»â€˜i kÃ¡Â»Â³), vÃƒÂ­ dÃ¡Â»Â¥ hÃƒÂ´m nay:
+            Ràng buộc bắt buộc:
+            - Chỉ được dùng SELECT.
+            - Không dùng INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT, REVOKE, CALL.
+            - Không được trả về nhiều hơn 1 câu lệnh.
+            - Nếu truy vấn có thể trả nhiều dòng, thêm LIMIT 20.
+            - Chỉ được dùng đúng tên bảng và tên cột trong schema bên dưới.
+            - Không được query bảng staff.
+            - Khi lọc theo tên hoặc mã (name, code, short_name), luôn ưu tiên tìm gần đúng bằng ILIKE với %%keyword%%; hạn chế tối đa so sánh bằng '='.
+            - Mặc định phải tìm không dấu ngay trong SQL cho name/code/short_name để user gõ không dấu vẫn khớp dữ liệu có dấu (ví dụ: 'kho chinh' khớp 'Kho Chính').
+                        - Quy tắc thời gian/ngày bắt buộc:
+                            + Múi giờ mặc định khi hiểu câu hỏi là Asia/Ho_Chi_Minh.
+                            + Với cột TIMESTAMP (ví dụ: orders.order_time, goods_receipts.receipt_date, returns.return_date, purchase_orders.order_date): KHÔNG dùng kiểu order_time::date = CURRENT_DATE.
+                            + Với cột TIMESTAMP, phải lọc theo khoảng thời gian [đầu kỳ, cuối kỳ), ví dụ hôm nay:
                                 order_time >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh')
                                 AND order_time < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '1 day'.
-                            + "HÃƒÂ´m qua": lÃƒÂ¹i 1 ngÃƒÂ y tÃ¡Â»Â« mÃ¡Â»â€˜c trÃƒÂªn; "7 ngÃƒÂ y gÃ¡ÂºÂ§n Ã„â€˜ÃƒÂ¢y": tÃ¡Â»Â« mÃ¡Â»â€˜c Ã„â€˜Ã¡ÂºÂ§u ngÃƒÂ y - INTERVAL '6 day' Ã„â€˜Ã¡ÂºÂ¿n < mÃ¡Â»â€˜c Ã„â€˜Ã¡ÂºÂ§u ngÃƒÂ y + INTERVAL '1 day'.
-                            + "ThÃƒÂ¡ng nÃƒÂ y" dÃƒÂ¹ng date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh'); "nÃ„Æ’m nay" dÃƒÂ¹ng date_trunc('year', ...).
-                            + ChÃ¡Â»â€° dÃƒÂ¹ng = CURRENT_DATE cho cÃ¡Â»â„¢t kiÃ¡Â»Æ’u DATE thuÃ¡ÂºÂ§n.
-                        - VÃ¡Â»â€ºi truy vÃ¡ÂºÂ¥n tÃ¡Â»â€¢ng hÃ¡Â»Â£p SUM/AVG/COUNT theo ngÃƒÂ y kÃ¡Â»Â³, Ã†Â°u tiÃƒÂªn COALESCE cho SUM/AVG Ã„â€˜Ã¡Â»Æ’ khÃƒÂ´ng trÃ¡ÂºÂ£ vÃ¡Â»Â NULL.
+                            + "Hôm qua": lùi 1 ngày từ mốc trên; "7 ngày gần đây": từ mốc đầu ngày - INTERVAL '6 day' đến < mốc đầu ngày + INTERVAL '1 day'.
+                            + "Tháng này" dùng date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh'); "năm nay" dùng date_trunc('year', ...).
+                            + Chỉ dùng = CURRENT_DATE cho cột kiểu DATE thuần.
+                        - Với truy vấn tổng hợp SUM/AVG/COUNT theo ngày kỳ, ưu tiên COALESCE cho SUM/AVG để không trả về NULL.
             
 
             Schema duoc phep dung:
@@ -130,13 +130,13 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
             """;
 
     private static final String EXPLAIN_SYSTEM_PROMPT = """
-            BÃ¡ÂºÂ¡n lÃƒÂ  trÃ¡Â»Â£ lÃƒÂ½ phÃƒÂ¢n tÃƒÂ­ch dÃ¡Â»Â¯ liÃ¡Â»â€¡u POS/kho.
-            NhiÃ¡Â»â€¡m vÃ¡Â»Â¥:
-            - DÃ¡Â»Â±a vÃƒÂ o cÃƒÂ¢u hÃ¡Â»Âi, cÃƒÂ¢u SQL Ã„â€˜ÃƒÂ£ chÃ¡ÂºÂ¡y, vÃƒÂ  kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ truy vÃ¡ÂºÂ¥n JSON.
-            - TrÃ¡ÂºÂ£ lÃ¡Â»Âi bÃ¡ÂºÂ±ng tiÃ¡ÂºÂ¿ng ViÃ¡Â»â€¡t rÃƒÂµ rÃƒÂ ng, ngÃ¡ÂºÂ¯n gÃ¡Â»Ân, Ã„â€˜Ã¡Â»Æ’ nhÃƒÂ¢n viÃƒÂªn dÃ¡Â»â€¦ hiÃ¡Â»Æ’u.
-            - NÃ¡ÂºÂ¿u khÃƒÂ´ng cÃƒÂ³ dÃ¡Â»Â¯ liÃ¡Â»â€¡u, nÃƒÂ³i rÃƒÂµ khÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u phÃƒÂ¹ hÃ¡Â»Â£p.
-            - KhÃƒÂ´ng tÃ¡ÂºÂ¡o sÃ¡Â»â€˜ liÃ¡Â»â€¡u mÃ¡Â»â€ºi, chÃ¡Â»â€° Ã„â€˜Ã†Â°Ã¡Â»Â£c dÃ¡Â»Â±a trÃƒÂªn kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ Ã„â€˜ÃƒÂ£ cho.
-            - KhÃƒÂ´ng dÃƒÂ¹ng markdown.
+            Bạn là trợ lý phân tích dữ liệu POS/kho.
+            Nhiệm vụ:
+            - Dựa vào câu hỏi, câu SQL đã chạy, và kết quả truy vấn JSON.
+            - Trả lời bằng tiếng Việt rõ ràng, ngắn gọn, để nhân viên dễ hiểu.
+            - Nếu không có dữ liệu, nói rõ không tìm thấy dữ liệu phù hợp.
+            - Không tạo số liệu mới, chỉ được dựa trên kết quả đã cho.
+            - Không dùng markdown.
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -342,7 +342,7 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
 
     private String summarize(List<Map<String, Object>> rows) {
         if (rows.isEmpty()) {
-            return "KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u phÃƒÂ¹ hÃ¡Â»Â£p.";
+            return "Không tìm thấy dữ liệu phù hợp.";
         }
         Map<String, Object> first = rows.get(0);
         String sample = first.entrySet().stream()
@@ -350,7 +350,7 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
                 .map(e -> e.getKey() + "=" + String.valueOf(e.getValue()))
                 .reduce((a, b) -> a + ", " + b)
                 .orElse("");
-        return "TÃƒÂ¬m thÃ¡ÂºÂ¥y " + rows.size() + " dÃƒÂ²ng. MÃ¡ÂºÂ«u: " + sample;
+        return "Tìm thấy " + rows.size() + " dòng. Mẫu: " + sample;
     }
 
     private String buildFuzzyFallbackSql(String sql) {
