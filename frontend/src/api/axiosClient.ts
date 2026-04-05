@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 
 // Chú ý: Web thì gọi localhost. Android Emulator thì gọi 10.0.2.2
 const BASE_URL = Platform.OS === 'web' 
-  ? 'http://localhost:8080/api' 
-  : 'http://10.0.2.2:8080/api'; 
+  ? 'http://localhost:9999/api' 
+  : 'http://10.0.2.2:9999/api'; 
 
 export const axiosClient = axios.create({
   baseURL: BASE_URL,

@@ -1,0 +1,11 @@
+git remote -v
+
+git remote add old_core_project https://github.com/dtluongg/DHKTPM18ATT_Nhom08_HeThongQuanLyBanHangVatTuNongNghiepOnline
+
+git remote -v
+
+git fetch old_core_project
+
+git merge old_core_project/main||master --allow-unrelated-histories -s ours
+
+git push origin master

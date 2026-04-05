@@ -2,8 +2,6 @@ package IUH.KLTN.LvsH.service.ai;
 
 import org.junit.jupiter.api.Test;
 
-import IUH.KLTN.LvsH.service.ai.SqlSafetyValidator;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
