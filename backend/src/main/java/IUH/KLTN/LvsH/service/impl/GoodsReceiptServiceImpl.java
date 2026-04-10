@@ -1,10 +1,10 @@
 package IUH.KLTN.LvsH.service.impl;
 
-import IUH.KLTN.LvsH.dto.GoodsReceiptRequestDTO;
-import IUH.KLTN.LvsH.dto.GoodsReceiptResponseDTO;
+import IUH.KLTN.LvsH.dto.goods_receipt.*;
 import IUH.KLTN.LvsH.entity.*;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.repository.*;
+import IUH.KLTN.LvsH.repository.specification.GoodsReceiptSpecification;
 import IUH.KLTN.LvsH.service.GoodsReceiptService;
 import IUH.KLTN.LvsH.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +18,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 @Service
 @RequiredArgsConstructor
@@ -33,8 +37,22 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
     private final InventoryMovementRepository inventoryMovementRepository;
 
     @Override
-    public List<GoodsReceipt> getAllGoodsReceipts() {
-        return grRepository.findAll();
+    public Page<GoodsReceiptListResponseDTO> getAllGoodsReceipts(GoodsReceiptSearchCriteria criteria, Pageable pageable) {
+        Specification<GoodsReceipt> spec = GoodsReceiptSpecification.withCriteria(criteria);
+        Page<GoodsReceipt> page = grRepository.findAll(spec, pageable);
+        return page.map(gr -> GoodsReceiptListResponseDTO.builder()
+                .id(gr.getId())
+                .grNo(gr.getGrNo())
+                .poNo(gr.getPurchaseOrder() != null ? gr.getPurchaseOrder().getPoNo() : null)
+                .supplierName(gr.getSupplier() != null ? gr.getSupplier().getName() : null)
+                .warehouseName(gr.getWarehouse() != null ? gr.getWarehouse().getName() : null)
+                .createdByName(gr.getCreatedBy() != null ? gr.getCreatedBy().getFullName() : null)
+                .receiptDate(gr.getReceiptDate())
+                .status(gr.getStatus())
+                .totalAmountPayable(gr.getTotalAmountPayable())
+                .createdAt(gr.getCreatedAt())
+                .note(gr.getNote())
+                .build());
     }
 
     @Override
@@ -44,8 +62,13 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
     }
 
     @Override
+    public GoodsReceiptDetailResponseDTO getGoodsReceiptDetailById(Long id) {
+        return toDetailResponseDTO(getGoodsReceiptById(id));
+    }
+
+    @Override
     @Transactional
-    public GoodsReceiptResponseDTO createGoodsReceipt(GoodsReceiptRequestDTO dto) {
+    public GoodsReceiptDetailResponseDTO createGoodsReceipt(GoodsReceiptRequestDTO dto) {
         PurchaseOrder po = poRepository.findById(dto.getPoId())
                 .orElseThrow(() -> new RuntimeException("PO not found"));
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
@@ -55,7 +78,11 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         Staff staff = getAuthenticatedStaff();
 
         validateItemList(dto.getItems());
-        Totals totals = calculateTotals(dto.getItems());
+        
+        BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
+        
+        Totals totals = calculateTotals(dto.getItems(), surcharge, discount);
 
         GoodsReceipt gr = GoodsReceipt.builder()
                 .purchaseOrder(po)
@@ -64,9 +91,11 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
                 .receiptDate(LocalDate.now())
                 .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
-            .totalAmount(totals.totalAmount)
-            .totalVat(totals.totalVat)
-            .totalAmountPayable(totals.totalAmountPayable)
+                .discountAmount(discount)
+                .surchargeAmount(surcharge)
+                .totalAmount(totals.totalAmount)
+                .totalVat(totals.totalVat)
+                .totalAmountPayable(totals.totalAmountPayable)
                 .createdBy(staff)
                 .build();
 
@@ -100,7 +129,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
             grItemRepository.save(item);
         }
 
-        return toResponseDTO(gr);
+        return toDetailResponseDTO(gr);
     }
 
     private Staff getAuthenticatedStaff() {
@@ -113,7 +142,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
 
     @Override
     @Transactional
-    public GoodsReceiptResponseDTO updateDraftGoodsReceipt(Long id, GoodsReceiptRequestDTO dto) {
+    public GoodsReceiptDetailResponseDTO updateDraftGoodsReceipt(Long id, GoodsReceiptRequestDTO dto) {
         validateItemList(dto.getItems());
 
         GoodsReceipt gr = getGoodsReceiptById(id);
@@ -128,12 +157,17 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
 
-        Totals totals = calculateTotals(dto.getItems());
+        BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
+
+        Totals totals = calculateTotals(dto.getItems(), surcharge, discount);
 
         gr.setPurchaseOrder(po);
         gr.setSupplier(supplier);
         gr.setWarehouse(warehouse);
         gr.setNote(dto.getNote());
+        gr.setDiscountAmount(discount);
+        gr.setSurchargeAmount(surcharge);
         gr.setTotalAmount(totals.totalAmount);
         gr.setTotalVat(totals.totalVat);
         gr.setTotalAmountPayable(totals.totalAmountPayable);
@@ -165,12 +199,12 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
             grItemRepository.save(item);
         }
 
-        return toResponseDTO(grRepository.save(gr));
+        return toDetailResponseDTO(grRepository.save(gr));
     }
 
     @Override
     @Transactional
-    public GoodsReceiptResponseDTO completeGoodsReceipt(Long id) {
+    public GoodsReceiptDetailResponseDTO completeGoodsReceipt(Long id) {
         GoodsReceipt gr = getGoodsReceiptById(id);
         
         if (gr.getStatus() == DocumentStatus.CANCELLED) {
@@ -229,10 +263,25 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         po.setStatus(DocumentStatus.POSTED);
         poRepository.save(po);
 
-        return toResponseDTO(gr);
+        return toDetailResponseDTO(gr);
     }
 
-    private Totals calculateTotals(List<GoodsReceiptRequestDTO.GrItemRequestDTO> items) {
+    @Override
+    @Transactional
+    public GoodsReceiptDetailResponseDTO cancelGoodsReceipt(Long id) {
+        GoodsReceipt gr = getGoodsReceiptById(id);
+        if (gr.getStatus() == DocumentStatus.POSTED) {
+            throw new RuntimeException("Cannot cancel a completed goods receipt.");
+        }
+        if (gr.getStatus() == DocumentStatus.CANCELLED) {
+            throw new RuntimeException("Goods Receipt is already cancelled.");
+        }
+        gr.setStatus(DocumentStatus.CANCELLED);
+        grRepository.save(gr);
+        return toDetailResponseDTO(gr);
+    }
+
+    private Totals calculateTotals(List<GoodsReceiptRequestDTO.GrItemRequestDTO> items, BigDecimal surcharge, BigDecimal discount) {
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalVat = BigDecimal.ZERO;
 
@@ -255,7 +304,12 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
             totalVat = totalVat.add(lineVat);
         }
 
-        return new Totals(totalAmount, totalVat, totalAmount.add(totalVat));
+        BigDecimal payable = totalAmount.add(totalVat).add(surcharge).subtract(discount);
+        if (payable.compareTo(BigDecimal.ZERO) < 0) {
+            payable = BigDecimal.ZERO;
+        }
+
+        return new Totals(totalAmount, totalVat, payable);
     }
 
     private void validateItemList(List<GoodsReceiptRequestDTO.GrItemRequestDTO> items) {
@@ -276,14 +330,42 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
         }
     }
 
-    private GoodsReceiptResponseDTO toResponseDTO(GoodsReceipt gr) {
-        GoodsReceiptResponseDTO res = new GoodsReceiptResponseDTO();
-        res.setId(gr.getId());
-        res.setGrNo(gr.getGrNo());
-        res.setStatus(gr.getStatus());
-        res.setTotalAmount(gr.getTotalAmount());
-        res.setTotalVat(gr.getTotalVat());
-        res.setTotalAmountPayable(gr.getTotalAmountPayable());
-        return res;
+    private GoodsReceiptDetailResponseDTO toDetailResponseDTO(GoodsReceipt gr) {
+        List<GoodsReceiptItem> items = grItemRepository.findByGoodsReceiptId(gr.getId());
+        List<GoodsReceiptDetailResponseDTO.GrItemResponseDTO> itemDtos = items.stream().map(item ->
+                GoodsReceiptDetailResponseDTO.GrItemResponseDTO.builder()
+                        .id(item.getId())
+                        .productId(item.getProduct().getId())
+                        .productSku(item.getProduct().getSku())
+                        .productName(item.getProduct().getName())
+                        .receivedQty(item.getReceivedQty())
+                        .unitCost(item.getUnitCost())
+                        .vatRate(item.getProduct().getVatRate())
+                        .lineTotal(item.getLineTotal())
+                        .build()
+        ).collect(Collectors.toList());
+
+        return GoodsReceiptDetailResponseDTO.builder()
+                .id(gr.getId())
+                .grNo(gr.getGrNo())
+                .poId(gr.getPurchaseOrder() != null ? gr.getPurchaseOrder().getId() : null)
+                .poNo(gr.getPurchaseOrder() != null ? gr.getPurchaseOrder().getPoNo() : null)
+                .supplierId(gr.getSupplier() != null ? gr.getSupplier().getId().toString() : null)
+                .supplierName(gr.getSupplier() != null ? gr.getSupplier().getName() : null)
+                .warehouseId(gr.getWarehouse() != null ? gr.getWarehouse().getId() : null)
+                .warehouseName(gr.getWarehouse() != null ? gr.getWarehouse().getName() : null)
+                .createdById(gr.getCreatedBy() != null ? gr.getCreatedBy().getId().toString() : null)
+                .createdByName(gr.getCreatedBy() != null ? gr.getCreatedBy().getFullName() : null)
+                .receiptDate(gr.getReceiptDate())
+                .status(gr.getStatus())
+                .note(gr.getNote())
+                .totalAmount(gr.getTotalAmount())
+                .totalVat(gr.getTotalVat())
+                .discountAmount(gr.getDiscountAmount())
+                .surchargeAmount(gr.getSurchargeAmount())
+                .totalAmountPayable(gr.getTotalAmountPayable())
+                .createdAt(gr.getCreatedAt())
+                .items(itemDtos)
+                .build();
     }
 }

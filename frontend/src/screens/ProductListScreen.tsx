@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert } from "react-native";
+import { Alert, Image, View, Text } from "react-native";
 import { DataTableScreen, StatusBadge, formatMoney } from "../components";
 
 const ProductListScreen = () => (
@@ -28,11 +28,20 @@ const ProductListScreen = () => (
             },
         ]}
         columns={[
+            {
+                key: "imageUrl",
+                label: "Ảnh",
+                width: 60,
+                render: (v: string) => (
+                    v ? <Image source={{ uri: v }} style={{ width: 40, height: 40, borderRadius: 4, resizeMode: "cover" }} />
+                      : <View style={{ width: 40, height: 40, borderRadius: 4, backgroundColor: "#E2E8F0", justifyContent: 'center', alignItems: 'center' }}><Text style={{fontSize: 10, color: "#64748B"}}>Trống</Text></View>
+                )
+            },
             { key: "sku", label: "SKU", width: 120 },
             { key: "barcode", label: "Barcode", width: 130 },
             { key: "name", label: "Tên sản phẩm", flex: 2 },
             { key: "shortName", label: "Tên ngắn", flex: 1 },
-            { key: "category.name", label: "Danh mục", flex: 1 },
+            { key: "categoryName", label: "Danh mục", flex: 1 },
             {
                 key: "salePrice",
                 label: "Giá bán",

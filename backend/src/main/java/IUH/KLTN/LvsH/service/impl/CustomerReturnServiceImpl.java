@@ -1,13 +1,15 @@
 package IUH.KLTN.LvsH.service.impl;
 
-import IUH.KLTN.LvsH.dto.CustomerReturnRequestDTO;
-import IUH.KLTN.LvsH.dto.CustomerReturnResponseDTO;
+import IUH.KLTN.LvsH.dto.customer_return.*;
 import IUH.KLTN.LvsH.entity.*;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.repository.*;
+import IUH.KLTN.LvsH.repository.specification.CustomerReturnSpecification;
 import IUH.KLTN.LvsH.service.CustomerReturnService;
 import IUH.KLTN.LvsH.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,19 +35,70 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
     private final WarehouseRepository warehouseRepository;
 
     @Override
-    public List<CustomerReturn> getAllCustomerReturns() {
-        return crRepository.findAll();
+    public Page<CustomerReturnListResponseDTO> getAllCustomerReturns(CustomerReturnSearchCriteria criteria, Pageable pageable) {
+        Page<CustomerReturn> page = crRepository.findAll(CustomerReturnSpecification.withCriteria(criteria), pageable);
+        return page.map(cr -> CustomerReturnListResponseDTO.builder()
+                .id(cr.getId())
+                .returnNo(cr.getReturnNo())
+                .customerName(cr.getCustomer().getName())
+                .orderId(cr.getOrder() != null ? cr.getOrder().getId() : null)
+                .orderNo(cr.getOrder() != null ? cr.getOrder().getOrderNo() : null)
+                .warehouseName(cr.getWarehouse().getName())
+                .returnDate(cr.getReturnDate())
+                .status(cr.getStatus().name())
+                .totalRefund(cr.getTotalRefund())
+                .createdBy(cr.getCreatedBy().getFullName())
+                .createdAt(cr.getCreatedAt())
+                .note(cr.getNote())
+                .build());
+    }
+
+    private CustomerReturn getCustomerReturnEntityById(Long id) {
+        return crRepository.findById(id).orElseThrow(() -> new RuntimeException("Customer Return not found"));
     }
 
     @Override
-    public CustomerReturn getCustomerReturnById(Long id) {
-        return crRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer Return not found"));
+    @Transactional(readOnly = true)
+    public CustomerReturnDetailResponseDTO getCustomerReturnDetailById(Long id) {
+        CustomerReturn cr = getCustomerReturnEntityById(id);
+        List<CustomerReturnItem> items = crItemRepository.findByCustomerReturnId(cr.getId());
+        
+        List<CustomerReturnDetailResponseDTO.CustomerReturnItemResponseDTO> itemDTOs = items.stream().map(i -> 
+                CustomerReturnDetailResponseDTO.CustomerReturnItemResponseDTO.builder()
+                        .id(i.getId())
+                        .productId(i.getProduct().getId())
+                        .productSku(i.getProduct().getSku())
+                        .productName(i.getProduct().getName())
+                        .orderItemId(i.getOrderItem() != null ? i.getOrderItem().getId() : null)
+                        .qty(i.getQty())
+                        .refundAmount(i.getRefundAmount())
+                        .build()
+        ).collect(Collectors.toList());
+
+        return CustomerReturnDetailResponseDTO.builder()
+                .id(cr.getId())
+                .returnNo(cr.getReturnNo())
+                .customerId(cr.getCustomer().getId().toString())
+                .customerName(cr.getCustomer().getName())
+                .orderId(cr.getOrder() != null ? cr.getOrder().getId() : null)
+                .orderNo(cr.getOrder() != null ? cr.getOrder().getOrderNo() : null)
+                .warehouseId(cr.getWarehouse().getId())
+                .warehouseName(cr.getWarehouse().getName())
+                .returnDate(cr.getReturnDate())
+                .status(cr.getStatus().name())
+                .note(cr.getNote())
+                .totalRefund(cr.getTotalRefund())
+                .discountAmount(cr.getDiscountAmount())
+                .surchargeAmount(cr.getSurchargeAmount())
+                .createdBy(cr.getCreatedBy().getFullName())
+                .createdAt(cr.getCreatedAt())
+                .items(itemDTOs)
+                .build();
     }
 
     @Override
     @Transactional
-    public CustomerReturnResponseDTO createCustomerReturn(CustomerReturnRequestDTO dto) {
+    public CustomerReturnDetailResponseDTO createCustomerReturn(CustomerReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
         Customer customer = customerRepository.findById(UUID.fromString(dto.getCustomerId()))
@@ -59,7 +113,10 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
 
-        BigDecimal totalRefund = calculateTotalRefund(dto.getItems());
+        BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
+
+        BigDecimal totalRefund = calculateTotalRefund(dto.getItems(), surcharge, discount);
 
         CustomerReturn cr = CustomerReturn.builder()
                 .customer(customer)
@@ -68,6 +125,8 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 .returnDate(LocalDate.now())
                 .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
+                .discountAmount(discount)
+                .surchargeAmount(surcharge)
                 .totalRefund(totalRefund)
                 .createdBy(staff)
                 .build();
@@ -76,7 +135,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         String generatedReturnNo = crRepository.findReturnNoById(cr.getId());
         cr.setReturnNo(generatedReturnNo);
         
-        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
+        for (CustomerReturnRequestDTO.CustomerReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -85,72 +144,6 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 orderItem = orderItemRepository.findById(itemDto.getOrderItemId())
                         .orElseThrow(() -> new RuntimeException("Order Item not found"));
                 
-                // Validate that orderItem belongs to the parent order
-                if (order != null && (orderItem.getOrder() == null || !orderItem.getOrder().getId().equals(order.getId()))) {
-                    throw new RuntimeException("Order Item does not belong to the specified Order: " + dto.getOrderId());
-                }
-            }
-
-            CustomerReturnItem item = CustomerReturnItem.builder()
-                    .customerReturn(cr)
-                    .orderItem(orderItem)
-                    .product(product)
-                    .qty(itemDto.getQty())
-                    .refundAmount(itemDto.getRefundAmount()) // Sá»‘ tiá»n tráº£ láº¡i cho khÃ¡ch
-                    .build();
-
-            crItemRepository.save(item);
-        }
-
-        return toResponseDTO(cr);
-    }
-
-    private Staff getAuthenticatedStaff() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
-            throw new RuntimeException("Unauthenticated request");
-        }
-        return userDetails.getStaff();
-    }
-
-    @Override
-    @Transactional
-    public CustomerReturnResponseDTO updateDraftCustomerReturn(Long id, CustomerReturnRequestDTO dto) {
-        validateItemList(dto.getItems());
-
-        CustomerReturn cr = getCustomerReturnById(id);
-        if (cr.getStatus() != DocumentStatus.DRAFT) {
-            throw new RuntimeException("Only DRAFT customer return can be updated");
-        }
-
-        Customer customer = customerRepository.findById(UUID.fromString(dto.getCustomerId()))
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
-
-        Order order = null;
-        if (dto.getOrderId() != null) {
-            order = orderRepository.findById(dto.getOrderId()).orElse(null);
-        }
-
-        Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
-                .orElseThrow(() -> new RuntimeException("Warehouse not found"));
-
-        cr.setCustomer(customer);
-        cr.setOrder(order);
-        cr.setWarehouse(warehouse);
-        cr.setNote(dto.getNote());
-        cr.setTotalRefund(calculateTotalRefund(dto.getItems()));
-
-        crItemRepository.deleteByCustomerReturnId(cr.getId());
-        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
-            Product product = productRepository.findById(itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
-
-            OrderItem orderItem = null;
-            if (itemDto.getOrderItemId() != null) {
-                orderItem = orderItemRepository.findById(itemDto.getOrderItemId())
-                        .orElseThrow(() -> new RuntimeException("Order Item not found"));
-                
-                // Validate that orderItem belongs to the parent order
                 if (order != null && (orderItem.getOrder() == null || !orderItem.getOrder().getId().equals(order.getId()))) {
                     throw new RuntimeException("Order Item does not belong to the specified Order: " + dto.getOrderId());
                 }
@@ -167,13 +160,83 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
             crItemRepository.save(item);
         }
 
-        return toResponseDTO(crRepository.save(cr));
+        return getCustomerReturnDetailById(cr.getId());
+    }
+
+    private Staff getAuthenticatedStaff() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
+            throw new RuntimeException("Unauthenticated request");
+        }
+        return userDetails.getStaff();
     }
 
     @Override
     @Transactional
-    public CustomerReturnResponseDTO completeCustomerReturn(Long id) {
-        CustomerReturn cr = getCustomerReturnById(id);
+    public CustomerReturnDetailResponseDTO updateDraftCustomerReturn(Long id, CustomerReturnRequestDTO dto) {
+        validateItemList(dto.getItems());
+
+        CustomerReturn cr = getCustomerReturnEntityById(id);
+        if (cr.getStatus() != DocumentStatus.DRAFT) {
+            throw new RuntimeException("Only DRAFT customer return can be updated");
+        }
+
+        Customer customer = customerRepository.findById(UUID.fromString(dto.getCustomerId()))
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        Order order = null;
+        if (dto.getOrderId() != null) {
+            order = orderRepository.findById(dto.getOrderId()).orElse(null);
+        }
+
+        Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
+                .orElseThrow(() -> new RuntimeException("Warehouse not found"));
+
+        BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
+
+        cr.setCustomer(customer);
+        cr.setOrder(order);
+        cr.setWarehouse(warehouse);
+        cr.setNote(dto.getNote());
+        cr.setDiscountAmount(discount);
+        cr.setSurchargeAmount(surcharge);
+        cr.setTotalRefund(calculateTotalRefund(dto.getItems(), surcharge, discount));
+
+        crItemRepository.deleteByCustomerReturnId(cr.getId());
+        for (CustomerReturnRequestDTO.CustomerReturnItemRequestDTO itemDto : dto.getItems()) {
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            OrderItem orderItem = null;
+            if (itemDto.getOrderItemId() != null) {
+                orderItem = orderItemRepository.findById(itemDto.getOrderItemId())
+                        .orElseThrow(() -> new RuntimeException("Order Item not found"));
+                
+                if (order != null && (orderItem.getOrder() == null || !orderItem.getOrder().getId().equals(order.getId()))) {
+                    throw new RuntimeException("Order Item does not belong to the specified Order: " + dto.getOrderId());
+                }
+            }
+
+            CustomerReturnItem item = CustomerReturnItem.builder()
+                    .customerReturn(cr)
+                    .orderItem(orderItem)
+                    .product(product)
+                    .qty(itemDto.getQty())
+                    .refundAmount(itemDto.getRefundAmount())
+                    .build();
+
+            crItemRepository.save(item);
+        }
+
+        crRepository.save(cr);
+        return getCustomerReturnDetailById(cr.getId());
+    }
+
+    @Override
+    @Transactional
+    public CustomerReturnDetailResponseDTO completeCustomerReturn(Long id) {
+        CustomerReturn cr = getCustomerReturnEntityById(id);
 
         if (cr.getStatus() == DocumentStatus.CANCELLED) {
             throw new RuntimeException("Cancelled return cannot be completed");
@@ -202,14 +265,14 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
 
             movementRepository.save(act);
         }
-        return toResponseDTO(cr);
+        return getCustomerReturnDetailById(cr.getId());
     }
 
-    private void validateItemList(List<CustomerReturnRequestDTO.ReturnItemRequestDTO> items) {
+    private void validateItemList(List<CustomerReturnRequestDTO.CustomerReturnItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Customer return items are required");
         }
-        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
+        for (CustomerReturnRequestDTO.CustomerReturnItemRequestDTO itemDto : items) {
             if (itemDto.getQty() == null || itemDto.getQty() <= 0) {
                 throw new RuntimeException("qty must be greater than 0");
             }
@@ -219,20 +282,16 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         }
     }
 
-    private BigDecimal calculateTotalRefund(List<CustomerReturnRequestDTO.ReturnItemRequestDTO> items) {
+    private BigDecimal calculateTotalRefund(List<CustomerReturnRequestDTO.CustomerReturnItemRequestDTO> items, BigDecimal surcharge, BigDecimal discount) {
         BigDecimal totalRefund = BigDecimal.ZERO;
-        for (CustomerReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
+        for (CustomerReturnRequestDTO.CustomerReturnItemRequestDTO itemDto : items) {
             totalRefund = totalRefund.add(itemDto.getRefundAmount());
         }
-        return totalRefund;
-    }
-
-    private CustomerReturnResponseDTO toResponseDTO(CustomerReturn cr) {
-        CustomerReturnResponseDTO res = new CustomerReturnResponseDTO();
-        res.setId(cr.getId());
-        res.setReturnNo(cr.getReturnNo());
-        res.setStatus(cr.getStatus());
-        res.setTotalRefund(cr.getTotalRefund());
-        return res;
+        
+        BigDecimal payable = totalRefund.add(surcharge).subtract(discount);
+        if (payable.compareTo(BigDecimal.ZERO) < 0) {
+            payable = BigDecimal.ZERO;
+        }
+        return payable;
     }
 }

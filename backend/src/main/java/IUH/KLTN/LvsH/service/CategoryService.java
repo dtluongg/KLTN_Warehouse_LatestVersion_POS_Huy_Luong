@@ -1,12 +1,13 @@
 package IUH.KLTN.LvsH.service;
 
-import IUH.KLTN.LvsH.entity.Category;
-import java.util.List;
+import IUH.KLTN.LvsH.dto.category.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface CategoryService {
-    List<Category> getAllCategories();
-    Category getCategoryById(Long id);
-    Category createCategory(Category category);
-    Category updateCategory(Long id, Category category);
+    Page<CategoryResponseDTO> getAllCategories(CategorySearchCriteria criteria, Pageable pageable);
+    CategoryResponseDTO getCategoryDetailById(Long id);
+    CategoryResponseDTO createCategory(CategoryRequestDTO request);
+    CategoryResponseDTO updateCategory(Long id, CategoryRequestDTO request);
     void deleteCategory(Long id);
 }

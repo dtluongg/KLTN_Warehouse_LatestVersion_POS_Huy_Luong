@@ -1,17 +1,14 @@
 package IUH.KLTN.LvsH.service;
 
 import IUH.KLTN.LvsH.dto.CouponPreviewResponseDTO;
-import IUH.KLTN.LvsH.dto.OrderRequestDTO;
-import IUH.KLTN.LvsH.dto.OrderResponseDTO;
-import IUH.KLTN.LvsH.entity.Order;
-
+import IUH.KLTN.LvsH.dto.order.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
-import java.util.List;
 
 public interface OrderService {
-    List<Order> getAllOrders();
-    Order getOrderById(Long id);
-    List<OrderResponseDTO.ItemResponseDTO> getOrderItems(Long orderId);
+    Page<OrderListResponseDTO> getAllOrders(OrderSearchCriteria criteria, Pageable pageable);
+    OrderDetailResponseDTO getOrderDetailById(Long id);
+    OrderDetailResponseDTO createOrder(OrderRequestDTO request);
     CouponPreviewResponseDTO previewCoupon(String couponCode, BigDecimal grossAmount);
-    OrderResponseDTO createOrder(OrderRequestDTO req);
 }

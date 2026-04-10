@@ -51,6 +51,14 @@ public class SupplierReturn {
     @Column(name = "total_amount_payable")
     private java.math.BigDecimal totalAmountPayable;
 
+    @Column(name = "discount_amount")
+    @Builder.Default
+    private java.math.BigDecimal discountAmount = java.math.BigDecimal.ZERO;
+
+    @Column(name = "surcharge_amount")
+    @Builder.Default
+    private java.math.BigDecimal surchargeAmount = java.math.BigDecimal.ZERO;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "passwordHash"})

@@ -1,15 +1,18 @@
 package IUH.KLTN.LvsH.service.impl;
 
 import IUH.KLTN.LvsH.dto.StaffSelfUpdateRequestDTO;
+import IUH.KLTN.LvsH.dto.staff.*;
 import IUH.KLTN.LvsH.entity.Staff;
 import IUH.KLTN.LvsH.repository.StaffRepository;
+import IUH.KLTN.LvsH.repository.specification.StaffSpecification;
 import IUH.KLTN.LvsH.service.StaffService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -20,62 +23,86 @@ public class StaffServiceImpl implements StaffService {
     private final PasswordEncoder passwordEncoder;
 
     @Override
-    public List<Staff> getAllStaffs() {
-        return staffRepository.findByDeletedAtIsNull();
+    public Page<StaffResponseDTO> getAllStaffs(StaffSearchCriteria criteria, Pageable pageable) {
+        Page<Staff> page = staffRepository.findAll(StaffSpecification.withCriteria(criteria), pageable);
+        return page.map(this::toResponseDTO);
     }
 
-    @Override
-    public Staff getStaffById(Long id) {
+    private Staff getStaffById(Long id) {
         return staffRepository.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new RuntimeException("Staff not found"));
+                .orElseThrow(() -> new RuntimeException("Staff not found: " + id));
     }
 
     @Override
-    public Staff createStaff(Staff staff) {
-        // KiÃ¡Â»Æ’m tra username Ã„â€˜ÃƒÂ£ tÃ¡Â»â€œn tÃ¡ÂºÂ¡i chÃ†Â°a
-        Optional<Staff> existingUser = staffRepository.findByUsername(staff.getUsername());
+    public StaffResponseDTO getStaffDetailById(Long id) {
+        return toResponseDTO(getStaffById(id));
+    }
+
+    @Override
+    public StaffResponseDTO createStaff(StaffRequestDTO request) {
+        Optional<Staff> existingUser = staffRepository.findByUsername(request.getUsername());
         if (existingUser.isPresent()) {
             throw new RuntimeException("Username already exists");
         }
-        
-        // Hash password trÃ†Â°Ã¡Â»â€ºc khi lÃ†Â°u
-        if (staff.getPasswordHash() != null && !staff.getPasswordHash().isEmpty()) {
-            staff.setPasswordHash(passwordEncoder.encode(staff.getPasswordHash()));
+
+        Staff staff = Staff.builder()
+                .staffCode(request.getStaffCode())
+                .fullName(request.getFullName())
+                .phone(request.getPhone())
+                .email(request.getEmail())
+                .taxCode(request.getTaxCode())
+                .address(request.getAddress())
+                .hireDate(request.getHireDate())
+                .username(request.getUsername())
+                .role(request.getRole())
+                .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+                .build();
+
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            staff.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        } else {
+            staff.setPasswordHash(passwordEncoder.encode("123456")); // Default fallback, should be handled better in real prod
         }
 
-        return staffRepository.save(staff);
+        return toResponseDTO(staffRepository.save(staff));
     }
 
     @Override
-    public Staff updateStaff(Long id, Staff staffDetails) {
+    public StaffResponseDTO updateStaff(Long id, StaffRequestDTO request) {
         Staff staff = getStaffById(id);
-        staff.setStaffCode(staffDetails.getStaffCode());
-        staff.setFullName(staffDetails.getFullName());
-        staff.setPhone(staffDetails.getPhone());
-        staff.setEmail(staffDetails.getEmail());
-        staff.setTaxCode(staffDetails.getTaxCode());
-        staff.setAddress(staffDetails.getAddress());
-        staff.setHireDate(staffDetails.getHireDate());
-        staff.setIsActive(staffDetails.getIsActive());
-        staff.setRole(staffDetails.getRole());
-
-        // NÃ¡ÂºÂ¿u cÃƒÂ³ truyÃ¡Â»Ân password mÃ¡Â»â€ºi lÃƒÂªn thÃƒÂ¬ mÃ¡Â»â€ºi hash vÃƒÂ  cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t
-        if (staffDetails.getPasswordHash() != null && !staffDetails.getPasswordHash().isEmpty()) {
-            staff.setPasswordHash(passwordEncoder.encode(staffDetails.getPasswordHash()));
+        staff.setStaffCode(request.getStaffCode());
+        staff.setFullName(request.getFullName());
+        staff.setPhone(request.getPhone());
+        staff.setEmail(request.getEmail());
+        staff.setTaxCode(request.getTaxCode());
+        staff.setAddress(request.getAddress());
+        staff.setHireDate(request.getHireDate());
+        staff.setRole(request.getRole());
+        
+        if (request.getIsActive() != null) {
+            staff.setIsActive(request.getIsActive());
         }
 
-        return staffRepository.save(staff);
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            staff.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        }
+
+        return toResponseDTO(staffRepository.save(staff));
     }
 
-    @Override
-    public Staff getCurrentStaff(String username) {
+    private Staff getStaffEntityByUsername(String username) {
         return staffRepository.findByUsernameAndDeletedAtIsNull(username)
                 .orElseThrow(() -> new RuntimeException("Staff not found"));
     }
 
     @Override
-    public Staff updateMyProfile(String username, StaffSelfUpdateRequestDTO request) {
-        Staff staff = getCurrentStaff(username);
+    public StaffResponseDTO getCurrentStaff(String username) {
+        return toResponseDTO(getStaffEntityByUsername(username));
+    }
+
+    @Override
+    public StaffResponseDTO updateMyProfile(String username, StaffSelfUpdateRequestDTO request) {
+        Staff staff = getStaffEntityByUsername(username);
 
         staff.setFullName(request.getFullName());
         staff.setPhone(request.getPhone());
@@ -87,7 +114,7 @@ public class StaffServiceImpl implements StaffService {
             staff.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         }
 
-        return staffRepository.save(staff);
+        return toResponseDTO(staffRepository.save(staff));
     }
 
     @Override
@@ -95,5 +122,23 @@ public class StaffServiceImpl implements StaffService {
         Staff staff = getStaffById(id);
         staff.setDeletedAt(LocalDateTime.now());
         staffRepository.save(staff);
+    }
+
+    private StaffResponseDTO toResponseDTO(Staff staff) {
+        return StaffResponseDTO.builder()
+                .id(staff.getId())
+                .staffCode(staff.getStaffCode())
+                .fullName(staff.getFullName())
+                .phone(staff.getPhone())
+                .email(staff.getEmail())
+                .taxCode(staff.getTaxCode())
+                .address(staff.getAddress())
+                .hireDate(staff.getHireDate())
+                .username(staff.getUsername())
+                .role(staff.getRole())
+                .isActive(staff.getIsActive())
+                .lastLoginAt(staff.getLastLoginAt())
+                .createdAt(staff.getCreatedAt())
+                .build();
     }
 }

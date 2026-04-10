@@ -1,13 +1,15 @@
 package IUH.KLTN.LvsH.service.impl;
 
-import IUH.KLTN.LvsH.dto.StockAdjustmentRequestDTO;
-import IUH.KLTN.LvsH.dto.StockAdjustmentResponseDTO;
+import IUH.KLTN.LvsH.dto.stock_adjustment.*;
 import IUH.KLTN.LvsH.entity.*;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.repository.*;
+import IUH.KLTN.LvsH.repository.specification.StockAdjustmentSpecification;
 import IUH.KLTN.LvsH.service.StockAdjustmentService;
 import IUH.KLTN.LvsH.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,19 +30,59 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
     private final InventoryMovementRepository movementRepository;
 
     @Override
-    public List<StockAdjustment> getAllAdjustments() {
-        return adjustRepository.findAll();
+    public Page<StockAdjustmentListResponseDTO> getAllAdjustments(StockAdjustmentSearchCriteria criteria, Pageable pageable) {
+        Page<StockAdjustment> page = adjustRepository.findAll(StockAdjustmentSpecification.withCriteria(criteria), pageable);
+        return page.map(a -> StockAdjustmentListResponseDTO.builder()
+                .id(a.getId())
+                .adjustNo(a.getAdjustNo())
+                .warehouseName(a.getWarehouse().getName())
+                .adjustDate(a.getAdjustDate())
+                .status(a.getStatus().name())
+                .reason(a.getReason())
+                .note(a.getNote())
+                .createdBy(a.getCreatedBy().getFullName())
+                .createdAt(a.getCreatedAt())
+                .build());
+    }
+
+    private StockAdjustment getStockAdjustmentEntityById(Long id) {
+        return adjustRepository.findById(id).orElseThrow(() -> new RuntimeException("Stock Adjustment not found"));
     }
 
     @Override
-    public StockAdjustment getAdjustmentById(Long id) {
-        return adjustRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Stock Adjustment not found"));
+    @Transactional(readOnly = true)
+    public StockAdjustmentDetailResponseDTO getAdjustmentDetailById(Long id) {
+        StockAdjustment a = getStockAdjustmentEntityById(id);
+        List<StockAdjustmentItem> items = adjustItemRepository.findByAdjustmentId(a.getId());
+        
+        List<StockAdjustmentDetailResponseDTO.StockAdjustmentItemResponseDTO> itemDTOs = items.stream().map(i -> 
+                StockAdjustmentDetailResponseDTO.StockAdjustmentItemResponseDTO.builder()
+                        .id(i.getId())
+                        .productId(i.getProduct().getId())
+                        .productSku(i.getProduct().getSku())
+                        .productName(i.getProduct().getName())
+                        .adjustQty(i.getDiffQty()) // Return the difference
+                        .build()
+        ).collect(Collectors.toList());
+
+        return StockAdjustmentDetailResponseDTO.builder()
+                .id(a.getId())
+                .adjustNo(a.getAdjustNo())
+                .warehouseId(a.getWarehouse().getId())
+                .warehouseName(a.getWarehouse().getName())
+                .adjustDate(a.getAdjustDate())
+                .status(a.getStatus().name())
+                .reason(a.getReason())
+                .note(a.getNote())
+                .createdBy(a.getCreatedBy().getFullName())
+                .createdAt(a.getCreatedAt())
+                .items(itemDTOs)
+                .build();
     }
 
     @Override
     @Transactional
-    public StockAdjustmentResponseDTO createAdjustment(StockAdjustmentRequestDTO dto) {
+    public StockAdjustmentDetailResponseDTO createAdjustment(StockAdjustmentRequestDTO dto) {
         validateItemList(dto.getItems());
 
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
@@ -48,7 +91,7 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
         StockAdjustment adjust = StockAdjustment.builder()
                 .warehouse(warehouse)
-                .adjustDate(LocalDate.now())
+                .adjustDate(dto.getAdjustDate() != null ? dto.getAdjustDate() : LocalDate.now())
                 .status(DocumentStatus.DRAFT)
                 .reason(dto.getReason())
                 .note(dto.getNote())
@@ -59,27 +102,31 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
         String generatedAdjustNo = adjustRepository.findAdjustNoById(adjust.getId());
         adjust.setAdjustNo(generatedAdjustNo);
         
-        for (StockAdjustmentRequestDTO.AdjustmentItemRequestDTO itemDto : dto.getItems()) {
+        for (StockAdjustmentRequestDTO.StockAdjustmentItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
             int systemQty = productRepository.calculateOnHandByWarehouseAndProductId(
                 warehouse.getId(), product.getId());
-            int diffQty = itemDto.getActualQty() - systemQty;
+            int actualQty = systemQty + itemDto.getAdjustQty(); // Because positive=add, negative=subtract
+            if (actualQty < 0) {
+                // Cannot adjust below 0 in total logically, though sometimes supported. Let's enforce >= 0 actual.
+                throw new RuntimeException("Adjustment results in negative actual stock for: " + product.getSku());
+            }
 
             StockAdjustmentItem item = StockAdjustmentItem.builder()
                     .adjustment(adjust)
                     .product(product)
                     .systemQty(systemQty)
-                    .actualQty(itemDto.getActualQty())
-                    .diffQty(diffQty)
+                    .actualQty(actualQty)
+                    .diffQty(itemDto.getAdjustQty())
                     .unitCostSnapshot(product.getAvgCost())
                     .build();
 
             adjustItemRepository.save(item);
         }
 
-        return toResponseDTO(adjust);
+        return getAdjustmentDetailById(adjust.getId());
     }
 
     private Staff getAuthenticatedStaff() {
@@ -92,10 +139,10 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
     @Override
     @Transactional
-    public StockAdjustmentResponseDTO updateDraftAdjustment(Long id, StockAdjustmentRequestDTO dto) {
+    public StockAdjustmentDetailResponseDTO updateDraftAdjustment(Long id, StockAdjustmentRequestDTO dto) {
         validateItemList(dto.getItems());
 
-        StockAdjustment adjust = getAdjustmentById(id);
+        StockAdjustment adjust = getStockAdjustmentEntityById(id);
         if (adjust.getStatus() != DocumentStatus.DRAFT) {
             throw new RuntimeException("Only DRAFT stock adjustment can be updated");
         }
@@ -104,37 +151,42 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
 
         adjust.setWarehouse(warehouse);
+        adjust.setAdjustDate(dto.getAdjustDate() != null ? dto.getAdjustDate() : LocalDate.now());
         adjust.setReason(dto.getReason());
         adjust.setNote(dto.getNote());
 
         adjustItemRepository.deleteByAdjustmentId(adjust.getId());
-        for (StockAdjustmentRequestDTO.AdjustmentItemRequestDTO itemDto : dto.getItems()) {
+        for (StockAdjustmentRequestDTO.StockAdjustmentItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
             int systemQty = productRepository.calculateOnHandByWarehouseAndProductId(
                     warehouse.getId(), product.getId());
-            int diffQty = itemDto.getActualQty() - systemQty;
+            int actualQty = systemQty + itemDto.getAdjustQty();
+            if (actualQty < 0) {
+                throw new RuntimeException("Adjustment results in negative actual stock for: " + product.getSku());
+            }
 
             StockAdjustmentItem item = StockAdjustmentItem.builder()
                     .adjustment(adjust)
                     .product(product)
                     .systemQty(systemQty)
-                    .actualQty(itemDto.getActualQty())
-                    .diffQty(diffQty)
+                    .actualQty(actualQty)
+                    .diffQty(itemDto.getAdjustQty())
                     .unitCostSnapshot(product.getAvgCost())
                     .build();
 
             adjustItemRepository.save(item);
         }
 
-        return toResponseDTO(adjustRepository.save(adjust));
+        adjustRepository.save(adjust);
+        return getAdjustmentDetailById(adjust.getId());
     }
 
     @Override
     @Transactional
-    public StockAdjustmentResponseDTO completeAdjustment(Long id) {
-        StockAdjustment adjust = getAdjustmentById(id);
+    public StockAdjustmentDetailResponseDTO completeAdjustment(Long id) {
+        StockAdjustment adjust = getStockAdjustmentEntityById(id);
 
         if (adjust.getStatus() == DocumentStatus.CANCELLED) {
             throw new RuntimeException("Cancelled adjustment cannot be completed");
@@ -151,7 +203,6 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
         for (StockAdjustmentItem item : items) {
             Product product = item.getProduct();
 
-            // Náº¿u khÃ´ng cÃ³ khÃ¡c biá»‡t, bá» qua
             if (item.getDiffQty() == 0) {
                 continue;
             }
@@ -172,25 +223,12 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
             movementRepository.save(act);
         }
-        return toResponseDTO(adjust);
+        return getAdjustmentDetailById(adjust.getId());
     }
 
-    private void validateItemList(List<StockAdjustmentRequestDTO.AdjustmentItemRequestDTO> items) {
+    private void validateItemList(List<StockAdjustmentRequestDTO.StockAdjustmentItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Stock adjustment items are required");
         }
-        for (StockAdjustmentRequestDTO.AdjustmentItemRequestDTO itemDto : items) {
-            if (itemDto.getActualQty() == null || itemDto.getActualQty() < 0) {
-                throw new RuntimeException("actualQty must be >= 0");
-            }
-        }
-    }
-
-    private StockAdjustmentResponseDTO toResponseDTO(StockAdjustment adjust) {
-        StockAdjustmentResponseDTO res = new StockAdjustmentResponseDTO();
-        res.setId(adjust.getId());
-        res.setAdjustNo(adjust.getAdjustNo());
-        res.setStatus(adjust.getStatus());
-        return res;
     }
 }

@@ -1,13 +1,14 @@
 package IUH.KLTN.LvsH.service;
 
-import IUH.KLTN.LvsH.entity.Supplier;
-import java.util.List;
+import IUH.KLTN.LvsH.dto.supplier.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface SupplierService {
-    List<Supplier> getAllSuppliers();
-    Supplier getSupplierById(UUID id);
-    Supplier createSupplier(Supplier supplier);
-    Supplier updateSupplier(UUID id, Supplier supplier);
+    Page<SupplierResponseDTO> getAllSuppliers(SupplierSearchCriteria criteria, Pageable pageable);
+    SupplierResponseDTO getSupplierDetailById(UUID id);
+    SupplierResponseDTO createSupplier(SupplierRequestDTO request);
+    SupplierResponseDTO updateSupplier(UUID id, SupplierRequestDTO request);
     void deleteSupplier(UUID id);
 }

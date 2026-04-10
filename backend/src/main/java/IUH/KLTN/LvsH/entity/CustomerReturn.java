@@ -45,6 +45,14 @@ public class CustomerReturn {
     @Column(name = "total_refund", nullable = false)
     private java.math.BigDecimal totalRefund;
 
+    @Column(name = "discount_amount")
+    @Builder.Default
+    private java.math.BigDecimal discountAmount = java.math.BigDecimal.ZERO;
+
+    @Column(name = "surcharge_amount")
+    @Builder.Default
+    private java.math.BigDecimal surchargeAmount = java.math.BigDecimal.ZERO;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "passwordHash"})

@@ -1,13 +1,16 @@
 package IUH.KLTN.LvsH.service.impl;
 
+import IUH.KLTN.LvsH.dto.category.*;
 import IUH.KLTN.LvsH.entity.Category;
 import IUH.KLTN.LvsH.repository.CategoryRepository;
+import IUH.KLTN.LvsH.repository.specification.CategorySpecification;
 import IUH.KLTN.LvsH.service.CategoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -16,28 +19,40 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
 
     @Override
-    public List<Category> getAllCategories() {
-        return categoryRepository.findByDeletedAtIsNull();
+    public Page<CategoryResponseDTO> getAllCategories(CategorySearchCriteria criteria, Pageable pageable) {
+        Page<Category> page = categoryRepository.findAll(CategorySpecification.withCriteria(criteria), pageable);
+        return page.map(this::toResponseDTO);
     }
 
-    @Override
-    public Category getCategoryById(Long id) {
+    private Category getCategoryById(Long id) {
         return categoryRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
     }
 
     @Override
-    public Category createCategory(Category category) {
-        return categoryRepository.save(category);
+    public CategoryResponseDTO getCategoryDetailById(Long id) {
+        return toResponseDTO(getCategoryById(id));
     }
 
     @Override
-    public Category updateCategory(Long id, Category categoryDetails) {
+    public CategoryResponseDTO createCategory(CategoryRequestDTO request) {
+        Category category = Category.builder()
+                .name(request.getName())
+                .slug(request.getSlug())
+                .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+                .build();
+        return toResponseDTO(categoryRepository.save(category));
+    }
+
+    @Override
+    public CategoryResponseDTO updateCategory(Long id, CategoryRequestDTO request) {
         Category category = getCategoryById(id);
-        category.setName(categoryDetails.getName());
-        category.setSlug(categoryDetails.getSlug());
-        category.setIsActive(categoryDetails.getIsActive());
-        return categoryRepository.save(category);
+        category.setName(request.getName());
+        category.setSlug(request.getSlug());
+        if(request.getIsActive() != null) {
+            category.setIsActive(request.getIsActive());
+        }
+        return toResponseDTO(categoryRepository.save(category));
     }
 
     @Override
@@ -45,5 +60,14 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = getCategoryById(id);
         category.setDeletedAt(LocalDateTime.now());
         categoryRepository.save(category);
+    }
+
+    private CategoryResponseDTO toResponseDTO(Category category) {
+        return CategoryResponseDTO.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .slug(category.getSlug())
+                .isActive(category.getIsActive())
+                .build();
     }
 }

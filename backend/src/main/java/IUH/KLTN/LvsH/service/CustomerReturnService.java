@@ -1,15 +1,13 @@
 package IUH.KLTN.LvsH.service;
 
-import IUH.KLTN.LvsH.dto.CustomerReturnRequestDTO;
-import IUH.KLTN.LvsH.dto.CustomerReturnResponseDTO;
-import IUH.KLTN.LvsH.entity.CustomerReturn;
-
-import java.util.List;
+import IUH.KLTN.LvsH.dto.customer_return.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface CustomerReturnService {
-    List<CustomerReturn> getAllCustomerReturns();
-    CustomerReturn getCustomerReturnById(Long id);
-    CustomerReturnResponseDTO createCustomerReturn(CustomerReturnRequestDTO dto);
-    CustomerReturnResponseDTO updateDraftCustomerReturn(Long id, CustomerReturnRequestDTO dto);
-    CustomerReturnResponseDTO completeCustomerReturn(Long id);
+    Page<CustomerReturnListResponseDTO> getAllCustomerReturns(CustomerReturnSearchCriteria criteria, Pageable pageable);
+    CustomerReturnDetailResponseDTO getCustomerReturnDetailById(Long id);
+    CustomerReturnDetailResponseDTO createCustomerReturn(CustomerReturnRequestDTO request);
+    CustomerReturnDetailResponseDTO updateDraftCustomerReturn(Long id, CustomerReturnRequestDTO request);
+    CustomerReturnDetailResponseDTO completeCustomerReturn(Long id);
 }

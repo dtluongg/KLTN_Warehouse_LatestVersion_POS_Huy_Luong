@@ -1,14 +1,16 @@
 package IUH.KLTN.LvsH.service.impl;
 
-import IUH.KLTN.LvsH.dto.SupplierReturnRequestDTO;
-import IUH.KLTN.LvsH.dto.SupplierReturnResponseDTO;
+import IUH.KLTN.LvsH.dto.supplier_return.*;
 import IUH.KLTN.LvsH.entity.*;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.enums.InventoryMovementType;
 import IUH.KLTN.LvsH.repository.*;
+import IUH.KLTN.LvsH.repository.specification.SupplierReturnSpecification;
 import IUH.KLTN.LvsH.service.SupplierReturnService;
 import IUH.KLTN.LvsH.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,19 +36,72 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
     private final InventoryMovementRepository movementRepository;
 
     @Override
-    public List<SupplierReturn> getAllSupplierReturns() {
-        return srRepository.findAll();
+    public Page<SupplierReturnListResponseDTO> getAllSupplierReturns(SupplierReturnSearchCriteria criteria, Pageable pageable) {
+        Page<SupplierReturn> page = srRepository.findAll(SupplierReturnSpecification.withCriteria(criteria), pageable);
+        return page.map(sr -> SupplierReturnListResponseDTO.builder()
+                .id(sr.getId())
+                .returnNo(sr.getReturnNo())
+                .supplierName(sr.getSupplier().getName())
+                .goodsReceiptId(sr.getGoodsReceipt() != null ? sr.getGoodsReceipt().getId() : null)
+                .warehouseName(sr.getWarehouse() != null ? sr.getWarehouse().getName() : null)
+                .returnDate(sr.getReturnDate())
+                .status(sr.getStatus().name())
+                .totalAmountPayable(sr.getTotalAmountPayable())
+                .createdBy(sr.getCreatedBy().getFullName())
+                .createdAt(sr.getCreatedAt())
+                .note(sr.getNote())
+                .build());
+    }
+
+    private SupplierReturn getSupplierReturnEntityById(Long id) {
+        return srRepository.findById(id).orElseThrow(() -> new RuntimeException("Supplier Return not found: " + id));
     }
 
     @Override
-    public SupplierReturn getSupplierReturnById(Long id) {
-        return srRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Supplier Return not found: " + id));
+    @Transactional(readOnly = true)
+    public SupplierReturnDetailResponseDTO getSupplierReturnDetailById(Long id) {
+        SupplierReturn sr = getSupplierReturnEntityById(id);
+        List<SupplierReturnItem> items = srItemRepository.findBySupplierReturnId(sr.getId());
+        
+        List<SupplierReturnDetailResponseDTO.SupplierReturnItemResponseDTO> itemDTOs = items.stream().map(i -> 
+                SupplierReturnDetailResponseDTO.SupplierReturnItemResponseDTO.builder()
+                        .id(i.getId())
+                        .productId(i.getProduct().getId())
+                        .productSku(i.getProduct().getSku())
+                        .productName(i.getProduct().getName())
+                        .goodsReceiptItemId(i.getGoodsReceiptItem() != null ? i.getGoodsReceiptItem().getId() : null)
+                        .qty(i.getQty())
+                        .returnAmount(i.getReturnAmount())
+                        .note(i.getNote())
+                        .build()
+        ).collect(Collectors.toList());
+
+        return SupplierReturnDetailResponseDTO.builder()
+                .id(sr.getId())
+                .returnNo(sr.getReturnNo())
+                .supplierId(sr.getSupplier().getId().toString())
+                .supplierName(sr.getSupplier().getName())
+                .goodsReceiptId(sr.getGoodsReceipt() != null ? sr.getGoodsReceipt().getId() : null)
+                .goodsReceiptNo(sr.getGoodsReceipt() != null ? sr.getGoodsReceipt().getGrNo() : null)
+                .warehouseId(sr.getWarehouse() != null ? sr.getWarehouse().getId() : null)
+                .warehouseName(sr.getWarehouse() != null ? sr.getWarehouse().getName() : null)
+                .returnDate(sr.getReturnDate())
+                .status(sr.getStatus().name())
+                .note(sr.getNote())
+                .totalAmount(sr.getTotalAmount())
+                .totalVat(sr.getTotalVat())
+                .discountAmount(sr.getDiscountAmount())
+                .surchargeAmount(sr.getSurchargeAmount())
+                .totalAmountPayable(sr.getTotalAmountPayable())
+                .createdBy(sr.getCreatedBy().getFullName())
+                .createdAt(sr.getCreatedAt())
+                .items(itemDTOs)
+                .build();
     }
 
     @Override
     @Transactional
-    public SupplierReturnResponseDTO createSupplierReturn(SupplierReturnRequestDTO dto) {
+    public SupplierReturnDetailResponseDTO createSupplierReturn(SupplierReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
         Supplier supplier = supplierRepository.findById(UUID.fromString(dto.getSupplierId()))
@@ -59,7 +115,10 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             goodsReceipt = grRepository.findById(dto.getGoodsReceiptId()).orElse(null);
         }
 
-        Totals totals = calculateTotals(dto.getItems());
+        BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
+
+        Totals totals = calculateTotals(dto.getItems(), surcharge, discount);
 
         SupplierReturn sr = SupplierReturn.builder()
                 .supplier(supplier)
@@ -68,6 +127,8 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
                 .returnDate(LocalDate.now())
                 .status(DocumentStatus.DRAFT)
                 .note(dto.getNote())
+                .discountAmount(discount)
+                .surchargeAmount(surcharge)
                 .totalAmount(totals.totalAmount)
                 .totalVat(totals.totalVat)
                 .totalAmountPayable(totals.totalAmountPayable)
@@ -78,7 +139,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         String generatedReturnNo = srRepository.findReturnNoById(sr.getId());
         sr.setReturnNo(generatedReturnNo);
 
-        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
+        for (SupplierReturnRequestDTO.SupplierReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -87,7 +148,6 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
                 grItem = grItemRepository.findById(itemDto.getGoodsReceiptItemId())
                         .orElseThrow(() -> new RuntimeException("Goods Receipt Item not found"));
                 
-                // Validate that grItem belongs to the parent goodsReceipt
                 if (goodsReceipt != null && (grItem.getGoodsReceipt() == null || !grItem.getGoodsReceipt().getId().equals(goodsReceipt.getId()))) {
                     throw new RuntimeException("Goods Receipt Item does not belong to the specified Goods Receipt: " + dto.getGoodsReceiptId());
                 }
@@ -105,7 +165,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             srItemRepository.save(item);
         }
 
-        return toResponseDTO(sr);
+        return getSupplierReturnDetailById(sr.getId());
     }
 
     private Staff getAuthenticatedStaff() {
@@ -118,10 +178,10 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
 
     @Override
     @Transactional
-    public SupplierReturnResponseDTO updateDraftSupplierReturn(Long id, SupplierReturnRequestDTO dto) {
+    public SupplierReturnDetailResponseDTO updateDraftSupplierReturn(Long id, SupplierReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
-        SupplierReturn sr = getSupplierReturnById(id);
+        SupplierReturn sr = getSupplierReturnEntityById(id);
         if (sr.getStatus() != DocumentStatus.DRAFT) {
             throw new RuntimeException("Only DRAFT supplier return can be updated");
         }
@@ -136,18 +196,23 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             goodsReceipt = grRepository.findById(dto.getGoodsReceiptId()).orElse(null);
         }
 
-        Totals totals = calculateTotals(dto.getItems());
+        BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
+
+        Totals totals = calculateTotals(dto.getItems(), surcharge, discount);
 
         sr.setSupplier(supplier);
         sr.setGoodsReceipt(goodsReceipt);
         sr.setWarehouse(warehouse);
         sr.setNote(dto.getNote());
+        sr.setDiscountAmount(discount);
+        sr.setSurchargeAmount(surcharge);
         sr.setTotalAmount(totals.totalAmount);
         sr.setTotalVat(totals.totalVat);
         sr.setTotalAmountPayable(totals.totalAmountPayable);
 
         srItemRepository.deleteBySupplierReturnId(sr.getId());
-        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : dto.getItems()) {
+        for (SupplierReturnRequestDTO.SupplierReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -156,7 +221,6 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
                 grItem = grItemRepository.findById(itemDto.getGoodsReceiptItemId())
                         .orElseThrow(() -> new RuntimeException("Goods Receipt Item not found"));
                 
-                // Validate that grItem belongs to the parent goodsReceipt
                 if (goodsReceipt != null && (grItem.getGoodsReceipt() == null || !grItem.getGoodsReceipt().getId().equals(goodsReceipt.getId()))) {
                     throw new RuntimeException("Goods Receipt Item does not belong to the specified Goods Receipt: " + dto.getGoodsReceiptId());
                 }
@@ -174,13 +238,14 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             srItemRepository.save(item);
         }
 
-        return toResponseDTO(srRepository.save(sr));
+        srRepository.save(sr);
+        return getSupplierReturnDetailById(sr.getId());
     }
 
     @Override
     @Transactional
-    public SupplierReturnResponseDTO completeSupplierReturn(Long id) {
-        SupplierReturn sr = getSupplierReturnById(id);
+    public SupplierReturnDetailResponseDTO completeSupplierReturn(Long id) {
+        SupplierReturn sr = getSupplierReturnEntityById(id);
 
         if (sr.getStatus() == DocumentStatus.CANCELLED) {
             throw new RuntimeException("Cancelled return cannot be completed");
@@ -208,14 +273,14 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             movementRepository.save(movement);
         }
 
-        return toResponseDTO(sr);
+        return getSupplierReturnDetailById(sr.getId());
     }
 
-    private void validateItemList(List<SupplierReturnRequestDTO.ReturnItemRequestDTO> items) {
+    private void validateItemList(List<SupplierReturnRequestDTO.SupplierReturnItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Supplier return items are required");
         }
-        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
+        for (SupplierReturnRequestDTO.SupplierReturnItemRequestDTO itemDto : items) {
             if (itemDto.getQty() == null || itemDto.getQty() <= 0) {
                 throw new RuntimeException("qty must be greater than 0");
             }
@@ -225,11 +290,11 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         }
     }
 
-    private Totals calculateTotals(List<SupplierReturnRequestDTO.ReturnItemRequestDTO> items) {
+    private Totals calculateTotals(List<SupplierReturnRequestDTO.SupplierReturnItemRequestDTO> items, BigDecimal surcharge, BigDecimal discount) {
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal totalVat = BigDecimal.ZERO;
 
-        for (SupplierReturnRequestDTO.ReturnItemRequestDTO itemDto : items) {
+        for (SupplierReturnRequestDTO.SupplierReturnItemRequestDTO itemDto : items) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -241,7 +306,12 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             totalVat = totalVat.add(lineVat);
         }
 
-        return new Totals(totalAmount, totalVat, totalAmount.add(totalVat));
+        BigDecimal payable = totalAmount.add(totalVat).add(surcharge).subtract(discount);
+        if (payable.compareTo(BigDecimal.ZERO) < 0) {
+            payable = BigDecimal.ZERO;
+        }
+
+        return new Totals(totalAmount, totalVat, payable);
     }
 
     private static class Totals {
@@ -254,16 +324,5 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             this.totalVat = totalVat;
             this.totalAmountPayable = totalAmountPayable;
         }
-    }
-
-    private SupplierReturnResponseDTO toResponseDTO(SupplierReturn sr) {
-        SupplierReturnResponseDTO res = new SupplierReturnResponseDTO();
-        res.setId(sr.getId());
-        res.setReturnNo(sr.getReturnNo());
-        res.setStatus(sr.getStatus());
-        res.setTotalAmount(sr.getTotalAmount());
-        res.setTotalVat(sr.getTotalVat());
-        res.setTotalAmountPayable(sr.getTotalAmountPayable());
-        return res;
     }
 }

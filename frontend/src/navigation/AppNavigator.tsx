@@ -24,6 +24,11 @@ import CouponListScreen from "../screens/CouponListScreen";
 import StaffListScreen from "../screens/StaffListScreen";
 import WarehouseListScreen from "../screens/WarehouseListScreen";
 import AiSqlChatScreen from "../screens/AiSqlChatScreen";
+import PurchaseOrderFormScreen from "../screens/PurchaseOrderFormScreen";
+import GoodsReceiptFormScreen from "../screens/GoodsReceiptFormScreen";
+import CustomerReturnFormScreen from "../screens/CustomerReturnFormScreen";
+import SupplierReturnFormScreen from "../screens/SupplierReturnFormScreen";
+import StockAdjustmentFormScreen from "../screens/StockAdjustmentFormScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -143,6 +148,31 @@ export default function AppNavigator() {
                             name="AiSqlChat"
                             component={AiSqlChatScreen}
                             options={{ title: "AI Chat SQL" }}
+                        />
+                        <Stack.Screen
+                            name="PurchaseOrderForm"
+                            component={PurchaseOrderFormScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name="GoodsReceiptForm"
+                            component={GoodsReceiptFormScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name="CustomerReturnForm"
+                            component={CustomerReturnFormScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name="SupplierReturnForm"
+                            component={SupplierReturnFormScreen}
+                            options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                            name="StockAdjustmentForm"
+                            component={StockAdjustmentFormScreen}
+                            options={{ headerShown: false }}
                         />
                     </>
                 )}

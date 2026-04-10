@@ -1,15 +1,13 @@
 package IUH.KLTN.LvsH.service;
 
-import IUH.KLTN.LvsH.dto.StockAdjustmentRequestDTO;
-import IUH.KLTN.LvsH.dto.StockAdjustmentResponseDTO;
-import IUH.KLTN.LvsH.entity.StockAdjustment;
-
-import java.util.List;
+import IUH.KLTN.LvsH.dto.stock_adjustment.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface StockAdjustmentService {
-    List<StockAdjustment> getAllAdjustments();
-    StockAdjustment getAdjustmentById(Long id);
-    StockAdjustmentResponseDTO createAdjustment(StockAdjustmentRequestDTO dto);
-    StockAdjustmentResponseDTO updateDraftAdjustment(Long id, StockAdjustmentRequestDTO dto);
-    StockAdjustmentResponseDTO completeAdjustment(Long id);
+    Page<StockAdjustmentListResponseDTO> getAllAdjustments(StockAdjustmentSearchCriteria criteria, Pageable pageable);
+    StockAdjustmentDetailResponseDTO getAdjustmentDetailById(Long id);
+    StockAdjustmentDetailResponseDTO createAdjustment(StockAdjustmentRequestDTO request);
+    StockAdjustmentDetailResponseDTO updateDraftAdjustment(Long id, StockAdjustmentRequestDTO request);
+    StockAdjustmentDetailResponseDTO completeAdjustment(Long id);
 }

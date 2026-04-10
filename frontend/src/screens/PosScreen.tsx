@@ -112,7 +112,7 @@ export const PosScreen = () => {
     const fetchWarehouses = async () => {
         try {
             const res = await axiosClient.get("/warehouses");
-            setWarehouses(res.data);
+            setWarehouses(res.data.content || res.data || []);
         } catch (e) {
             console.log("Lỗi fetch kho:", e);
         }
@@ -142,7 +142,7 @@ export const PosScreen = () => {
     const fetchCustomers = async () => {
         try {
             const res = await axiosClient.get("/customers");
-            setCustomers(res.data);
+            setCustomers(res.data.content || res.data || []);
         } catch (error) {
             console.log("Lỗi fetch khách hàng:", error);
         }

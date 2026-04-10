@@ -1,16 +1,18 @@
 package IUH.KLTN.LvsH.service.impl;
 
 import IUH.KLTN.LvsH.dto.CouponPreviewResponseDTO;
-import IUH.KLTN.LvsH.dto.OrderRequestDTO;
-import IUH.KLTN.LvsH.dto.OrderResponseDTO;
+import IUH.KLTN.LvsH.dto.order.*;
 import IUH.KLTN.LvsH.entity.*;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.enums.PaymentMethod;
 import IUH.KLTN.LvsH.enums.SalesChannel;
 import IUH.KLTN.LvsH.repository.*;
+import IUH.KLTN.LvsH.repository.specification.OrderSpecification;
 import IUH.KLTN.LvsH.security.CustomUserDetails;
 import IUH.KLTN.LvsH.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -33,74 +35,79 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerRepository customerRepository;
     private final InventoryMovementRepository movementRepository;
     private final WarehouseRepository warehouseRepository;
-        private final CouponRepository couponRepository;
+    private final CouponRepository couponRepository;
 
     @Override
-    public List<Order> getAllOrders() {
-        return orderRepository.findAll();
+    public Page<OrderListResponseDTO> getAllOrders(OrderSearchCriteria criteria, Pageable pageable) {
+        Page<Order> page = orderRepository.findAll(OrderSpecification.withCriteria(criteria), pageable);
+        return page.map(o -> OrderListResponseDTO.builder()
+                .id(o.getId())
+                .orderNo(o.getOrderNo())
+                .salesChannel(o.getSalesChannel().name())
+                .customerName(o.getCustomer() != null ? o.getCustomer().getName() : null)
+                .warehouseName(o.getWarehouse().getName())
+                .orderTime(o.getOrderTime())
+                .status(o.getStatus().name())
+                .netAmount(o.getNetAmount())
+                .grossAmount(o.getGrossAmount())
+                .discountAmount(o.getDiscountAmount())
+                .couponDiscountAmount(o.getCouponDiscountAmount())
+                .surchargeAmount(o.getSurchargeAmount())
+                .note(o.getNote())
+                .paymentMethod(o.getPaymentMethod().name())
+                .createdBy(o.getCreatedBy().getFullName())
+                .build());
     }
 
-    @Override
-    public Order getOrderById(Long id) {
-        return orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found: " + id));
+    private Order getOrderEntityById(Long id) {
+        return orderRepository.findById(id).orElseThrow(() -> new RuntimeException("Order not found: " + id));
     }
 
     @Override
     @Transactional(readOnly = true)
-        public List<OrderResponseDTO.ItemResponseDTO> getOrderItems(Long orderId) {
-        // Ensure the order exists before fetching items.
-        getOrderById(orderId);
-        return orderItemRepository.findByOrderId(orderId)
-                .stream()
-            .map(item -> OrderResponseDTO.ItemResponseDTO.builder()
-                        .id(item.getId())
-                        .qty(item.getQty())
-                        .salePrice(item.getSalePrice())
-                        .lineRevenue(item.getLineRevenue())
-                .product(OrderResponseDTO.ProductLiteDTO.builder()
-                                .id(item.getProduct().getId())
-                                .sku(item.getProduct().getSku())
-                                .name(item.getProduct().getName())
-                                .build())
-                        .build())
-                .collect(Collectors.toList());
+    public OrderDetailResponseDTO getOrderDetailById(Long id) {
+        Order o = getOrderEntityById(id);
+        List<OrderItem> items = orderItemRepository.findByOrderId(o.getId());
+        
+        List<OrderDetailResponseDTO.OrderItemResponseDTO> itemDTOs = items.stream().map(i -> OrderDetailResponseDTO.OrderItemResponseDTO.builder()
+                .id(i.getId())
+                .productId(i.getProduct().getId())
+                .productSku(i.getProduct().getSku())
+                .productName(i.getProduct().getName())
+                .qty(i.getQty())
+                .salePrice(i.getSalePrice())
+                .lineRevenue(i.getLineRevenue())
+                .build()).collect(Collectors.toList());
+
+        return OrderDetailResponseDTO.builder()
+                .id(o.getId())
+                .orderNo(o.getOrderNo())
+                .salesChannel(o.getSalesChannel().name())
+                .customerId(o.getCustomer() != null ? o.getCustomer().getId() : null)
+                .customerName(o.getCustomer() != null ? o.getCustomer().getName() : null)
+                .customerPhone(o.getCustomer() != null ? o.getCustomer().getPhone() : null)
+                .warehouseId(o.getWarehouse().getId())
+                .warehouseName(o.getWarehouse().getName())
+                .orderTime(o.getOrderTime())
+                .status(o.getStatus().name())
+                .paymentMethod(o.getPaymentMethod().name())
+                .note(o.getNote())
+                .grossAmount(o.getGrossAmount())
+                .discountAmount(o.getDiscountAmount())
+                .couponCode(o.getCouponCode())
+                .couponDiscountAmount(o.getCouponDiscountAmount())
+                .surchargeAmount(o.getSurchargeAmount())
+                .netAmount(o.getNetAmount())
+                .createdBy(o.getCreatedBy().getFullName())
+                .createdAt(o.getCreatedAt())
+                .items(itemDTOs)
+                .build();
     }
-
-        @Override
-        @Transactional(readOnly = true)
-        public CouponPreviewResponseDTO previewCoupon(String couponCode, BigDecimal grossAmount) {
-                CouponPreviewResponseDTO response = new CouponPreviewResponseDTO();
-                BigDecimal safeGross = grossAmount == null ? BigDecimal.ZERO : grossAmount.max(BigDecimal.ZERO);
-                String normalizedCouponCode = normalizeCouponCode(couponCode);
-
-                response.setCouponCode(normalizedCouponCode);
-                response.setGrossAmount(safeGross);
-
-                try {
-                        CouponCalculation calc = calculateCouponOrThrow(normalizedCouponCode, safeGross, LocalDateTime.now());
-                        response.setValid(true);
-                        response.setDiscountAmount(calc.discountAmount);
-                        response.setPayableAmount(safeGross.subtract(calc.discountAmount).max(BigDecimal.ZERO));
-                        response.setMessage("Coupon is valid");
-                } catch (RuntimeException ex) {
-                        response.setValid(false);
-                        response.setDiscountAmount(BigDecimal.ZERO);
-                        response.setPayableAmount(safeGross);
-                        response.setMessage(ex.getMessage());
-                }
-
-                return response;
-        }
 
     @Override
     @Transactional
-    public OrderResponseDTO createOrder(OrderRequestDTO req) {
+    public OrderDetailResponseDTO createOrder(OrderRequestDTO req) {
         Staff staff = getAuthenticatedStaff();
-
-        if (req.getItems() == null || req.getItems().isEmpty()) {
-            throw new RuntimeException("Order items are required");
-        }
 
         Customer customer = null;
         if (req.getCustomerId() != null) {
@@ -108,44 +115,36 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new RuntimeException("Customer not found"));
         }
 
-        if (req.getPaymentMethod() == PaymentMethod.DEBT && customer == null) {
+        PaymentMethod pMethod = PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase());
+        if (pMethod == PaymentMethod.DEBT && customer == null) {
             throw new RuntimeException("Customer is required for DEBT payment");
         }
 
-        // Láº¥y kho tá»« request (báº¯t buá»™c)
         Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found: " + req.getWarehouseId()));
 
         BigDecimal grossAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for (OrderRequestDTO.ItemRequestDTO itemReq : req.getItems()) {
-            if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
-                throw new RuntimeException("quantity must be greater than 0");
-            }
-            if (itemReq.getSalePrice() == null || itemReq.getSalePrice().compareTo(BigDecimal.ZERO) < 0) {
-                throw new RuntimeException("salePrice must be >= 0");
-            }
-
+        for (OrderRequestDTO.OrderItemRequestDTO itemReq : req.getItems()) {
             Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found: " + itemReq.getProductId()));
 
-            // Validate on_hand before selling
             int onHand = productRepository.calculateOnHandByWarehouseAndProductId(warehouse.getId(), product.getId());
-            if (onHand < itemReq.getQuantity()) {
+            if (onHand < itemReq.getQty()) {
                 throw new RuntimeException("Insufficient stock for product: " + product.getSku() + 
-                    ". Available: " + onHand + ", Requested: " + itemReq.getQuantity());
+                    ". Available: " + onHand + ", Requested: " + itemReq.getQty());
             }
 
-            BigDecimal lineRevenue = itemReq.getSalePrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
-            BigDecimal lineCogs = product.getAvgCost().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+            BigDecimal lineRevenue = itemReq.getSalePrice().multiply(BigDecimal.valueOf(itemReq.getQty()));
+            BigDecimal lineCogs = product.getAvgCost().multiply(BigDecimal.valueOf(itemReq.getQty()));
             BigDecimal lineProfit = lineRevenue.subtract(lineCogs);
 
             grossAmount = grossAmount.add(lineRevenue);
 
             OrderItem orderItem = OrderItem.builder()
                     .product(product)
-                    .qty(itemReq.getQuantity())
+                    .qty(itemReq.getQty())
                     .salePrice(itemReq.getSalePrice())
                     .costAtSale(product.getAvgCost())
                     .lineRevenue(lineRevenue)
@@ -156,9 +155,6 @@ public class OrderServiceImpl implements OrderService {
             orderItems.add(orderItem);
         }
 
-        BigDecimal discountAmount = req.getDiscountAmount() != null ? req.getDiscountAmount() : BigDecimal.ZERO;
-        BigDecimal surchargeAmount = req.getSurchargeAmount() != null ? req.getSurchargeAmount() : BigDecimal.ZERO;
-
         CouponCalculation couponCalculation = null;
         String normalizedCouponCode = normalizeCouponCode(req.getCouponCode());
         if (normalizedCouponCode != null) {
@@ -167,18 +163,15 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal couponDiscountAmount = couponCalculation != null ? couponCalculation.discountAmount : BigDecimal.ZERO;
 
-        // Táº¡o Order Entity
         Order order = Order.builder()
-                .salesChannel(SalesChannel.POS)
+                .salesChannel(SalesChannel.valueOf(req.getSalesChannel().toUpperCase()))
                 .customer(customer)
                 .warehouse(warehouse)
                 .orderTime(LocalDateTime.now())
-                .status(DocumentStatus.POSTED) // BÃ¡n POS lÃ  chá»‘t ngay
-                .discountAmount(discountAmount)
+                .status(DocumentStatus.POSTED)
                 .couponCode(couponCalculation != null ? couponCalculation.coupon.getCode() : null)
                 .couponDiscountAmount(couponDiscountAmount)
-                .surchargeAmount(surchargeAmount)
-                .paymentMethod(req.getPaymentMethod() != null ? req.getPaymentMethod() : PaymentMethod.CASH)
+                .paymentMethod(pMethod)
                 .note(req.getNote())
                 .createdBy(staff)
                 .build();
@@ -189,7 +182,6 @@ public class OrderServiceImpl implements OrderService {
 
         order.setGrossAmount(grossAmount);
         
-        // TÃ­nh tá»•ng pháº£i tráº£ NetAmount
         BigDecimal netAmount = grossAmount
                 .subtract(order.getDiscountAmount())
                 .subtract(order.getCouponDiscountAmount())
@@ -199,6 +191,7 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.saveAndFlush(order);
         String generatedOrderNo = orderRepository.findOrderNoById(order.getId());
+        order.setOrderNo(generatedOrderNo);
 
         if (couponCalculation != null) {
             int currentUsed = couponCalculation.coupon.getUsedCount() == null ? 0 : couponCalculation.coupon.getUsedCount();
@@ -208,7 +201,6 @@ public class OrderServiceImpl implements OrderService {
         
         List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
 
-        // Sinh Movement (dÃ¹ng láº¡i warehouse Ä‘Ã£ láº¥y tá»« request)
         for (OrderItem savedItem : savedItems) {
             InventoryMovement movement = InventoryMovement.builder()
                     .product(savedItem.getProduct())
@@ -222,15 +214,33 @@ public class OrderServiceImpl implements OrderService {
             movementRepository.save(movement);
         }
 
-        // Chuyá»ƒn Type sang DTO tráº£ vá» cho Frontend
-        OrderResponseDTO res = new OrderResponseDTO();
-        res.setId(order.getId());
-        res.setOrderNo(generatedOrderNo);
-        res.setStatus(order.getStatus());
-        res.setNetAmount(order.getNetAmount());
-        res.setPaymentMethod(order.getPaymentMethod());
+        return getOrderDetailById(order.getId());
+    }
 
-        return res;
+    @Override
+    @Transactional(readOnly = true)
+    public CouponPreviewResponseDTO previewCoupon(String couponCode, BigDecimal grossAmount) {
+        CouponPreviewResponseDTO response = new CouponPreviewResponseDTO();
+        BigDecimal safeGross = grossAmount == null ? BigDecimal.ZERO : grossAmount.max(BigDecimal.ZERO);
+        String normalizedCouponCode = normalizeCouponCode(couponCode);
+
+        response.setCouponCode(normalizedCouponCode);
+        response.setGrossAmount(safeGross);
+
+        try {
+            CouponCalculation calc = calculateCouponOrThrow(normalizedCouponCode, safeGross, LocalDateTime.now());
+            response.setValid(true);
+            response.setDiscountAmount(calc.discountAmount);
+            response.setPayableAmount(safeGross.subtract(calc.discountAmount).max(BigDecimal.ZERO));
+            response.setMessage("Coupon is valid");
+        } catch (RuntimeException ex) {
+            response.setValid(false);
+            response.setDiscountAmount(BigDecimal.ZERO);
+            response.setPayableAmount(safeGross);
+            response.setMessage(ex.getMessage());
+        }
+
+        return response;
     }
 
     private CouponCalculation calculateCouponOrThrow(String couponCode, BigDecimal grossAmount, LocalDateTime now) {

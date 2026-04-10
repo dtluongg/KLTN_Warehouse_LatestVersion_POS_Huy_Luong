@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import * as React from "react";
+import { useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -8,13 +9,15 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Pressable,
+    ScrollView
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
-import { axiosClient } from "../api/axiosClient";
 import { EmptyState, ScreenHeader, SearchBar } from "./ui";
 import { theme } from "../utils/theme";
 import { useResponsive } from "../utils/responsive";
+import { useTablePagination } from "../hooks/useTablePagination";
 
 export interface Column {
     key: string;
@@ -31,7 +34,6 @@ export interface DataTableScreenProps {
     idField?: string;
     searchPlaceholder?: string;
     mobilePreviewCount?: number;
-    detailActionLabel?: string;
     createAction?: {
         label: string;
         onPress: () => void;
@@ -45,9 +47,8 @@ export interface DataTableScreenProps {
         shouldShow?: (row: any) => boolean;
     }>;
     hideDefaultDetailAction?: boolean;
-    showDefaultDetailOnDesktop?: boolean;
-    showDefaultDetailOnMobile?: boolean;
-    mobileCardPressToDetail?: boolean;
+    renderDetailContent?: (row: any) => React.ReactNode; 
+    renderFilters?: (setFilters: (filters: Record<string, any>) => void, currentFilters: Record<string, any>) => React.ReactNode;
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -56,17 +57,15 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
     COMPLETED: { bg: "#d1fae5", text: "#065f46" },
     CANCELLED: { bg: "#fee2e2", text: "#991b1b" },
     PENDING: { bg: "#dbeafe", text: "#1e40af" },
-    ACTIVE: { bg: "#d1fae5", text: "#065f46" },
-    INACTIVE: { bg: "#f3f4f6", text: "#6b7280" },
+    ACTIVE: { bg: "#ccfbf1", text: "#0f766e" },
+    INACTIVE: { bg: "#f1f5f9", text: "#64748b" },
 };
 
 export const StatusBadge = ({ status }: { status: string }) => {
-    const colors = STATUS_COLORS[status] || { bg: "#f3f4f6", text: "#374151" };
+    const colors = STATUS_COLORS[status] || { bg: "#f1f5f9", text: "#475569" };
     return (
         <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-            <Text style={[styles.badgeText, { color: colors.text }]}>
-                {status}
-            </Text>
+            <Text style={[styles.badgeText, { color: colors.text }]}>{status}</Text>
         </View>
     );
 };
@@ -87,99 +86,15 @@ const getTextValue = (value: any): string => {
     return String(value);
 };
 
-const normalizeRenderedTextNode = (
-    node: React.ReactNode,
-    textStyle: any,
-): React.ReactNode => {
-    if (node == null || typeof node === "boolean") {
-        return <Text style={textStyle}>-</Text>;
-    }
-
-    if (typeof node === "string" || typeof node === "number") {
-        return <Text style={textStyle}>{String(node)}</Text>;
-    }
-
-    if (React.isValidElement(node) && node.type === React.Fragment) {
-        const children = (node.props as { children?: unknown })?.children;
-        if (typeof children === "string" || typeof children === "number") {
-            return <Text style={textStyle}>{String(children)}</Text>;
-        }
-        if (
-            Array.isArray(children) &&
-            children.every(
-                (child) =>
-                    typeof child === "string" || typeof child === "number",
-            )
-        ) {
-            return <Text style={textStyle}>{children.join("")}</Text>;
-        }
-    }
-
-    return node;
-};
-
 const getActionToneStyle = (tone?: "primary" | "neutral" | "danger") => {
     switch (tone) {
         case "danger":
-            return {
-                button: styles.rowActionButtonDanger,
-                text: styles.rowActionTextDanger,
-            };
+            return { button: styles.rowActionButtonDanger, text: styles.rowActionTextDanger };
         case "neutral":
-            return {
-                button: styles.rowActionButtonNeutral,
-                text: styles.rowActionTextNeutral,
-            };
+            return { button: styles.rowActionButtonNeutral, text: styles.rowActionTextNeutral };
         default:
-            return {
-                button: styles.rowActionButtonPrimary,
-                text: styles.rowActionTextPrimary,
-            };
+            return { button: styles.rowActionButtonPrimary, text: styles.rowActionTextPrimary };
     }
-};
-
-const MOBILE_COMPACT_DEFAULT_COUNT = 8;
-
-const getMobileFieldPriorityScore = (column: Column): number => {
-    const key = column.key.toLowerCase();
-    const label = column.label.toLowerCase();
-    const haystack = `${key} ${label}`;
-
-    if (/(^|\.)id$|(^|\.)code$|no$/.test(key)) return 100;
-    if (/status|trạng thái/.test(haystack)) return 95;
-    if (/netamount|total|amount|tiền|giá|vat|discount|surcharge/.test(haystack))
-        return 90;
-    if (/date|time|ngày|giờ/.test(haystack)) return 85;
-    if (
-        /customer|supplier|warehouse|createdby|staff|khách|nhà cung|kho|nhân viên|người tạo/.test(
-            haystack,
-        )
-    )
-        return 80;
-    if (/payment|channel|thanh toán|kênh/.test(haystack)) return 75;
-    if (/qty|quantity|sl/.test(haystack)) return 70;
-    if (/note|ghi chú|reason|lý do/.test(haystack)) return 20;
-    return 60;
-};
-
-const pickImportantMobileColumns = (
-    sourceColumns: Column[],
-    maxCount: number,
-): Column[] => {
-    if (sourceColumns.length <= maxCount) return sourceColumns;
-    return sourceColumns
-        .map((col, index) => ({
-            col,
-            index,
-            score: getMobileFieldPriorityScore(col),
-        }))
-        .sort((a, b) => {
-            if (b.score !== a.score) return b.score - a.score;
-            return a.index - b.index;
-        })
-        .slice(0, maxCount)
-        .sort((a, b) => a.index - b.index)
-        .map((item) => item.col);
 };
 
 const DataTableScreen: React.FC<DataTableScreenProps> = ({
@@ -188,422 +103,261 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
     title = "Danh sách",
     idField = "id",
     searchPlaceholder = "Tìm kiếm...",
-    mobilePreviewCount = MOBILE_COMPACT_DEFAULT_COUNT,
-    detailActionLabel = "Chi tiết",
+    mobilePreviewCount = 5,
     createAction,
     rowActions = [],
     hideDefaultDetailAction = false,
-    showDefaultDetailOnDesktop = true,
-    showDefaultDetailOnMobile = false,
-    mobileCardPressToDetail = false,
+    renderFilters,
+    renderDetailContent
 }) => {
-    const [data, setData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [search, setSearch] = useState("");
+    const tablePagination = useTablePagination(apiUrl);
+    const {
+        data, loading, refreshing,
+        pageState, totalElements, totalPages,
+        setPage, setSize, setSort, search, refresh
+    } = tablePagination;
+
+    const [searchInput, setSearchInput] = useState("");
     const [selectedRow, setSelectedRow] = useState<any | null>(null);
+    const [showFilters, setShowFilters] = useState(false);
 
     const { isDesktop } = useResponsive();
 
-    const fetchData = async () => {
-        try {
-            const res = await axiosClient.get(apiUrl);
-            setData(Array.isArray(res.data) ? res.data : []);
-        } catch (e: any) {
-            console.log(`Lỗi tải ${apiUrl}:`, e?.message);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
+    // Prevent immediate API firing on every keystroke
+    const handleSearchSubmit = () => {
+        search(searchInput);
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const onRefresh = () => {
-        setRefreshing(true);
-        fetchData();
+    const handleSort = (colKey: string) => {
+        setSort(colKey);
     };
 
-    const filtered = useMemo(() => {
-        if (!search.trim()) return data;
-        const q = search.toLowerCase();
-        return data.filter((row) =>
-            columns.some((col) => {
-                const v = getNestedValue(row, col.key);
-                return v != null && String(v).toLowerCase().includes(q);
-            }),
-        );
-    }, [columns, data, search]);
+    const hasActionColumn = !hideDefaultDetailAction || rowActions.some((a) => a.showOnDesktop !== false);
 
-    const compactMobileColumns = useMemo(
-        () =>
-            pickImportantMobileColumns(
-                columns,
-                Math.max(1, mobilePreviewCount),
-            ),
-        [columns, mobilePreviewCount],
-    );
-
-    const shouldShowDefaultDetail =
-        !hideDefaultDetailAction &&
-        (isDesktop ? showDefaultDetailOnDesktop : showDefaultDetailOnMobile);
-
-    const visibleCustomActions = (row: any) =>
-        rowActions.filter((action) => {
-            const platformAllowed = isDesktop
-                ? action.showOnDesktop !== false
-                : action.showOnMobile !== false;
-            if (!platformAllowed) return false;
-            if (action.shouldShow) return action.shouldShow(row);
-            return true;
-        });
-
-    const visibleActionsForRow = (row: any) => {
-        const actions = [...visibleCustomActions(row)];
-        if (shouldShowDefaultDetail) {
-            actions.unshift({
-                label: detailActionLabel,
-                onPress: (targetRow: any) => setSelectedRow(targetRow),
-                tone: "primary" as const,
-            });
-        }
-        return actions;
-    };
-
-    const hasActionColumn =
-        shouldShowDefaultDetail ||
-        rowActions.some((action) => action.showOnDesktop !== false);
-
-    const renderMobileValue = (col: Column, row: any) => {
-        const rawValue = getNestedValue(row, col.key);
-        if (!col.render) {
-            return (
-                <Text style={styles.cardValue} numberOfLines={1}>
-                    {getTextValue(rawValue)}
-                </Text>
-            );
-        }
-        return normalizeRenderedTextNode(
-            col.render(rawValue, row),
-            styles.cardValue,
-        );
-    };
-
-    const renderRowActions = (row: any) => {
-        const actions = visibleActionsForRow(row);
-        if (actions.length === 0) return null;
+    const renderPaginationFooter = () => {
         return (
-            <View style={styles.rowActionsWrap}>
-                {actions.map((action, actionIndex) => {
-                    const toneStyle = getActionToneStyle(action.tone);
-                    return (
-                        <TouchableOpacity
-                            key={`${action.label}-${actionIndex}`}
-                            style={[styles.rowActionButton, toneStyle.button]}
-                            onPress={() => action.onPress(row)}
-                        >
-                            <Text
-                                style={[styles.rowActionText, toneStyle.text]}
-                            >
-                                {action.label}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
+            <View style={styles.paginationFooter}>
+                <Text style={styles.paginationText}>
+                    Tổng {totalElements} | Trang {pageState.page + 1}/{Math.max(1, totalPages)}
+                </Text>
+                <View style={styles.paginationActions}>
+                    <TouchableOpacity 
+                        style={[styles.pageButton, pageState.page === 0 && styles.pageButtonDisabled]}
+                        disabled={pageState.page === 0}
+                        onPress={() => setPage(pageState.page - 1)}
+                    >
+                        <Feather name="chevron-left" size={16} color={pageState.page === 0 ? theme.colors.mutedForeground : theme.colors.foreground} />
+                        {!isDesktop ? null : <Text style={styles.pageButtonText}>Trước</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.pageButton, pageState.page >= totalPages - 1 && styles.pageButtonDisabled]}
+                        disabled={pageState.page >= totalPages - 1}
+                        onPress={() => setPage(pageState.page + 1)}
+                    >
+                        {!isDesktop ? null : <Text style={styles.pageButtonText}>Sau</Text>}
+                        <Feather name="chevron-right" size={16} color={pageState.page >= totalPages - 1 ? theme.colors.mutedForeground : theme.colors.foreground} />
+                    </TouchableOpacity>
+                </View>
             </View>
         );
-    };
+    }
 
-    const renderDetailModal = () => (
-        <Modal
-            visible={selectedRow != null}
-            transparent
-            animationType={isDesktop ? "fade" : "slide"}
-            onRequestClose={() => setSelectedRow(null)}
-        >
-            <View
-                style={[
-                    styles.modalOverlay,
-                    !isDesktop && styles.modalOverlayBottomSheet,
-                ]}
-            >
-                <View
-                    style={[
-                        styles.modalBox,
-                        !isDesktop && styles.modalBoxBottomSheet,
-                    ]}
-                >
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Chi tiết bản ghi</Text>
-                        <TouchableOpacity onPress={() => setSelectedRow(null)}>
-                            <Feather
-                                name="x"
-                                size={18}
-                                color={theme.colors.mutedForeground}
-                            />
-                        </TouchableOpacity>
-                    </View>
-
-                    <FlatList
-                        data={columns}
-                        keyExtractor={(col) => col.key}
-                        style={styles.modalList}
-                        renderItem={({ item: col }) => (
-                            <View style={styles.modalRow}>
-                                <Text style={styles.modalLabel}>
-                                    {col.label}
-                                </Text>
-                                <View style={styles.modalValueBox}>
-                                    {col.render && selectedRow ? (
-                                        col.render(
-                                            getNestedValue(
-                                                selectedRow,
-                                                col.key,
-                                            ),
-                                            selectedRow,
-                                        )
-                                    ) : (
-                                        <Text style={styles.modalValue}>
-                                            {selectedRow
-                                                ? getTextValue(
-                                                      getNestedValue(
-                                                          selectedRow,
-                                                          col.key,
-                                                      ),
-                                                  )
-                                                : "-"}
+    const renderMobileCards = () => (
+        <FlatList
+            data={data}
+            keyExtractor={(item, index) => String(item[idField] ?? index)}
+            contentContainerStyle={styles.mobileListContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[theme.colors.primary]} />}
+            renderItem={({ item }) => {
+                const previewCols = columns.slice(0, mobilePreviewCount);
+                return (
+                    <TouchableOpacity 
+                        style={styles.mobileCard}
+                        onPress={() => setSelectedRow(item)}
+                        activeOpacity={0.7}
+                    >
+                        {previewCols.map((col) => (
+                            <View key={col.key} style={styles.cardRow}>
+                                <Text style={styles.cardLabel}>{col.label}</Text>
+                                <View style={styles.cardValueBox}>
+                                    {col.render ? col.render(getNestedValue(item, col.key), item) : (
+                                        <Text style={styles.cardValue} numberOfLines={1}>
+                                            {getTextValue(getNestedValue(item, col.key))}
                                         </Text>
                                     )}
                                 </View>
                             </View>
-                        )}
-                    />
-
-                    {selectedRow ? (
-                        <View style={styles.modalActionsWrap}>
-                            {visibleCustomActions(selectedRow).map(
-                                (action, actionIndex) => {
-                                    const toneStyle = getActionToneStyle(
-                                        action.tone,
-                                    );
-                                    return (
-                                        <TouchableOpacity
-                                            key={`${action.label}-${actionIndex}`}
-                                            style={[
-                                                styles.rowActionButton,
-                                                toneStyle.button,
-                                            ]}
-                                            onPress={() =>
-                                                action.onPress(selectedRow)
-                                            }
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.rowActionText,
-                                                    toneStyle.text,
-                                                ]}
-                                            >
-                                                {action.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                },
-                            )}
-                        </View>
-                    ) : null}
-                </View>
-            </View>
-        </Modal>
+                        ))}
+                    </TouchableOpacity>
+                );
+            }}
+            ListEmptyComponent={<EmptyState title="Không có dữ liệu" />}
+            ListFooterComponent={renderPaginationFooter}
+        />
     );
 
     const renderDesktopTable = () => (
         <View style={styles.tableContainer}>
             <View style={styles.tableHeaderRow}>
                 {columns.map((col) => (
-                    <View
+                    <TouchableOpacity
                         key={col.key}
-                        style={[
-                            styles.tableHeaderCell,
-                            col.width
-                                ? { width: col.width }
-                                : { flex: col.flex || 1 },
-                        ]}
+                        style={[styles.tableHeaderCell, col.width ? { width: col.width } : { flex: col.flex || 1 }]}
+                        onPress={() => handleSort(col.key)}
+                        activeOpacity={0.6}
                     >
                         <Text style={styles.tableHeaderText}>{col.label}</Text>
-                    </View>
+                        {pageState.sortBy === col.key && (
+                            <Feather name={pageState.direction === "asc" ? "chevron-up" : "chevron-down"} size={14} color={theme.colors.primary} />
+                        )}
+                    </TouchableOpacity>
                 ))}
-                {hasActionColumn ? (
-                    <View style={[styles.tableHeaderCell, { width: 180 }]}>
-                        <Text style={styles.tableHeaderText}>Hành động</Text>
-                    </View>
-                ) : null}
+                {hasActionColumn && <View style={[styles.tableHeaderCell, { width: 140 }]}><Text style={styles.tableHeaderText}>Hành động</Text></View>}
             </View>
 
             <FlatList
-                data={filtered}
+                data={data}
                 keyExtractor={(item, index) => String(item[idField] ?? index)}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={[theme.colors.primary]}
-                    />
-                }
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[theme.colors.primary]} />}
                 renderItem={({ item, index }) => (
-                    <View
-                        style={[
-                            styles.tableRow,
-                            index % 2 === 0 && styles.tableRowEven,
-                        ]}
-                    >
+                    <View style={[styles.tableRow, index % 2 === 0 && styles.tableRowEven]}>
                         {columns.map((col) => (
-                            <View
-                                key={col.key}
-                                style={[
-                                    styles.tableCell,
-                                    col.width
-                                        ? { width: col.width }
-                                        : { flex: col.flex || 1 },
-                                ]}
-                            >
-                                {col.render ? (
-                                    col.render(
-                                        getNestedValue(item, col.key),
-                                        item,
-                                    )
-                                ) : (
-                                    <Text
-                                        style={styles.tableCellText}
-                                        numberOfLines={1}
-                                    >
-                                        {getTextValue(
-                                            getNestedValue(item, col.key),
-                                        )}
-                                    </Text>
+                            <View key={col.key} style={[styles.tableCell, col.width ? { width: col.width } : { flex: col.flex || 1 }]}>
+                                {col.render ? col.render(getNestedValue(item, col.key), item) : (
+                                    <Text style={styles.tableCellText} numberOfLines={1}>{getTextValue(getNestedValue(item, col.key))}</Text>
                                 )}
                             </View>
                         ))}
-                        {hasActionColumn ? (
-                            <View style={[styles.tableCell, { width: 180 }]}>
-                                {renderRowActions(item)}
+                        {hasActionColumn && (
+                            <View style={[styles.tableCell, { width: 140, flexDirection: 'row', gap: 8 }]}>
+                                {!hideDefaultDetailAction && (
+                                    <TouchableOpacity style={[styles.rowActionButton, styles.rowActionButtonPrimary]} onPress={() => setSelectedRow(item)}>
+                                        <Text style={[styles.rowActionText, styles.rowActionTextPrimary]}>Mở</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
-                        ) : null}
+                        )}
                     </View>
                 )}
                 ListEmptyComponent={<EmptyState title="Không có dữ liệu" />}
             />
+            {renderPaginationFooter()}
         </View>
     );
 
-    const hiddenMobileFieldCount = columns.length - compactMobileColumns.length;
-
-    const renderMobileCards = () => (
-        <FlatList
-            data={filtered}
-            keyExtractor={(item, index) => String(item[idField] ?? index)}
-            contentContainerStyle={styles.mobileListContent}
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    colors={[theme.colors.primary]}
-                />
-            }
-            renderItem={({ item }) => (
-                <View style={styles.card}>
-                    {compactMobileColumns.map((col) => (
-                        <View key={col.key} style={styles.cardRow}>
-                            <Text style={styles.cardLabel}>{col.label}</Text>
-                            <View style={styles.cardValueBox}>
-                                {renderMobileValue(col, item)}
-                            </View>
-                        </View>
-                    ))}
-
-                    {hiddenMobileFieldCount > 0 ? (
-                        <TouchableOpacity
-                            style={styles.viewMoreButton}
-                            onPress={() => setSelectedRow(item)}
-                        >
-                            <Text style={styles.viewMoreButtonText}>
-                                Xem thêm ({hiddenMobileFieldCount} trường)
-                            </Text>
+    const renderSidebarModal = () => (
+        <Modal
+            visible={selectedRow !== null}
+            transparent
+            animationType={isDesktop ? "none" : "slide"}
+            onRequestClose={() => setSelectedRow(null)}
+        >
+            <View style={[styles.modalOverlay, !isDesktop && styles.modalOverlayBottomSheet]}>
+                <Pressable style={styles.modalBackdrop} onPress={() => setSelectedRow(null)} />
+                <View style={[styles.sidebarBox, !isDesktop && styles.sidebarBoxMobile]}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Chi tiết bản ghi</Text>
+                        <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setSelectedRow(null)}>
+                            <Feather name="x" size={20} color={theme.colors.foreground} />
                         </TouchableOpacity>
-                    ) : null}
-
-                    <View style={styles.cardActionWrap}>
-                        {renderRowActions(item)}
                     </View>
 
-                    {mobileCardPressToDetail && shouldShowDefaultDetail ? (
-                        <TouchableOpacity
-                            style={styles.cardTapHintButton}
-                            onPress={() => setSelectedRow(item)}
-                        >
-                            <Text style={styles.cardTapHintText}>
-                                Chạm để xem chi tiết
-                            </Text>
-                        </TouchableOpacity>
-                    ) : null}
-                </View>
-            )}
-            ListEmptyComponent={<EmptyState title="Không có dữ liệu" />}
-        />
-    );
+                    <ScrollView style={styles.modalList} contentContainerStyle={{ paddingBottom: 40 }}>
+                        {/* Auto-render basic info */}
+                        <View style={styles.autoDetailSection}>
+                            {columns.map((col) => (
+                                <View key={col.key} style={styles.modalRow}>
+                                    <Text style={styles.modalLabel}>{col.label}</Text>
+                                    <View style={styles.modalValueBox}>
+                                        {col.render && selectedRow ? col.render(getNestedValue(selectedRow, col.key), selectedRow) : (
+                                            <Text style={styles.modalValue}>{selectedRow ? getTextValue(getNestedValue(selectedRow, col.key)) : "-"}</Text>
+                                        )}
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                        
+                        {/* Custom content mapping like item list */}
+                        {renderDetailContent && selectedRow && (
+                            <View style={styles.customDetailWrap}>
+                                {renderDetailContent(selectedRow)}
+                            </View>
+                        )}
+                    </ScrollView>
 
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+                    {/* Actions bar */}
+                    {selectedRow && rowActions.length > 0 && (
+                        <View style={styles.modalActionsWrap}>
+                            {rowActions.filter(a => !a.shouldShow || a.shouldShow(selectedRow)).map((action, i) => {
+                                const toneStyle = getActionToneStyle(action.tone);
+                                return (
+                                    <TouchableOpacity
+                                        key={i}
+                                        style={[styles.rowActionButton, toneStyle.button, { flex: 1, paddingVertical: 12 }]}
+                                        onPress={() => action.onPress(selectedRow)}
+                                    >
+                                        <Text style={[styles.rowActionText, toneStyle.text, { fontSize: 13 }]}>{action.label}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    )}
+                </View>
             </View>
-        );
-    }
+        </Modal>
+    );
 
     return (
         <View style={styles.container}>
             <ScreenHeader
                 title={title}
-                subtitle={`${filtered.length} bản ghi`}
+                subtitle={`Danh sách tự động cập nhật`}
                 rightSlot={
                     <View style={styles.rightHeaderWrap}>
-                        {createAction ? (
-                            <TouchableOpacity
-                                style={styles.createButton}
-                                onPress={createAction.onPress}
-                            >
-                                <Feather
-                                    name="plus"
-                                    size={14}
-                                    color={theme.colors.primaryForeground}
-                                />
-                                <Text style={styles.createButtonText}>
-                                    {createAction.label}
-                                </Text>
+                        {createAction && (
+                            <TouchableOpacity style={styles.createButton} onPress={createAction.onPress}>
+                                <Feather name="plus" size={16} color={theme.colors.primaryForeground} />
+                                <Text style={styles.createButtonText}>{createAction.label}</Text>
                             </TouchableOpacity>
-                        ) : null}
-                        <View style={styles.countBadge}>
-                            <Text style={styles.countText}>
-                                {filtered.length}
-                            </Text>
-                        </View>
+                        )}
                     </View>
                 }
             />
 
             <View style={styles.searchWrapper}>
-                <SearchBar
-                    value={search}
-                    onChangeText={setSearch}
-                    placeholder={searchPlaceholder}
-                />
+                <View style={{ flex: 1, flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                        <SearchBar
+                            value={searchInput}
+                            onChangeText={setSearchInput}
+                            placeholder={searchPlaceholder}
+                            onSubmitEditing={handleSearchSubmit}
+                        />
+                    </View>
+                    {renderFilters && (
+                        <TouchableOpacity style={[styles.searchButton, showFilters && { backgroundColor: theme.colors.primaryDark }]} onPress={() => setShowFilters(!showFilters)}>
+                            <Feather name="filter" size={16} color={theme.colors.primaryForeground} />
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={styles.searchButton} onPress={handleSearchSubmit}>
+                        <Feather name="search" size={16} color={theme.colors.primaryForeground} />
+                    </TouchableOpacity>
+                </View>
+                
+                {showFilters && renderFilters && (
+                    <View style={styles.filterPanel}>
+                        {renderFilters(tablePagination.setFilters, pageState.filters || {})}
+                    </View>
+                )}
             </View>
 
-            {isDesktop ? renderDesktopTable() : renderMobileCards()}
+            {loading && data.length === 0 ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                </View>
+            ) : isDesktop ? renderDesktopTable() : renderMobileCards()}
 
-            {renderDetailModal()}
+            {renderSidebarModal()}
         </View>
     );
 };
@@ -611,292 +365,92 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
 export default DataTableScreen;
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: theme.colors.background,
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+    searchWrapper: { paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm },
+    searchButton: {
+        backgroundColor: theme.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        borderRadius: theme.borderRadius.md,
+        ...theme.shadows.sm
     },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 10,
-    },
-    loadingText: {
-        color: theme.colors.mutedForeground,
-        fontSize: 14,
-    },
-    searchWrapper: {
-        paddingHorizontal: theme.spacing.md,
-        paddingTop: theme.spacing.sm,
-        paddingBottom: theme.spacing.sm,
-    },
-    countBadge: {
-        minWidth: 34,
-        height: 28,
-        borderRadius: 14,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.colors.primaryLight,
+    filterPanel: {
+        marginTop: 12,
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.md,
         borderWidth: 1,
-        borderColor: "#a7f3d0",
+        borderColor: theme.colors.border,
+        ...theme.shadows.sm
     },
-    countText: {
-        color: theme.colors.primary,
-        fontSize: 12,
-        fontWeight: "700",
-    },
-    rightHeaderWrap: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
+    rightHeaderWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
     createButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
+        flexDirection: "row", alignItems: "center", gap: 8,
         backgroundColor: theme.colors.primary,
         borderRadius: theme.borderRadius.md,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
+        paddingHorizontal: 14, paddingVertical: 10,
+        ...theme.shadows.sm
     },
-    createButtonText: {
-        color: theme.colors.primaryForeground,
-        fontSize: 12,
-        fontWeight: "700",
-    },
+    createButtonText: { color: theme.colors.primaryForeground, fontSize: 13, fontWeight: "700" },
 
-    tableContainer: {
-        flex: 1,
-    },
-    tableHeaderRow: {
-        flexDirection: "row",
-        backgroundColor: theme.colors.surfaceRaised,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: theme.colors.border,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: 10,
-    },
-    tableHeaderCell: {
-        paddingHorizontal: 8,
-    },
-    tableHeaderText: {
-        fontSize: 12,
-        fontWeight: "700",
-        color: theme.colors.mutedForeground,
-        textTransform: "uppercase",
-    },
-    tableRow: {
-        flexDirection: "row",
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-        alignItems: "center",
-        backgroundColor: theme.colors.surface,
-    },
-    tableRowEven: {
-        backgroundColor: "#f8fafc",
-    },
-    tableCell: {
-        paddingHorizontal: 8,
-    },
-    tableCellText: {
-        fontSize: 13,
-        color: theme.colors.foreground,
-    },
+    tableContainer: { flex: 1, backgroundColor: theme.colors.surface, margin: theme.spacing.md, borderRadius: theme.borderRadius.lg, ...theme.shadows.md, overflow: 'hidden' },
+    tableHeaderRow: { flexDirection: "row", backgroundColor: theme.colors.surfaceRaised, paddingHorizontal: theme.spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderColor: theme.colors.border },
+    tableHeaderCell: { paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 6 },
+    tableHeaderText: { fontSize: 13, fontWeight: "700", color: theme.colors.foreground, textTransform: "uppercase" },
+    tableRow: { flexDirection: "row", paddingHorizontal: theme.spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface },
+    tableRowEven: { backgroundColor: "#fafbfc" },
+    tableCell: { paddingHorizontal: 8, justifyContent: 'center' },
+    tableCellText: { fontSize: 14, color: theme.colors.foreground },
 
-    mobileListContent: {
-        paddingHorizontal: theme.spacing.md,
-        paddingBottom: theme.spacing.md,
-    },
-    card: {
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-    },
-    cardRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        gap: 10,
-        paddingVertical: 4,
-    },
-    cardLabel: {
-        fontSize: 12,
-        color: theme.colors.mutedForeground,
-        fontWeight: "600",
-        width: "42%",
-    },
-    cardValueBox: {
-        flex: 1,
-        alignItems: "flex-end",
-    },
-    cardValue: {
-        fontSize: 13,
-        color: theme.colors.foreground,
-        fontWeight: "600",
-        textAlign: "right",
-    },
-    moreHint: {
-        marginTop: 6,
-        fontSize: 11,
-        color: theme.colors.mutedForeground,
-        textAlign: "right",
-    },
-    viewMoreButton: {
-        marginTop: 8,
-        alignSelf: "flex-end",
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: theme.borderRadius.sm,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surfaceRaised,
-    },
-    viewMoreButtonText: {
-        fontSize: 11,
-        fontWeight: "700",
-        color: theme.colors.foreground,
-    },
-    cardActionWrap: {
-        marginTop: 10,
-        paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
-    },
-    cardTapHintButton: {
-        marginTop: 8,
-        alignSelf: "flex-end",
-    },
-    cardTapHintText: {
-        fontSize: 11,
-        fontWeight: "600",
-        color: theme.colors.mutedForeground,
-    },
-
-    rowActionsWrap: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        flexWrap: "wrap",
-    },
-    rowActionButton: {
-        borderRadius: theme.borderRadius.sm,
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-    },
-    rowActionText: {
-        fontSize: 11,
-        fontWeight: "700",
-    },
-    rowActionButtonPrimary: {
-        borderColor: "#a7f3d0",
-        backgroundColor: theme.colors.primaryLight,
-    },
-    rowActionTextPrimary: {
-        color: theme.colors.primary,
-    },
-    rowActionButtonNeutral: {
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surfaceRaised,
-    },
-    rowActionTextNeutral: {
-        color: theme.colors.foreground,
-    },
-    rowActionButtonDanger: {
-        borderColor: "#fecaca",
-        backgroundColor: "#fef2f2",
-    },
-    rowActionTextDanger: {
-        color: theme.colors.error,
-    },
-
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: theme.colors.overlay,
-        justifyContent: "center",
-        paddingHorizontal: theme.spacing.md,
-    },
-    modalOverlayBottomSheet: {
-        justifyContent: "flex-end",
-        paddingHorizontal: 0,
-    },
-    modalBox: {
-        maxHeight: "80%",
+    mobileListContent: { padding: theme.spacing.md },
+    mobileCard: {
         backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.lg,
         padding: theme.spacing.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        gap: 10,
+        marginBottom: 12,
+        borderWidth: 1, borderColor: "transparent",
+        ...theme.shadows.sm
     },
-    modalBoxBottomSheet: {
-        maxHeight: "88%",
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
-        borderTopLeftRadius: theme.borderRadius.xl,
-        borderTopRightRadius: theme.borderRadius.xl,
-        borderLeftWidth: 0,
-        borderRightWidth: 0,
-        borderBottomWidth: 0,
-        paddingBottom: theme.spacing.lg,
-    },
-    modalHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-    },
-    modalTitle: {
-        ...theme.typography.title,
-        color: theme.colors.foreground,
-    },
-    modalList: {
-        maxHeight: 380,
-    },
-    modalRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 10,
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-    },
-    modalLabel: {
-        width: "38%",
-        fontSize: 12,
-        color: theme.colors.mutedForeground,
-        fontWeight: "600",
-    },
-    modalValueBox: {
-        flex: 1,
-        alignItems: "flex-end",
-    },
-    modalValue: {
-        fontSize: 13,
-        color: theme.colors.foreground,
-        textAlign: "right",
-    },
-    modalActionsWrap: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        flexWrap: "wrap",
-    },
+    cardRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
+    cardLabel: { fontSize: 13, color: theme.colors.mutedForeground, fontWeight: "600", width: "40%" },
+    cardValueBox: { flex: 1, alignItems: "flex-end" },
+    cardValue: { fontSize: 14, color: theme.colors.foreground, fontWeight: "600", textAlign: "right" },
 
-    badge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 999,
-        alignSelf: "flex-end",
-    },
-    badgeText: {
-        fontSize: 11,
-        fontWeight: "700",
-    },
+    paginationFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.md, borderTopWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+    paginationText: { fontSize: 13, color: theme.colors.mutedForeground },
+    paginationActions: { flexDirection: 'row', gap: 10 },
+    pageButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.surfaceRaised },
+    pageButtonDisabled: { opacity: 0.5 },
+    pageButtonText: { fontSize: 13, color: theme.colors.foreground, fontWeight: '600' },
+
+    rowActionButton: { alignItems: 'center', justifyContent: 'center', borderRadius: theme.borderRadius.sm, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
+    rowActionText: { fontSize: 12, fontWeight: "700" },
+    rowActionButtonPrimary: { borderColor: theme.colors.ring, backgroundColor: theme.colors.primaryLight },
+    rowActionTextPrimary: { color: theme.colors.primary },
+    rowActionButtonNeutral: { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceRaised },
+    rowActionTextNeutral: { color: theme.colors.foreground },
+    rowActionButtonDanger: { borderColor: "#fecaca", backgroundColor: "#fef2f2" },
+    rowActionTextDanger: { color: theme.colors.error },
+
+    modalOverlay: { flex: 1, backgroundColor: theme.colors.overlay, flexDirection: 'row', justifyContent: "flex-end" },
+    modalOverlayBottomSheet: { flexDirection: 'column', justifyContent: "flex-end" },
+    modalBackdrop: { ...StyleSheet.absoluteFillObject },
+    sidebarBox: { width: 450, maxWidth: '100%', height: '100%', backgroundColor: theme.colors.surface, ...theme.shadows.float },
+    sidebarBoxMobile: { height: '85%', width: '100%', borderTopLeftRadius: theme.borderRadius.xl, borderTopRightRadius: theme.borderRadius.xl },
+    modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+    modalTitle: { ...theme.typography.h3, color: theme.colors.foreground },
+    modalCloseBtn: { padding: 8, backgroundColor: theme.colors.surfaceRaised, borderRadius: 20 },
+    modalList: { flex: 1 },
+    autoDetailSection: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg },
+    customDetailWrap: { paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.lg },
+    modalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border, borderStyle: 'dashed' },
+    modalLabel: { width: "40%", fontSize: 13, color: theme.colors.mutedForeground, fontWeight: "600" },
+    modalValueBox: { flex: 1, alignItems: "flex-end" },
+    modalValue: { fontSize: 14, color: theme.colors.foreground, textAlign: "right", fontWeight: "600" },
+    modalActionsWrap: { flexDirection: "row", gap: 10, padding: theme.spacing.lg, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
+    
+    badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, alignSelf: "flex-end" },
+    badgeText: { fontSize: 12, fontWeight: "700" },
 });

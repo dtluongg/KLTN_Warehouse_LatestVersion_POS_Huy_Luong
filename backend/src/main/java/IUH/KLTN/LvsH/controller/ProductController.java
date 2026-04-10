@@ -1,9 +1,16 @@
 package IUH.KLTN.LvsH.controller;
 
+import IUH.KLTN.LvsH.dto.product.ProductRequestDTO;
+import IUH.KLTN.LvsH.dto.product.ProductResponseDTO;
+import IUH.KLTN.LvsH.dto.product.ProductSearchCriteria;
 import IUH.KLTN.LvsH.entity.Product;
 import IUH.KLTN.LvsH.repository.ProductRepository;
 import IUH.KLTN.LvsH.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 
@@ -19,8 +26,17 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<List<Product>> getAllProducts() {
-        return ResponseEntity.ok(productService.getAllProducts());
+    public ResponseEntity<Page<ProductResponseDTO>> getAllProducts(
+            ProductSearchCriteria criteria,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+            
+        Sort sort = direction.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(productService.getAllProducts(criteria, pageable));
     }
 
     @GetMapping("/stock-by-warehouse")
@@ -30,20 +46,20 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.getProductById(id));
+    public ResponseEntity<ProductResponseDTO> getProductById(@PathVariable Long id) {
+        return ResponseEntity.ok(productService.getProductDetailById(id));
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
-    public ResponseEntity<Product> createProduct(@Valid @RequestBody Product product) {
-        return ResponseEntity.ok(productService.createProduct(product));
+    public ResponseEntity<ProductResponseDTO> createProduct(@Valid @RequestBody ProductRequestDTO request) {
+        return ResponseEntity.ok(productService.createProduct(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
-    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody Product product) {
-        return ResponseEntity.ok(productService.updateProduct(id, product));
+    public ResponseEntity<ProductResponseDTO> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequestDTO request) {
+        return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
     @DeleteMapping("/{id}")

@@ -1,14 +1,13 @@
 package IUH.KLTN.LvsH.service;
 
-import IUH.KLTN.LvsH.dto.SupplierReturnRequestDTO;
-import IUH.KLTN.LvsH.dto.SupplierReturnResponseDTO;
-import IUH.KLTN.LvsH.entity.SupplierReturn;
-import java.util.List;
+import IUH.KLTN.LvsH.dto.supplier_return.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface SupplierReturnService {
-    List<SupplierReturn> getAllSupplierReturns();
-    SupplierReturn getSupplierReturnById(Long id);
-    SupplierReturnResponseDTO createSupplierReturn(SupplierReturnRequestDTO dto);
-    SupplierReturnResponseDTO updateDraftSupplierReturn(Long id, SupplierReturnRequestDTO dto);
-    SupplierReturnResponseDTO completeSupplierReturn(Long id);
+    Page<SupplierReturnListResponseDTO> getAllSupplierReturns(SupplierReturnSearchCriteria criteria, Pageable pageable);
+    SupplierReturnDetailResponseDTO getSupplierReturnDetailById(Long id);
+    SupplierReturnDetailResponseDTO createSupplierReturn(SupplierReturnRequestDTO request);
+    SupplierReturnDetailResponseDTO updateDraftSupplierReturn(Long id, SupplierReturnRequestDTO request);
+    SupplierReturnDetailResponseDTO completeSupplierReturn(Long id);
 }

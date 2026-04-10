@@ -1,12 +1,13 @@
 package IUH.KLTN.LvsH.service;
 
-import IUH.KLTN.LvsH.entity.Warehouse;
-import java.util.List;
+import IUH.KLTN.LvsH.dto.warehouse.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface WarehouseService {
-    List<Warehouse> getAllWarehouses();
-    Warehouse getWarehouseById(Long id);
-    Warehouse createWarehouse(Warehouse warehouse);
-    Warehouse updateWarehouse(Long id, Warehouse warehouse);
+    Page<WarehouseResponseDTO> getAllWarehouses(WarehouseSearchCriteria criteria, Pageable pageable);
+    WarehouseResponseDTO getWarehouseDetailById(Long id);
+    WarehouseResponseDTO createWarehouse(WarehouseRequestDTO request);
+    WarehouseResponseDTO updateWarehouse(Long id, WarehouseRequestDTO request);
     void deleteWarehouse(Long id);
 }

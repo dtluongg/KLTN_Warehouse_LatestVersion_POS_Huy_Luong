@@ -1,13 +1,14 @@
 package IUH.KLTN.LvsH.service;
 
-import IUH.KLTN.LvsH.entity.Customer;
-import java.util.List;
+import IUH.KLTN.LvsH.dto.customer.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface CustomerService {
-    List<Customer> getAllCustomers();
-    Customer getCustomerById(UUID id);
-    Customer createCustomer(Customer customer);
-    Customer updateCustomer(UUID id, Customer customer);
+    Page<CustomerResponseDTO> getAllCustomers(CustomerSearchCriteria criteria, Pageable pageable);
+    CustomerResponseDTO getCustomerDetailById(UUID id);
+    CustomerResponseDTO createCustomer(CustomerRequestDTO request);
+    CustomerResponseDTO updateCustomer(UUID id, CustomerRequestDTO request);
     void deleteCustomer(UUID id);
 }

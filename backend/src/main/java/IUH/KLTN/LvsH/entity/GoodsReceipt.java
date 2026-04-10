@@ -53,6 +53,14 @@ public class GoodsReceipt {
     @Column(name = "total_amount_payable")
     private BigDecimal totalAmountPayable;
 
+    @Column(name = "discount_amount")
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "surcharge_amount")
+    @Builder.Default
+    private BigDecimal surchargeAmount = BigDecimal.ZERO;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "passwordHash"})

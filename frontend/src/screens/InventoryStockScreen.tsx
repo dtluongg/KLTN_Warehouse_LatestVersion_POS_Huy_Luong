@@ -65,7 +65,7 @@ const InventoryStockScreen = () => {
             setErrorMessage(null);
             const warehouseRes = await axiosClient.get("/warehouses");
             const activeWarehouses: Warehouse[] = (
-                warehouseRes.data || []
+                warehouseRes.data.content || warehouseRes.data || []
             ).filter((w: Warehouse) => w.isActive);
             setWarehouses(activeWarehouses);
 
