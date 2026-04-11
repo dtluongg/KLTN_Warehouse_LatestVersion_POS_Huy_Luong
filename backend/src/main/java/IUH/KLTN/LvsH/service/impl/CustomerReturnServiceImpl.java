@@ -110,6 +110,8 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
             order = orderRepository.findById(dto.getOrderId()).orElse(null);
         }
 
+        validateAgainstOrderItemLimits(dto.getItems(), order, null);
+
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
 
@@ -173,6 +175,31 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
 
     @Override
     @Transactional
+    public CustomerReturnDetailResponseDTO cancelDraftCustomerReturn(Long id) {
+        CustomerReturn cr = getCustomerReturnEntityById(id);
+
+        if (cr.getStatus() == DocumentStatus.POSTED) {
+            throw new RuntimeException("Posted customer return cannot be cancelled");
+        }
+        if (cr.getStatus() == DocumentStatus.CANCELLED) {
+            throw new RuntimeException("Customer return is already cancelled");
+        }
+
+        Staff currentStaff = getAuthenticatedStaff();
+        boolean isAdmin = currentStaff.getRole() != null && currentStaff.getRole().equalsIgnoreCase("ADMIN");
+        boolean isOwner = cr.getCreatedBy() != null && cr.getCreatedBy().getId() != null && cr.getCreatedBy().getId().equals(currentStaff.getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new RuntimeException("You do not have permission to cancel this customer return");
+        }
+
+        cr.setStatus(DocumentStatus.CANCELLED);
+        crRepository.save(cr);
+        return getCustomerReturnDetailById(cr.getId());
+    }
+
+    @Override
+    @Transactional
     public CustomerReturnDetailResponseDTO updateDraftCustomerReturn(Long id, CustomerReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
@@ -188,6 +215,8 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         if (dto.getOrderId() != null) {
             order = orderRepository.findById(dto.getOrderId()).orElse(null);
         }
+
+        validateAgainstOrderItemLimits(dto.getItems(), order, id);
 
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
@@ -244,11 +273,44 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         if (cr.getStatus() == DocumentStatus.POSTED) {
             throw new RuntimeException("Return already completed");
         }
-        
-        cr.setStatus(DocumentStatus.POSTED);
-        crRepository.save(cr);
 
         List<CustomerReturnItem> items = crItemRepository.findByCustomerReturnId(cr.getId());
+
+        for (CustomerReturnItem item : items) {
+            if (cr.getOrder() != null && item.getOrderItem() == null) {
+                throw new RuntimeException("Order item is required when customer return references an order");
+            }
+
+            OrderItem orderItem = item.getOrderItem();
+            if (orderItem == null) {
+                continue;
+            }
+
+            if (orderItem.getProduct() == null || !orderItem.getProduct().getId().equals(item.getProduct().getId())) {
+                throw new RuntimeException("Returned product does not match the referenced order item");
+            }
+
+            Integer postedQty = crItemRepository.sumQtyByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.POSTED);
+            int alreadyReturnedQty = postedQty == null ? 0 : postedQty;
+            int maxQty = orderItem.getQty() == null ? 0 : orderItem.getQty();
+            int requestedQty = item.getQty() == null ? 0 : item.getQty();
+
+            if (alreadyReturnedQty + requestedQty > maxQty) {
+                throw new RuntimeException("Returned quantity exceeds sold quantity for order item: " + orderItem.getId());
+            }
+
+            BigDecimal postedRefund = crItemRepository.sumRefundByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.POSTED);
+            BigDecimal alreadyRefunded = postedRefund == null ? BigDecimal.ZERO : postedRefund;
+            BigDecimal maxRefund = orderItem.getLineRevenue() == null ? BigDecimal.ZERO : orderItem.getLineRevenue();
+            BigDecimal requestedRefund = item.getRefundAmount() == null ? BigDecimal.ZERO : item.getRefundAmount();
+
+            if (alreadyRefunded.add(requestedRefund).compareTo(maxRefund) > 0) {
+                throw new RuntimeException("Refund amount exceeds original order item value: " + orderItem.getId());
+            }
+        }
+
+        cr.setStatus(DocumentStatus.POSTED);
+        crRepository.save(cr);
 
         for (CustomerReturnItem item : items) {
             Product product = item.getProduct();
@@ -293,5 +355,54 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
             payable = BigDecimal.ZERO;
         }
         return payable;
+    }
+
+    private void validateAgainstOrderItemLimits(List<CustomerReturnRequestDTO.CustomerReturnItemRequestDTO> items,
+                                                Order order,
+                                                Long excludedReturnId) {
+        for (CustomerReturnRequestDTO.CustomerReturnItemRequestDTO itemDto : items) {
+            if (itemDto.getOrderItemId() == null) {
+                continue;
+            }
+
+            OrderItem orderItem = orderItemRepository.findById(itemDto.getOrderItemId())
+                    .orElseThrow(() -> new RuntimeException("Order Item not found"));
+
+            if (order != null && (orderItem.getOrder() == null || !orderItem.getOrder().getId().equals(order.getId()))) {
+                throw new RuntimeException("Order Item does not belong to the specified Order: " + order.getId());
+            }
+
+            Integer postedQty = excludedReturnId == null
+                    ? crItemRepository.sumQtyByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.POSTED)
+                    : crItemRepository.sumQtyByOrderItemIdAndReturnStatusExcludingReturnId(orderItem.getId(), DocumentStatus.POSTED, excludedReturnId);
+            Integer pendingQty = excludedReturnId == null
+                    ? crItemRepository.sumQtyByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.DRAFT)
+                    : crItemRepository.sumQtyByOrderItemIdAndReturnStatusExcludingReturnId(orderItem.getId(), DocumentStatus.DRAFT, excludedReturnId);
+
+            int alreadyPosted = postedQty == null ? 0 : postedQty;
+            int alreadyPending = pendingQty == null ? 0 : pendingQty;
+            int maxQty = orderItem.getQty() == null ? 0 : orderItem.getQty();
+            int requestedQty = itemDto.getQty() == null ? 0 : itemDto.getQty();
+
+            if (alreadyPosted + alreadyPending + requestedQty > maxQty) {
+                throw new RuntimeException("Returned quantity exceeds available quantity (sold - pending - posted) for order item: " + orderItem.getId());
+            }
+
+            BigDecimal postedRefund = excludedReturnId == null
+                    ? crItemRepository.sumRefundByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.POSTED)
+                    : crItemRepository.sumRefundByOrderItemIdAndReturnStatusExcludingReturnId(orderItem.getId(), DocumentStatus.POSTED, excludedReturnId);
+            BigDecimal pendingRefund = excludedReturnId == null
+                    ? crItemRepository.sumRefundByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.DRAFT)
+                    : crItemRepository.sumRefundByOrderItemIdAndReturnStatusExcludingReturnId(orderItem.getId(), DocumentStatus.DRAFT, excludedReturnId);
+
+            BigDecimal alreadyRefunded = postedRefund == null ? BigDecimal.ZERO : postedRefund;
+            BigDecimal pendingRefunded = pendingRefund == null ? BigDecimal.ZERO : pendingRefund;
+            BigDecimal maxRefund = orderItem.getLineRevenue() == null ? BigDecimal.ZERO : orderItem.getLineRevenue();
+            BigDecimal requestedRefund = itemDto.getRefundAmount() == null ? BigDecimal.ZERO : itemDto.getRefundAmount();
+
+            if (alreadyRefunded.add(pendingRefunded).add(requestedRefund).compareTo(maxRefund) > 0) {
+                throw new RuntimeException("Refund amount exceeds available amount (line revenue - pending - posted) for order item: " + orderItem.getId());
+            }
+        }
     }
 }

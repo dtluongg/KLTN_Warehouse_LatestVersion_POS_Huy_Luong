@@ -22,6 +22,11 @@ interface LineItem {
     returnAmount: number;
     vatRate: number; // % nguyên, ví dụ 8 = 8%
     note: string;
+    receivedQty?: number;
+    returnedQty?: number;
+    pendingQty?: number;
+    availableQty?: number;
+    unitCost?: number;
 }
 
 const SupplierReturnFormScreen = () => {
@@ -63,6 +68,49 @@ const SupplierReturnFormScreen = () => {
     const vatReturn   = items.reduce((s, i) => s + i.returnAmount * (i.vatRate / 100), 0);
     const totalReturn = grossReturn + vatReturn;
     const canEdit     = !isEdit || status === "DRAFT";
+
+    const calcReturnAmount = (qty: number, unitCost?: number) => {
+        const safeQty = Number.isFinite(qty) ? Math.max(0, qty) : 0;
+        const safeUnitCost = Number.isFinite(unitCost) ? Number(unitCost) : 0;
+        return safeQty * safeUnitCost;
+    };
+
+    const buildGrItemReturnStats = async (selectedGrId: number, excludedReturnId?: number) => {
+        const postedByGrItemId = new Map<number, number>();
+        const pendingByGrItemId = new Map<number, number>();
+
+        const [postedRes, draftRes] = await Promise.all([
+            axiosClient.get("/supplier-returns?status=POSTED&page=0&size=500&sortBy=id&direction=desc"),
+            axiosClient.get("/supplier-returns?status=DRAFT&page=0&size=500&sortBy=id&direction=desc"),
+        ]);
+        const postedRows: any[] = postedRes.data?.content || postedRes.data || [];
+        const draftRows: any[] = draftRes.data?.content || draftRes.data || [];
+
+        const postedForGr = postedRows.filter((row) => Number(row?.goodsReceiptId) === Number(selectedGrId));
+        const draftForGr = draftRows.filter(
+            (row) => Number(row?.goodsReceiptId) === Number(selectedGrId) && Number(row?.id) !== Number(excludedReturnId || 0),
+        );
+
+        const collectMap = async (rows: any[], targetMap: Map<number, number>) => {
+            await Promise.all(
+                rows.map(async (row) => {
+                    const detailRes = await axiosClient.get(`/supplier-returns/${row.id}`);
+                    const detailItems: any[] = detailRes.data?.items || [];
+                    detailItems.forEach((it) => {
+                        const grItemId = Number(it?.goodsReceiptItemId);
+                        if (!Number.isFinite(grItemId) || grItemId <= 0) return;
+                        const qty = Number(it?.qty || 0);
+                        targetMap.set(grItemId, (targetMap.get(grItemId) || 0) + qty);
+                    });
+                }),
+            );
+        };
+
+        await collectMap(postedForGr, postedByGrItemId);
+        await collectMap(draftForGr, pendingByGrItemId);
+
+        return { postedByGrItemId, pendingByGrItemId };
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -114,6 +162,7 @@ const SupplierReturnFormScreen = () => {
         try {
             const res = await axiosClient.get(`/goods-receipts/${gr.id}`);
             const detail = res.data;
+            const { postedByGrItemId, pendingByGrItemId } = await buildGrItemReturnStats(gr.id);
             // Auto-fill kho
             if (detail.warehouseId) {
                 setWarehouseId(detail.warehouseId);
@@ -126,8 +175,16 @@ const SupplierReturnFormScreen = () => {
                 productName: gi.productName || "",
                 productSku: gi.productSku || "",
                 goodsReceiptItemId: gi.id,
-                qty: gi.receivedQty,
-                returnAmount: Number(gi.unitCost ?? 0) * (gi.receivedQty || 1),
+                receivedQty: Number(gi.receivedQty || 0),
+                returnedQty: postedByGrItemId.get(Number(gi.id)) || 0,
+                pendingQty: pendingByGrItemId.get(Number(gi.id)) || 0,
+                availableQty: Math.max(0, Number(gi.receivedQty || 0) - (postedByGrItemId.get(Number(gi.id)) || 0) - (pendingByGrItemId.get(Number(gi.id)) || 0)),
+                qty: Math.max(0, Number(gi.receivedQty || 0) - (postedByGrItemId.get(Number(gi.id)) || 0) - (pendingByGrItemId.get(Number(gi.id)) || 0)),
+                unitCost: Number(gi.unitCost ?? 0),
+                returnAmount: calcReturnAmount(
+                    Math.max(0, Number(gi.receivedQty || 0) - (postedByGrItemId.get(Number(gi.id)) || 0) - (pendingByGrItemId.get(Number(gi.id)) || 0)),
+                    Number(gi.unitCost ?? 0),
+                ),
                 vatRate: Number(gi.vatRate ?? 0),
                 note: "",
             })));
@@ -166,6 +223,43 @@ const SupplierReturnFormScreen = () => {
                         })));
                     } catch (_) {}
                 }
+
+                if (d.goodsReceiptId) {
+                    try {
+                        const grDetailRes = await axiosClient.get(`/goods-receipts/${d.goodsReceiptId}`);
+                        const grItems: any[] = grDetailRes.data?.items || [];
+                        const { postedByGrItemId, pendingByGrItemId } = await buildGrItemReturnStats(Number(d.goodsReceiptId), editId);
+                        const grItemMap = new Map<number, any>(
+                            grItems
+                                .filter((it: any) => it?.id != null)
+                                .map((it: any) => [Number(it.id), it]),
+                        );
+
+                        setItems((prev) =>
+                            prev.map((it) => {
+                                const ref = it.goodsReceiptItemId ? grItemMap.get(Number(it.goodsReceiptItemId)) : null;
+                                if (!ref) return it;
+                                const receivedQty = Number(ref.receivedQty || 0);
+                                const returnedQty = postedByGrItemId.get(Number(ref.id)) || 0;
+                                const pendingQty = pendingByGrItemId.get(Number(ref.id)) || 0;
+                                const availableQty = Math.max(0, receivedQty - returnedQty - pendingQty);
+                                const qty = Math.max(0, Math.min(Number(it.qty || 0), availableQty));
+                                const unitCost = Number(ref.unitCost ?? 0);
+
+                                return {
+                                    ...it,
+                                    qty,
+                                    receivedQty,
+                                    returnedQty,
+                                    pendingQty,
+                                    availableQty,
+                                    unitCost,
+                                    returnAmount: calcReturnAmount(qty, unitCost),
+                                };
+                            }),
+                        );
+                    } catch (_) {}
+                }
             } catch (e) { Alert.alert("Lỗi", "Không thể tải phiếu."); }
             finally { setLoading(false); }
         };
@@ -173,18 +267,52 @@ const SupplierReturnFormScreen = () => {
     }, [editId]);
 
     const addProduct = (prod: Product) => {
+        if (goodsReceiptId) {
+            Alert.alert("Không thể thêm", "Đã chọn phiếu nhập gốc, chỉ được trả các sản phẩm trong phiếu nhập đó.");
+            return;
+        }
         if (items.find(i => i.productId === prod.id)) {
             Alert.alert("Trùng sản phẩm", "Sản phẩm đã có."); setShowProductModal(false); return;
         }
         setItems(prev => [...prev, {
             productId: prod.id, productName: prod.name, productSku: prod.sku,
-            qty: 1, returnAmount: prod.avgCost ?? 0, vatRate: 0, note: "",
+            qty: 1,
+            unitCost: Number(prod.avgCost ?? 0),
+            returnAmount: calcReturnAmount(1, Number(prod.avgCost ?? 0)),
+            vatRate: 0,
+            note: "",
         }]);
         setShowProductModal(false);
     };
 
     const updateItem = (idx: number, field: keyof LineItem, val: any) => {
-        setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
+        setItems(prev => prev.map((it, i) => {
+            if (i !== idx) return it;
+
+            if (field === "qty") {
+                const requestedQty = Number(val) || 0;
+                const normalizedQty = Math.max(1, Math.floor(requestedQty));
+                const maxQty = it.availableQty != null
+                    ? Math.max(0, Math.floor(it.availableQty))
+                    : it.receivedQty != null
+                        ? Math.max(1, Math.floor(it.receivedQty))
+                        : undefined;
+                const finalQty = maxQty != null ? Math.min(normalizedQty, maxQty) : normalizedQty;
+
+                return {
+                    ...it,
+                    qty: finalQty,
+                    returnAmount: calcReturnAmount(finalQty, it.unitCost),
+                };
+            }
+
+            if (field === "returnAmount") {
+                if (it.goodsReceiptItemId) return it;
+                return { ...it, returnAmount: Number(val) || 0 };
+            }
+
+            return { ...it, [field]: val };
+        }));
     };
 
     const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
@@ -193,6 +321,20 @@ const SupplierReturnFormScreen = () => {
         if (!supplierId) { Alert.alert("Thiếu thông tin", "Chọn nhà cung cấp."); return; }
         if (!warehouseId) { Alert.alert("Thiếu thông tin", "Chọn kho."); return; }
         if (items.length === 0) { Alert.alert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
+
+        if (goodsReceiptId) {
+            for (const item of items) {
+                if (!item.goodsReceiptItemId) {
+                    Alert.alert("Không hợp lệ", "Khi có phiếu nhập gốc, mọi sản phẩm trả phải thuộc phiếu nhập đã chọn.");
+                    return;
+                }
+                if (item.availableQty != null && item.qty > item.availableQty) {
+                    Alert.alert("Không hợp lệ", `Số lượng trả của ${item.productName} vượt quá số lượng có thể trả (${item.availableQty}).`);
+                    return;
+                }
+            }
+        }
+
         const payload = {
             supplierId, goodsReceiptId: goodsReceiptId || null, warehouseId,
             note: note || null,
@@ -299,13 +441,16 @@ const SupplierReturnFormScreen = () => {
                 <View style={styles.card}>
                     <View style={styles.sectionRow}>
                         <Text style={styles.sectionTitle}>Sản phẩm trả NCC</Text>
-                        {canEdit && (
+                        {canEdit && !goodsReceiptId && (
                             <TouchableOpacity style={styles.addBtn} onPress={() => setShowProductModal(true)}>
                                 <Feather name="plus" size={16} color="#fff" />
                                 <Text style={styles.addBtnText}>Thêm</Text>
                             </TouchableOpacity>
                         )}
                     </View>
+                    {!!goodsReceiptId && (
+                        <Text style={styles.orderBoundHint}>Đã chọn phiếu nhập gốc, chỉ trả các sản phẩm thuộc phiếu nhập này.</Text>
+                    )}
                     {items.length === 0 ? (
                         <View style={styles.emptyItems}><Feather name="package" size={32} color={theme.colors.muted} /><Text style={styles.emptyItemsText}>Chưa có sản phẩm.</Text></View>
                     ) : items.map((item, idx) => (
@@ -314,21 +459,32 @@ const SupplierReturnFormScreen = () => {
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.lineItemName}>{item.productName}</Text>
                                     <Text style={styles.lineItemSku}>SKU: {item.productSku}</Text>
+                                    {item.receivedQty != null && (
+                                        <Text style={styles.lineItemReceived}>
+                                            Đã nhập: {item.receivedQty}
+                                            {item.pendingQty != null ? `  |  Chờ duyệt: ${item.pendingQty}` : ""}
+                                            {item.returnedQty != null ? `  |  Đã trả: ${item.returnedQty}` : ""}
+                                            {item.availableQty != null ? `  |  Có thể trả: ${item.availableQty}` : ""}
+                                        </Text>
+                                    )}
                                 </View>
                                 {canEdit && <TouchableOpacity onPress={() => removeItem(idx)} style={styles.removeBtn}><Feather name="x" size={18} color={theme.colors.error} /></TouchableOpacity>}
                             </View>
                             <View style={styles.lineItemInputRow}>
-                                <View style={{ flex: 1 }}>
+                                <View style={styles.lineField}>
                                     <Text style={styles.lineInputLabel}>Số lượng</Text>
                                     <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled]}
                                         keyboardType="numeric" value={String(item.qty)}
                                         onChangeText={v => updateItem(idx, "qty", Number(v) || 0)} editable={canEdit} />
+                                    {item.availableQty != null && (
+                                        <Text style={styles.limitHint}>Tối đa: {item.availableQty}</Text>
+                                    )}
                                 </View>
-                                <View style={{ flex: 1.5 }}>
+                                <View style={styles.lineField}>
                                     <Text style={styles.lineInputLabel}>Giá trả về (VND)</Text>
-                                    <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled]}
+                                    <TextInput style={[styles.lineInput, (!canEdit || !!item.goodsReceiptItemId) && styles.inputDisabled]}
                                         keyboardType="numeric" value={String(item.returnAmount)}
-                                        onChangeText={v => updateItem(idx, "returnAmount", Number(v) || 0)} editable={canEdit} />
+                                        onChangeText={v => updateItem(idx, "returnAmount", Number(v) || 0)} editable={canEdit && !item.goodsReceiptItemId} />
                                 </View>
                                 {item.vatRate > 0 && (
                                     <View style={{ alignItems: "flex-end", justifyContent: "flex-end" }}>
@@ -502,12 +658,16 @@ const styles = StyleSheet.create({
     lineItemHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 10 },
     lineItemName: { fontSize: 14, fontWeight: "600", color: theme.colors.foreground, flex: 1 },
     lineItemSku: { fontSize: 12, color: theme.colors.mutedForeground, marginTop: 2 },
+    lineItemReceived: { fontSize: 12, color: theme.colors.primary, marginTop: 4, fontWeight: "600", lineHeight: 18 },
     removeBtn: { padding: 4 },
     vatBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: "#fef9c3" },
     vatBadgeText: { fontSize: 11, fontWeight: "700", color: "#92400e" },
-    lineItemInputRow: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
+    lineItemInputRow: { flexDirection: "row", gap: 12, alignItems: "flex-start", flexWrap: "wrap" },
+    lineField: { flex: 1, minWidth: 220 },
     lineInputLabel: { fontSize: 11, color: theme.colors.mutedForeground, marginBottom: 4 },
-    lineInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.surface },
+    lineInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.surface, width: "100%" },
+    limitHint: { fontSize: 11, color: theme.colors.mutedForeground, marginTop: 4 },
+    orderBoundHint: { fontSize: 12, color: theme.colors.primary, marginBottom: 10, marginTop: -6 },
     summaryCard: { margin: 16, marginTop: 12, borderRadius: 12, padding: 16, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
     summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
     summaryLabel: { color: theme.colors.mutedForeground, fontSize: 14 },

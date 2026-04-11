@@ -10,4 +10,5 @@ public interface SupplierReturnService {
     SupplierReturnDetailResponseDTO createSupplierReturn(SupplierReturnRequestDTO request);
     SupplierReturnDetailResponseDTO updateDraftSupplierReturn(Long id, SupplierReturnRequestDTO request);
     SupplierReturnDetailResponseDTO completeSupplierReturn(Long id);
+    SupplierReturnDetailResponseDTO cancelDraftSupplierReturn(Long id);
 }

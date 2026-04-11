@@ -20,6 +20,11 @@ interface LineItem {
     orderItemId?: number;
     qty: number;
     refundAmount: number;
+    purchasedQty?: number;
+    unitPrice?: number;
+    returnedQty?: number;
+    pendingQty?: number;
+    availableQty?: number;
 }
 
 const CustomerReturnFormScreen = () => {
@@ -59,6 +64,49 @@ const CustomerReturnFormScreen = () => {
 
     const totalRefund = items.reduce((s, i) => s + i.refundAmount, 0);
     const canEdit     = !isEdit || status === "DRAFT";
+
+    const calcRefundAmount = (qty: number, unitPrice?: number) => {
+        const safeQty = Number.isFinite(qty) ? Math.max(0, qty) : 0;
+        const safeUnitPrice = Number.isFinite(unitPrice) ? Number(unitPrice) : 0;
+        return safeQty * safeUnitPrice;
+    };
+
+    const buildOrderItemReturnStats = async (selectedOrderId: number, excludedReturnId?: number) => {
+        const postedByOrderItemId = new Map<number, number>();
+        const pendingByOrderItemId = new Map<number, number>();
+
+        const [postedRes, draftRes] = await Promise.all([
+            axiosClient.get("/customer-returns?status=POSTED&page=0&size=500&sortBy=id&direction=desc"),
+            axiosClient.get("/customer-returns?status=DRAFT&page=0&size=500&sortBy=id&direction=desc"),
+        ]);
+        const postedRows: any[] = postedRes.data?.content || postedRes.data || [];
+        const draftRows: any[] = draftRes.data?.content || draftRes.data || [];
+
+        const postedForOrder = postedRows.filter((row) => Number(row?.orderId) === Number(selectedOrderId));
+        const draftForOrder = draftRows.filter(
+            (row) => Number(row?.orderId) === Number(selectedOrderId) && Number(row?.id) !== Number(excludedReturnId || 0),
+        );
+
+        const collectMap = async (rows: any[], targetMap: Map<number, number>) => {
+            await Promise.all(
+                rows.map(async (row) => {
+                    const detailRes = await axiosClient.get(`/customer-returns/${row.id}`);
+                    const detailItems: any[] = detailRes.data?.items || [];
+                    detailItems.forEach((it) => {
+                        const orderItemId = Number(it?.orderItemId);
+                        if (!Number.isFinite(orderItemId) || orderItemId <= 0) return;
+                        const qty = Number(it?.qty || 0);
+                        targetMap.set(orderItemId, (targetMap.get(orderItemId) || 0) + qty);
+                    });
+                }),
+            );
+        };
+
+        await collectMap(postedForOrder, postedByOrderItemId);
+        await collectMap(draftForOrder, pendingByOrderItemId);
+
+        return { postedByOrderItemId, pendingByOrderItemId };
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -110,6 +158,8 @@ const CustomerReturnFormScreen = () => {
         try {
             const res = await axiosClient.get(`/orders/${order.id}`);
             const detail = res.data;
+            const { postedByOrderItemId, pendingByOrderItemId } = await buildOrderItemReturnStats(order.id);
+
             // Auto-fill kho từ đơn hàng
             if (detail.warehouseId) {
                 setWarehouseId(detail.warehouseId);
@@ -117,14 +167,28 @@ const CustomerReturnFormScreen = () => {
             }
             // Auto-fill items từ order items
             const orderItems = detail.items || [];
-            setItems(orderItems.map((oi: any) => ({
-                productId: oi.productId,
-                productName: oi.productName || "",
-                productSku: oi.productSku || "",
-                orderItemId: oi.id,
-                qty: oi.qty,
-                refundAmount: Number(oi.salePrice ?? 0) * (oi.qty || 1),
-            })));
+            setItems(orderItems.map((oi: any) => {
+                const purchasedQty = Number(oi.qty || 0);
+                const returnedQty = postedByOrderItemId.get(Number(oi.id)) || 0;
+                const pendingQty = pendingByOrderItemId.get(Number(oi.id)) || 0;
+                const availableQty = Math.max(0, purchasedQty - returnedQty - pendingQty);
+                const unitPrice = Number(oi.salePrice ?? 0);
+                const initialQty = availableQty;
+
+                return {
+                    productId: oi.productId,
+                    productName: oi.productName || "",
+                    productSku: oi.productSku || "",
+                    orderItemId: oi.id,
+                    qty: initialQty,
+                    purchasedQty,
+                    returnedQty,
+                    pendingQty,
+                    availableQty,
+                    unitPrice,
+                    refundAmount: calcRefundAmount(initialQty, unitPrice),
+                };
+            }));
         } catch (e) {
             console.error("Load order detail:", e);
             Alert.alert("Lỗi", "Không thể tải chi tiết đơn hàng.");
@@ -158,6 +222,43 @@ const CustomerReturnFormScreen = () => {
                         })));
                     } catch (_) {}
                 }
+
+                if (d.orderId) {
+                    try {
+                        const orderRes = await axiosClient.get(`/orders/${d.orderId}`);
+                        const orderItems: any[] = orderRes.data?.items || [];
+                        const { postedByOrderItemId, pendingByOrderItemId } = await buildOrderItemReturnStats(Number(d.orderId), editId);
+                        const orderItemMap = new Map<number, any>(
+                            orderItems
+                                .filter((oi: any) => oi?.id != null)
+                                .map((oi: any) => [Number(oi.id), oi]),
+                        );
+
+                        setItems((prev) =>
+                            prev.map((it) => {
+                                const ref = it.orderItemId ? orderItemMap.get(Number(it.orderItemId)) : null;
+                                if (!ref) return it;
+                                const unitPrice = Number(ref.salePrice ?? 0);
+                                const purchasedQty = Number(ref.qty ?? it.qty ?? 0);
+                                const returnedQty = postedByOrderItemId.get(Number(ref.id)) || 0;
+                                const pendingQty = pendingByOrderItemId.get(Number(ref.id)) || 0;
+                                const availableQty = Math.max(0, purchasedQty - returnedQty - pendingQty);
+                                const currentQty = Number(it.qty || 0);
+                                const qty = Math.max(0, Math.min(currentQty, availableQty));
+                                return {
+                                    ...it,
+                                    qty,
+                                    purchasedQty,
+                                    returnedQty,
+                                    pendingQty,
+                                    availableQty,
+                                    unitPrice,
+                                    refundAmount: calcRefundAmount(qty, unitPrice),
+                                };
+                            }),
+                        );
+                    } catch (_) {}
+                }
             } catch (e) { Alert.alert("Lỗi", "Không thể tải phiếu."); }
             finally { setLoading(false); }
         };
@@ -165,19 +266,52 @@ const CustomerReturnFormScreen = () => {
     }, [editId]);
 
     const addProduct = (prod: Product) => {
+        if (orderId) {
+            Alert.alert("Không thể thêm", "Đã chọn đơn hàng gốc, chỉ được trả các sản phẩm trong đơn này.");
+            return;
+        }
         if (items.find(i => i.productId === prod.id)) {
             Alert.alert("Trùng sản phẩm", "Sản phẩm đã có.");
             setShowProductModal(false); return;
         }
         setItems(prev => [...prev, {
             productId: prod.id, productName: prod.name, productSku: prod.sku,
-            qty: 1, refundAmount: prod.salePrice ?? 0,
+            qty: 1,
+            unitPrice: Number(prod.salePrice ?? 0),
+            refundAmount: calcRefundAmount(1, Number(prod.salePrice ?? 0)),
         }]);
         setShowProductModal(false);
     };
 
     const updateItem = (idx: number, field: keyof LineItem, val: any) => {
-        setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
+        setItems(prev => prev.map((it, i) => {
+            if (i !== idx) return it;
+
+            if (field === "qty") {
+                const requestedQty = Number(val) || 0;
+                const normalizedQty = Math.max(1, Math.floor(requestedQty));
+                const maxQty = it.availableQty != null
+                    ? Math.max(0, Math.floor(it.availableQty))
+                    : it.purchasedQty != null
+                        ? Math.max(1, Math.floor(it.purchasedQty))
+                        : undefined;
+                const finalQty = maxQty != null ? Math.min(normalizedQty, maxQty) : normalizedQty;
+
+                return {
+                    ...it,
+                    qty: finalQty,
+                    refundAmount: calcRefundAmount(finalQty, it.unitPrice),
+                };
+            }
+
+            if (field === "refundAmount") {
+                // For order-based return, refund amount follows qty * unitPrice.
+                if (it.orderItemId) return it;
+                return { ...it, refundAmount: Number(val) || 0 };
+            }
+
+            return { ...it, [field]: val };
+        }));
     };
 
     const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
@@ -186,6 +320,20 @@ const CustomerReturnFormScreen = () => {
         if (!customerId) { Alert.alert("Thiếu thông tin", "Chọn khách hàng."); return; }
         if (!warehouseId) { Alert.alert("Thiếu thông tin", "Chọn kho nhận hàng trả."); return; }
         if (items.length === 0) { Alert.alert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
+
+        if (orderId) {
+            for (const item of items) {
+                if (!item.orderItemId) {
+                    Alert.alert("Không hợp lệ", "Khi có đơn hàng gốc, mọi sản phẩm trả phải thuộc đơn hàng đã chọn.");
+                    return;
+                }
+                if (item.availableQty != null && item.qty > item.availableQty) {
+                    Alert.alert("Không hợp lệ", `Số lượng trả của ${item.productName} vượt quá số lượng có thể trả (${item.availableQty}).`);
+                    return;
+                }
+            }
+        }
+
         const payload = {
             customerId, orderId: orderId || null, warehouseId,
             note: note || null,
@@ -294,13 +442,16 @@ const CustomerReturnFormScreen = () => {
                 <View style={styles.card}>
                     <View style={styles.sectionRow}>
                         <Text style={styles.sectionTitle}>Sản phẩm trả lại</Text>
-                        {canEdit && (
+                        {canEdit && !orderId && (
                             <TouchableOpacity style={styles.addBtn} onPress={() => setShowProductModal(true)}>
                                 <Feather name="plus" size={16} color="#fff" />
                                 <Text style={styles.addBtnText}>Thêm</Text>
                             </TouchableOpacity>
                         )}
                     </View>
+                    {!!orderId && (
+                        <Text style={styles.orderBoundHint}>Đã chọn đơn hàng gốc, chỉ trả các sản phẩm thuộc đơn hàng này.</Text>
+                    )}
                     {items.length === 0 ? (
                         <View style={styles.emptyItems}>
                             <Feather name="package" size={32} color={theme.colors.muted} />
@@ -312,21 +463,32 @@ const CustomerReturnFormScreen = () => {
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.lineItemName}>{item.productName}</Text>
                                     <Text style={styles.lineItemSku}>SKU: {item.productSku}</Text>
+                                    {item.purchasedQty != null && (
+                                        <Text style={styles.lineItemPurchased}>
+                                            Đã mua: {item.purchasedQty}
+                                            {item.pendingQty != null ? `  |  Chờ duyệt: ${item.pendingQty}` : ""}
+                                            {item.returnedQty != null ? `  |  Đã trả: ${item.returnedQty}` : ""}
+                                            {item.availableQty != null ? `  |  Có thể trả: ${item.availableQty}` : ""}
+                                        </Text>
+                                    )}
                                 </View>
                                 {canEdit && <TouchableOpacity onPress={() => removeItem(idx)} style={styles.removeBtn}><Feather name="x" size={18} color={theme.colors.error} /></TouchableOpacity>}
                             </View>
                             <View style={styles.lineItemInputRow}>
-                                <View style={{ flex: 1 }}>
+                                <View style={styles.lineField}>
                                     <Text style={styles.lineInputLabel}>Số lượng trả</Text>
                                     <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled]}
                                         keyboardType="numeric" value={String(item.qty)}
                                         onChangeText={v => updateItem(idx, "qty", Number(v) || 0)} editable={canEdit} />
+                                    {item.availableQty != null && (
+                                        <Text style={styles.limitHint}>Tối đa: {item.availableQty}</Text>
+                                    )}
                                 </View>
-                                <View style={{ flex: 1.5 }}>
+                                <View style={styles.lineField}>
                                     <Text style={styles.lineInputLabel}>Số tiền hoàn (VND)</Text>
-                                    <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled]}
+                                    <TextInput style={[styles.lineInput, (!canEdit || !!item.orderItemId) && styles.inputDisabled]}
                                         keyboardType="numeric" value={String(item.refundAmount)}
-                                        onChangeText={v => updateItem(idx, "refundAmount", Number(v) || 0)} editable={canEdit} />
+                                        onChangeText={v => updateItem(idx, "refundAmount", Number(v) || 0)} editable={canEdit && !item.orderItemId} />
                                 </View>
                             </View>
                         </View>
@@ -481,10 +643,14 @@ const styles = StyleSheet.create({
     lineItemHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 10 },
     lineItemName: { fontSize: 14, fontWeight: "600", color: theme.colors.foreground, flex: 1 },
     lineItemSku: { fontSize: 12, color: theme.colors.mutedForeground, marginTop: 2 },
+    lineItemPurchased: { fontSize: 12, color: theme.colors.primary, marginTop: 4, fontWeight: "600", lineHeight: 18 },
     removeBtn: { padding: 4 },
-    lineItemInputRow: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
+    lineItemInputRow: { flexDirection: "row", gap: 12, alignItems: "flex-start", flexWrap: "wrap" },
+    lineField: { flex: 1, minWidth: 220 },
     lineInputLabel: { fontSize: 11, color: theme.colors.mutedForeground, marginBottom: 4 },
-    lineInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.surface },
+    lineInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.surface, width: "100%" },
+    limitHint: { fontSize: 11, color: theme.colors.mutedForeground, marginTop: 4 },
+    orderBoundHint: { fontSize: 12, color: theme.colors.primary, marginBottom: 10, marginTop: -6 },
     summaryCard: { margin: 16, marginTop: 12, borderRadius: 12, padding: 16, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
     summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
     summaryTotal: { borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12, marginTop: 4 },

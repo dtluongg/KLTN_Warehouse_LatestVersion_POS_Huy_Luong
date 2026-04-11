@@ -10,4 +10,5 @@ public interface CustomerReturnService {
     CustomerReturnDetailResponseDTO createCustomerReturn(CustomerReturnRequestDTO request);
     CustomerReturnDetailResponseDTO updateDraftCustomerReturn(Long id, CustomerReturnRequestDTO request);
     CustomerReturnDetailResponseDTO completeCustomerReturn(Long id);
+    CustomerReturnDetailResponseDTO cancelDraftCustomerReturn(Long id);
 }

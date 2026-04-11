@@ -59,4 +59,10 @@ public class SupplierReturnController {
     public ResponseEntity<SupplierReturnDetailResponseDTO> completeSupplierReturn(@PathVariable Long id) {
         return ResponseEntity.ok(returnService.completeSupplierReturn(id));
     }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<SupplierReturnDetailResponseDTO> cancelDraftSupplierReturn(@PathVariable Long id) {
+        return ResponseEntity.ok(returnService.cancelDraftSupplierReturn(id));
+    }
 }

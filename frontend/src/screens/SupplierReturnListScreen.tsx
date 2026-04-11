@@ -1,9 +1,9 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, TextInput } from "react-native";
+import { Alert, Platform, StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, TextInput } from "react-native";
 import { DataTableScreen, StatusBadge, formatMoney } from "../components";
 import { useAuthStore } from "../store/authStore";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { theme } from "../utils/theme";
 import { axiosClient } from "../api/axiosClient";
 
@@ -78,6 +78,89 @@ const SupplierReturnListScreen = () => {
     const { role } = useAuthStore();
     const navigation = useNavigation<any>();
     const [warehouses, setWarehouses] = useState<any[]>([]);
+    const [tableVersion, setTableVersion] = useState(0);
+
+    const canApproveSupplierReturn = role === "ADMIN" || role === "WAREHOUSE_STAFF";
+
+    const completeReturnRequest = async (row: any) => {
+        try {
+            await axiosClient.post(`/supplier-returns/${row.id}/complete`);
+            Alert.alert("Thành công", `Đã duyệt ${row?.returnNo || "phiếu"}.`);
+            setTableVersion((prev) => prev + 1);
+        } catch (err: any) {
+            Alert.alert(
+                "Không thể duyệt",
+                err?.response?.data?.message
+                    || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`,
+            );
+        }
+    };
+
+    const cancelReturnRequest = async (row: any) => {
+        try {
+            await axiosClient.post(`/supplier-returns/${row.id}/cancel`);
+            Alert.alert("Thành công", `Đã hủy ${row?.returnNo || "phiếu"}.`);
+            setTableVersion((prev) => prev + 1);
+        } catch (err: any) {
+            Alert.alert(
+                "Không thể hủy",
+                err?.response?.data?.message
+                    || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`,
+            );
+        }
+    };
+
+    const handleCompleteReturn = (row: any) => {
+        const confirmMessage = `Bạn có chắc muốn duyệt ${row?.returnNo || "phiếu"} không?`;
+
+        if (Platform.OS === "web") {
+            const confirmed = window.confirm(confirmMessage);
+            if (!confirmed) {
+                return;
+            }
+            completeReturnRequest(row);
+            return;
+        }
+
+        Alert.alert(
+            "Xác nhận duyệt phiếu",
+            confirmMessage,
+            [
+                { text: "Huỷ", style: "cancel" },
+                {
+                    text: "Duyệt",
+                    style: "default",
+                    onPress: () => completeReturnRequest(row),
+                },
+            ],
+        );
+    };
+
+    const handleCancelReturn = (row: any) => {
+        const confirmMessage = `Bạn có chắc muốn hủy ${row?.returnNo || "phiếu"} không?`;
+
+        if (Platform.OS === "web") {
+            const confirmed = window.confirm(confirmMessage);
+            if (!confirmed) {
+                return;
+            }
+            cancelReturnRequest(row);
+            return;
+        }
+
+        Alert.alert(
+            "Xác nhận hủy phiếu",
+            confirmMessage,
+            [
+                { text: "Không", style: "cancel" },
+                {
+                    text: "Hủy phiếu",
+                    style: "destructive",
+                    onPress: () => cancelReturnRequest(row),
+                },
+            ],
+        );
+    };
 
     useEffect(() => {
         const fetchWarehouses = async () => {
@@ -96,8 +179,16 @@ const SupplierReturnListScreen = () => {
         fetchWarehouses();
     }, []);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            setTableVersion((prev) => prev + 1);
+            return undefined;
+        }, []),
+    );
+
     return (
         <DataTableScreen
+            key={`supplier-returns-${tableVersion}`}
             apiUrl="/supplier-returns"
             title="Trả hàng NCC"
             mobilePreviewCount={10}
@@ -114,10 +205,17 @@ const SupplierReturnListScreen = () => {
                     shouldShow: (row) => row.status === "DRAFT"
                 },
                 {
+                    label: "Hủy",
+                    tone: "danger",
+                    shouldShow: (row) =>
+                        canApproveSupplierReturn && String(row?.status || "") === "DRAFT",
+                    onPress: handleCancelReturn,
+                },
+                {
                     label: "Duyệt",
-                    onPress: (row) =>
-                        Alert.alert("Duyệt", `Duyệt ${row?.returnNo}`),
-                    shouldShow: (row) => role === "ADMIN" && ["DRAFT", "PENDING"].includes(String(row?.status)),
+                    onPress: handleCompleteReturn,
+                    shouldShow: (row) =>
+                        canApproveSupplierReturn && String(row?.status || "") === "DRAFT",
                 },
             ]}
             renderDetailContent={(row) => <SupplierReturnDetailView id={row.id} />}

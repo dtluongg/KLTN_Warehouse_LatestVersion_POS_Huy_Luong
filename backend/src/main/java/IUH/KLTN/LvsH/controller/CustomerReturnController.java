@@ -59,4 +59,10 @@ public class CustomerReturnController {
     public ResponseEntity<CustomerReturnDetailResponseDTO> completeCustomerReturn(@PathVariable Long id) {
         return ResponseEntity.ok(returnService.completeCustomerReturn(id));
     }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
+    public ResponseEntity<CustomerReturnDetailResponseDTO> cancelDraftCustomerReturn(@PathVariable Long id) {
+        return ResponseEntity.ok(returnService.cancelDraftCustomerReturn(id));
+    }
 }

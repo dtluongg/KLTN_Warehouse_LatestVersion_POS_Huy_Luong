@@ -115,6 +115,8 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             goodsReceipt = grRepository.findById(dto.getGoodsReceiptId()).orElse(null);
         }
 
+        validateAgainstGoodsReceiptItemLimits(dto.getItems(), goodsReceipt, null);
+
         BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
 
@@ -178,6 +180,31 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
 
     @Override
     @Transactional
+    public SupplierReturnDetailResponseDTO cancelDraftSupplierReturn(Long id) {
+        SupplierReturn sr = getSupplierReturnEntityById(id);
+
+        if (sr.getStatus() == DocumentStatus.POSTED) {
+            throw new RuntimeException("Posted supplier return cannot be cancelled");
+        }
+        if (sr.getStatus() == DocumentStatus.CANCELLED) {
+            throw new RuntimeException("Supplier return is already cancelled");
+        }
+
+        Staff currentStaff = getAuthenticatedStaff();
+        boolean isAdmin = currentStaff.getRole() != null && currentStaff.getRole().equalsIgnoreCase("ADMIN");
+        boolean isOwner = sr.getCreatedBy() != null && sr.getCreatedBy().getId() != null && sr.getCreatedBy().getId().equals(currentStaff.getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new RuntimeException("You do not have permission to cancel this supplier return");
+        }
+
+        sr.setStatus(DocumentStatus.CANCELLED);
+        srRepository.save(sr);
+        return getSupplierReturnDetailById(sr.getId());
+    }
+
+    @Override
+    @Transactional
     public SupplierReturnDetailResponseDTO updateDraftSupplierReturn(Long id, SupplierReturnRequestDTO dto) {
         validateItemList(dto.getItems());
 
@@ -195,6 +222,8 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         if (dto.getGoodsReceiptId() != null) {
             goodsReceipt = grRepository.findById(dto.getGoodsReceiptId()).orElse(null);
         }
+
+        validateAgainstGoodsReceiptItemLimits(dto.getItems(), goodsReceipt, id);
 
         BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
@@ -254,10 +283,43 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             throw new RuntimeException("Return already completed");
         }
 
+        List<SupplierReturnItem> items = srItemRepository.findBySupplierReturnId(sr.getId());
+
+        for (SupplierReturnItem item : items) {
+            if (sr.getGoodsReceipt() != null && item.getGoodsReceiptItem() == null) {
+                throw new RuntimeException("Goods receipt item is required when supplier return references a goods receipt");
+            }
+
+            GoodsReceiptItem grItem = item.getGoodsReceiptItem();
+            if (grItem == null) {
+                continue;
+            }
+
+            if (grItem.getProduct() == null || !grItem.getProduct().getId().equals(item.getProduct().getId())) {
+                throw new RuntimeException("Returned product does not match the referenced goods receipt item");
+            }
+
+            Integer postedQty = srItemRepository.sumQtyByGoodsReceiptItemIdAndReturnStatus(grItem.getId(), DocumentStatus.POSTED);
+            int alreadyReturnedQty = postedQty == null ? 0 : postedQty;
+            int maxQty = grItem.getReceivedQty() == null ? 0 : grItem.getReceivedQty();
+            int requestedQty = item.getQty() == null ? 0 : item.getQty();
+
+            if (alreadyReturnedQty + requestedQty > maxQty) {
+                throw new RuntimeException("Returned quantity exceeds received quantity for goods receipt item: " + grItem.getId());
+            }
+
+            BigDecimal postedAmount = srItemRepository.sumAmountByGoodsReceiptItemIdAndReturnStatus(grItem.getId(), DocumentStatus.POSTED);
+            BigDecimal alreadyReturnedAmount = postedAmount == null ? BigDecimal.ZERO : postedAmount;
+            BigDecimal maxAmount = grItem.getLineTotal() == null ? BigDecimal.ZERO : grItem.getLineTotal();
+            BigDecimal requestedAmount = item.getReturnAmount() == null ? BigDecimal.ZERO : item.getReturnAmount();
+
+            if (alreadyReturnedAmount.add(requestedAmount).compareTo(maxAmount) > 0) {
+                throw new RuntimeException("Return amount exceeds original goods receipt item value: " + grItem.getId());
+            }
+        }
+
         sr.setStatus(DocumentStatus.POSTED);
         srRepository.save(sr);
-
-        List<SupplierReturnItem> items = srItemRepository.findBySupplierReturnId(sr.getId());
 
         for (SupplierReturnItem item : items) {
             InventoryMovement movement = InventoryMovement.builder()
@@ -323,6 +385,55 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
             this.totalAmount = totalAmount;
             this.totalVat = totalVat;
             this.totalAmountPayable = totalAmountPayable;
+        }
+    }
+
+    private void validateAgainstGoodsReceiptItemLimits(List<SupplierReturnRequestDTO.SupplierReturnItemRequestDTO> items,
+                                                       GoodsReceipt goodsReceipt,
+                                                       Long excludedReturnId) {
+        for (SupplierReturnRequestDTO.SupplierReturnItemRequestDTO itemDto : items) {
+            if (itemDto.getGoodsReceiptItemId() == null) {
+                continue;
+            }
+
+            GoodsReceiptItem grItem = grItemRepository.findById(itemDto.getGoodsReceiptItemId())
+                    .orElseThrow(() -> new RuntimeException("Goods Receipt Item not found"));
+
+            if (goodsReceipt != null && (grItem.getGoodsReceipt() == null || !grItem.getGoodsReceipt().getId().equals(goodsReceipt.getId()))) {
+                throw new RuntimeException("Goods Receipt Item does not belong to the specified Goods Receipt: " + goodsReceipt.getId());
+            }
+
+            Integer postedQty = excludedReturnId == null
+                    ? srItemRepository.sumQtyByGoodsReceiptItemIdAndReturnStatus(grItem.getId(), DocumentStatus.POSTED)
+                    : srItemRepository.sumQtyByGoodsReceiptItemIdAndReturnStatusExcludingReturnId(grItem.getId(), DocumentStatus.POSTED, excludedReturnId);
+            Integer pendingQty = excludedReturnId == null
+                    ? srItemRepository.sumQtyByGoodsReceiptItemIdAndReturnStatus(grItem.getId(), DocumentStatus.DRAFT)
+                    : srItemRepository.sumQtyByGoodsReceiptItemIdAndReturnStatusExcludingReturnId(grItem.getId(), DocumentStatus.DRAFT, excludedReturnId);
+
+            int alreadyPosted = postedQty == null ? 0 : postedQty;
+            int alreadyPending = pendingQty == null ? 0 : pendingQty;
+            int maxQty = grItem.getReceivedQty() == null ? 0 : grItem.getReceivedQty();
+            int requestedQty = itemDto.getQty() == null ? 0 : itemDto.getQty();
+
+            if (alreadyPosted + alreadyPending + requestedQty > maxQty) {
+                throw new RuntimeException("Returned quantity exceeds available quantity (received - pending - posted) for goods receipt item: " + grItem.getId());
+            }
+
+            BigDecimal postedAmount = excludedReturnId == null
+                    ? srItemRepository.sumAmountByGoodsReceiptItemIdAndReturnStatus(grItem.getId(), DocumentStatus.POSTED)
+                    : srItemRepository.sumAmountByGoodsReceiptItemIdAndReturnStatusExcludingReturnId(grItem.getId(), DocumentStatus.POSTED, excludedReturnId);
+            BigDecimal pendingAmount = excludedReturnId == null
+                    ? srItemRepository.sumAmountByGoodsReceiptItemIdAndReturnStatus(grItem.getId(), DocumentStatus.DRAFT)
+                    : srItemRepository.sumAmountByGoodsReceiptItemIdAndReturnStatusExcludingReturnId(grItem.getId(), DocumentStatus.DRAFT, excludedReturnId);
+
+            BigDecimal alreadyPostedAmount = postedAmount == null ? BigDecimal.ZERO : postedAmount;
+            BigDecimal alreadyPendingAmount = pendingAmount == null ? BigDecimal.ZERO : pendingAmount;
+            BigDecimal maxAmount = grItem.getLineTotal() == null ? BigDecimal.ZERO : grItem.getLineTotal();
+            BigDecimal requestedAmount = itemDto.getReturnAmount() == null ? BigDecimal.ZERO : itemDto.getReturnAmount();
+
+            if (alreadyPostedAmount.add(alreadyPendingAmount).add(requestedAmount).compareTo(maxAmount) > 0) {
+                throw new RuntimeException("Return amount exceeds available amount (line total - pending - posted) for goods receipt item: " + grItem.getId());
+            }
         }
     }
 }
