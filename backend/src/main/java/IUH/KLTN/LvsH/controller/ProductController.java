@@ -3,7 +3,6 @@ package IUH.KLTN.LvsH.controller;
 import IUH.KLTN.LvsH.dto.product.ProductRequestDTO;
 import IUH.KLTN.LvsH.dto.product.ProductResponseDTO;
 import IUH.KLTN.LvsH.dto.product.ProductSearchCriteria;
-import IUH.KLTN.LvsH.entity.Product;
 import IUH.KLTN.LvsH.repository.ProductRepository;
 import IUH.KLTN.LvsH.service.ProductService;
 import lombok.RequiredArgsConstructor;
