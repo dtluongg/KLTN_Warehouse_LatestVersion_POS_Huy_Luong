@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
     ActivityIndicator,
     FlatList,
@@ -100,6 +101,12 @@ const InventoryStockScreen = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [fetchData]),
+    );
 
     const inventoryRows: InventoryRow[] = useMemo(() => {
         if (selectedWarehouse === "SYSTEM") {

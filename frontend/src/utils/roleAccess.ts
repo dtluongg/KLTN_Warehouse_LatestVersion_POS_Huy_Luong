@@ -8,6 +8,7 @@ const SALES_ALLOWED_ROUTES = new Set<string>([
     "CustomerReturns",
     "CustomerReturnForm",
     "InventoryStock",
+    "AiSqlChat",
 ]);
 
 const WAREHOUSE_ALLOWED_ROUTES = new Set<string>([
@@ -23,6 +24,7 @@ const WAREHOUSE_ALLOWED_ROUTES = new Set<string>([
     "StockAdjustments",
     "StockAdjustmentForm",
     "InventoryMovements",
+    "AiSqlChat",
 ]);
 
 export function normalizeRole(role: string | null | undefined): AppRole | null {

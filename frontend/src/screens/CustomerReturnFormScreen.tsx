@@ -22,9 +22,13 @@ interface LineItem {
     refundAmount: number;
     purchasedQty?: number;
     unitPrice?: number;
+    lineRevenue?: number;
     returnedQty?: number;
     pendingQty?: number;
     availableQty?: number;
+    postedRefund?: number;
+    pendingRefund?: number;
+    availableRefund?: number;
 }
 
 const CustomerReturnFormScreen = () => {
@@ -64,16 +68,34 @@ const CustomerReturnFormScreen = () => {
 
     const totalRefund = items.reduce((s, i) => s + i.refundAmount, 0);
     const canEdit     = !isEdit || status === "DRAFT";
+    const hasReturnableItems = items.some((item) => (item.availableQty ?? item.purchasedQty ?? 1) > 0 || !orderId);
+    const submitItems = orderId
+        ? items.filter((item) => (item.availableQty ?? 0) > 0)
+        : items;
 
     const calcRefundAmount = (qty: number, unitPrice?: number) => {
         const safeQty = Number.isFinite(qty) ? Math.max(0, qty) : 0;
         const safeUnitPrice = Number.isFinite(unitPrice) ? Number(unitPrice) : 0;
-        return safeQty * safeUnitPrice;
+        return Math.round(safeQty * safeUnitPrice);
+    };
+
+    const calcOrderItemRefundAmount = (qty: number, purchasedQty?: number, lineRevenue?: number, fallbackUnitPrice?: number) => {
+        const safeQty = Number.isFinite(qty) ? Math.max(0, qty) : 0;
+        const safePurchasedQty = Number.isFinite(purchasedQty) ? Number(purchasedQty) : 0;
+        const safeLineRevenue = Number.isFinite(lineRevenue) ? Number(lineRevenue) : null;
+
+        if (safeLineRevenue != null && safePurchasedQty > 0) {
+            return Math.round((safeLineRevenue * safeQty) / safePurchasedQty);
+        }
+
+        return calcRefundAmount(safeQty, fallbackUnitPrice);
     };
 
     const buildOrderItemReturnStats = async (selectedOrderId: number, excludedReturnId?: number) => {
         const postedByOrderItemId = new Map<number, number>();
         const pendingByOrderItemId = new Map<number, number>();
+        const postedRefundByOrderItemId = new Map<number, number>();
+        const pendingRefundByOrderItemId = new Map<number, number>();
 
         const [postedRes, draftRes] = await Promise.all([
             axiosClient.get("/customer-returns?status=POSTED&page=0&size=500&sortBy=id&direction=desc"),
@@ -87,7 +109,11 @@ const CustomerReturnFormScreen = () => {
             (row) => Number(row?.orderId) === Number(selectedOrderId) && Number(row?.id) !== Number(excludedReturnId || 0),
         );
 
-        const collectMap = async (rows: any[], targetMap: Map<number, number>) => {
+        const collectMap = async (
+            rows: any[],
+            qtyMap: Map<number, number>,
+            refundMap: Map<number, number>,
+        ) => {
             await Promise.all(
                 rows.map(async (row) => {
                     const detailRes = await axiosClient.get(`/customer-returns/${row.id}`);
@@ -96,16 +122,23 @@ const CustomerReturnFormScreen = () => {
                         const orderItemId = Number(it?.orderItemId);
                         if (!Number.isFinite(orderItemId) || orderItemId <= 0) return;
                         const qty = Number(it?.qty || 0);
-                        targetMap.set(orderItemId, (targetMap.get(orderItemId) || 0) + qty);
+                        const refund = Number(it?.refundAmount || 0);
+                        qtyMap.set(orderItemId, (qtyMap.get(orderItemId) || 0) + qty);
+                        refundMap.set(orderItemId, (refundMap.get(orderItemId) || 0) + refund);
                     });
                 }),
             );
         };
 
-        await collectMap(postedForOrder, postedByOrderItemId);
-        await collectMap(draftForOrder, pendingByOrderItemId);
+        await collectMap(postedForOrder, postedByOrderItemId, postedRefundByOrderItemId);
+        await collectMap(draftForOrder, pendingByOrderItemId, pendingRefundByOrderItemId);
 
-        return { postedByOrderItemId, pendingByOrderItemId };
+        return {
+            postedByOrderItemId,
+            pendingByOrderItemId,
+            postedRefundByOrderItemId,
+            pendingRefundByOrderItemId,
+        };
     };
 
     useEffect(() => {
@@ -158,7 +191,12 @@ const CustomerReturnFormScreen = () => {
         try {
             const res = await axiosClient.get(`/orders/${order.id}`);
             const detail = res.data;
-            const { postedByOrderItemId, pendingByOrderItemId } = await buildOrderItemReturnStats(order.id);
+            const {
+                postedByOrderItemId,
+                pendingByOrderItemId,
+                postedRefundByOrderItemId,
+                pendingRefundByOrderItemId,
+            } = await buildOrderItemReturnStats(order.id);
 
             // Auto-fill kho từ đơn hàng
             if (detail.warehouseId) {
@@ -173,7 +211,12 @@ const CustomerReturnFormScreen = () => {
                 const pendingQty = pendingByOrderItemId.get(Number(oi.id)) || 0;
                 const availableQty = Math.max(0, purchasedQty - returnedQty - pendingQty);
                 const unitPrice = Number(oi.salePrice ?? 0);
+                const lineRevenue = Number(oi.lineRevenue ?? 0);
+                const postedRefund = postedRefundByOrderItemId.get(Number(oi.id)) || 0;
+                const pendingRefund = pendingRefundByOrderItemId.get(Number(oi.id)) || 0;
+                const availableRefund = Math.max(0, lineRevenue - postedRefund - pendingRefund);
                 const initialQty = availableQty;
+                const proposedRefund = calcOrderItemRefundAmount(initialQty, purchasedQty, lineRevenue, unitPrice);
 
                 return {
                     productId: oi.productId,
@@ -186,7 +229,11 @@ const CustomerReturnFormScreen = () => {
                     pendingQty,
                     availableQty,
                     unitPrice,
-                    refundAmount: calcRefundAmount(initialQty, unitPrice),
+                    lineRevenue,
+                    postedRefund,
+                    pendingRefund,
+                    availableRefund,
+                    refundAmount: Math.min(proposedRefund, availableRefund),
                 };
             }));
         } catch (e) {
@@ -227,7 +274,12 @@ const CustomerReturnFormScreen = () => {
                     try {
                         const orderRes = await axiosClient.get(`/orders/${d.orderId}`);
                         const orderItems: any[] = orderRes.data?.items || [];
-                        const { postedByOrderItemId, pendingByOrderItemId } = await buildOrderItemReturnStats(Number(d.orderId), editId);
+                        const {
+                            postedByOrderItemId,
+                            pendingByOrderItemId,
+                            postedRefundByOrderItemId,
+                            pendingRefundByOrderItemId,
+                        } = await buildOrderItemReturnStats(Number(d.orderId), editId);
                         const orderItemMap = new Map<number, any>(
                             orderItems
                                 .filter((oi: any) => oi?.id != null)
@@ -240,11 +292,16 @@ const CustomerReturnFormScreen = () => {
                                 if (!ref) return it;
                                 const unitPrice = Number(ref.salePrice ?? 0);
                                 const purchasedQty = Number(ref.qty ?? it.qty ?? 0);
+                                const lineRevenue = Number(ref.lineRevenue ?? 0);
                                 const returnedQty = postedByOrderItemId.get(Number(ref.id)) || 0;
                                 const pendingQty = pendingByOrderItemId.get(Number(ref.id)) || 0;
                                 const availableQty = Math.max(0, purchasedQty - returnedQty - pendingQty);
                                 const currentQty = Number(it.qty || 0);
                                 const qty = Math.max(0, Math.min(currentQty, availableQty));
+                                const postedRefund = postedRefundByOrderItemId.get(Number(ref.id)) || 0;
+                                const pendingRefund = pendingRefundByOrderItemId.get(Number(ref.id)) || 0;
+                                const availableRefund = Math.max(0, lineRevenue - postedRefund - pendingRefund);
+                                const proposedRefund = calcOrderItemRefundAmount(qty, purchasedQty, lineRevenue, unitPrice);
                                 return {
                                     ...it,
                                     qty,
@@ -253,7 +310,11 @@ const CustomerReturnFormScreen = () => {
                                     pendingQty,
                                     availableQty,
                                     unitPrice,
-                                    refundAmount: calcRefundAmount(qty, unitPrice),
+                                    lineRevenue,
+                                    postedRefund,
+                                    pendingRefund,
+                                    availableRefund,
+                                    refundAmount: Math.min(proposedRefund, availableRefund),
                                 };
                             }),
                         );
@@ -300,7 +361,12 @@ const CustomerReturnFormScreen = () => {
                 return {
                     ...it,
                     qty: finalQty,
-                    refundAmount: calcRefundAmount(finalQty, it.unitPrice),
+                    refundAmount: it.orderItemId
+                        ? Math.min(
+                            calcOrderItemRefundAmount(finalQty, it.purchasedQty, it.lineRevenue, it.unitPrice),
+                            Math.max(0, Number(it.availableRefund ?? Number.MAX_SAFE_INTEGER)),
+                        )
+                        : calcRefundAmount(finalQty, it.unitPrice),
                 };
             }
 
@@ -322,7 +388,14 @@ const CustomerReturnFormScreen = () => {
         if (items.length === 0) { Alert.alert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
 
         if (orderId) {
-            for (const item of items) {
+            const returnableItems = submitItems;
+
+            if (returnableItems.length === 0) {
+                Alert.alert("Không thể tạo phiếu", "Tất cả sản phẩm trong đơn hàng này đã đạt tối đa yêu cầu trả.");
+                return;
+            }
+
+            for (const item of returnableItems) {
                 if (!item.orderItemId) {
                     Alert.alert("Không hợp lệ", "Khi có đơn hàng gốc, mọi sản phẩm trả phải thuộc đơn hàng đã chọn.");
                     return;
@@ -339,9 +412,15 @@ const CustomerReturnFormScreen = () => {
             note: note || null,
             discountAmount: Number(discountAmount) || 0,
             surchargeAmount: Number(surchargeAmount) || 0,
-            items: items.map(it => ({
+            items: submitItems.map(it => ({
                 productId: it.productId, orderItemId: it.orderItemId || null,
-                qty: it.qty, refundAmount: it.refundAmount,
+                qty: it.qty,
+                refundAmount: it.orderItemId
+                    ? Math.min(
+                        calcOrderItemRefundAmount(it.qty, it.purchasedQty, it.lineRevenue, it.unitPrice),
+                        Math.max(0, Number(it.availableRefund ?? Number.MAX_SAFE_INTEGER)),
+                    )
+                    : it.refundAmount,
             })),
         };
         try {
@@ -355,7 +434,13 @@ const CustomerReturnFormScreen = () => {
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert("Lỗi", err?.response?.data?.message || "Không thể lưu phiếu.");
+            const responseData = err?.response?.data;
+            const statusText = err?.response?.status ? `HTTP ${err.response.status}` : "";
+            const rawDetail = typeof responseData === "object" ? JSON.stringify(responseData) : String(responseData || "");
+            const detailMessage = typeof responseData === "string"
+                ? responseData
+                : responseData?.message || responseData?.error || responseData?.fieldErrors?.items || "Không thể lưu phiếu.";
+            Alert.alert("Lỗi", [statusText, detailMessage, rawDetail].filter(Boolean).join("\n"));
         } finally { setSubmitting(false); }
     };
 
@@ -452,6 +537,14 @@ const CustomerReturnFormScreen = () => {
                     {!!orderId && (
                         <Text style={styles.orderBoundHint}>Đã chọn đơn hàng gốc, chỉ trả các sản phẩm thuộc đơn hàng này.</Text>
                     )}
+                    {!!orderId && !hasReturnableItems && (
+                        <View style={styles.zeroItemBanner}>
+                            <Feather name="alert-circle" size={14} color="#991b1b" />
+                            <Text style={styles.zeroItemBannerText}>
+                                Tất cả sản phẩm trong đơn này đã đạt tối đa yêu cầu trả, không thể trả thêm.
+                            </Text>
+                        </View>
+                    )}
                     {items.length === 0 ? (
                         <View style={styles.emptyItems}>
                             <Feather name="package" size={32} color={theme.colors.muted} />
@@ -477,18 +570,29 @@ const CustomerReturnFormScreen = () => {
                             <View style={styles.lineItemInputRow}>
                                 <View style={styles.lineField}>
                                     <Text style={styles.lineInputLabel}>Số lượng trả</Text>
-                                    <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled]}
-                                        keyboardType="numeric" value={String(item.qty)}
-                                        onChangeText={v => updateItem(idx, "qty", Number(v) || 0)} editable={canEdit} />
-                                    {item.availableQty != null && (
-                                        <Text style={styles.limitHint}>Tối đa: {item.availableQty}</Text>
+                                    {(item.availableQty ?? 0) <= 0 ? (
+                                        <View style={styles.zeroItemNoticeBox}>
+                                            <Feather name="slash" size={14} color="#991b1b" />
+                                            <Text style={styles.zeroItemNoticeText}>
+                                                Sản phẩm này đã đạt tối đa yêu cầu trả, không thể trả sản phẩm này.
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled]}
+                                                keyboardType="numeric" value={String(item.qty)}
+                                                onChangeText={v => updateItem(idx, "qty", Number(v) || 0)} editable={canEdit} />
+                                            {item.availableQty != null && (
+                                                <Text style={styles.limitHint}>Tối đa: {item.availableQty}</Text>
+                                            )}
+                                        </>
                                     )}
                                 </View>
                                 <View style={styles.lineField}>
                                     <Text style={styles.lineInputLabel}>Số tiền hoàn (VND)</Text>
-                                    <TextInput style={[styles.lineInput, (!canEdit || !!item.orderItemId) && styles.inputDisabled]}
+                                    <TextInput style={[styles.lineInput, (!canEdit || !!item.orderItemId || (item.availableQty ?? 0) <= 0) && styles.inputDisabled]}
                                         keyboardType="numeric" value={String(item.refundAmount)}
-                                        onChangeText={v => updateItem(idx, "refundAmount", Number(v) || 0)} editable={canEdit && !item.orderItemId} />
+                                        onChangeText={v => updateItem(idx, "refundAmount", Number(v) || 0)} editable={canEdit && !item.orderItemId && (item.availableQty ?? 0) > 0} />
                                 </View>
                             </View>
                         </View>
@@ -651,6 +755,10 @@ const styles = StyleSheet.create({
     lineInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.surface, width: "100%" },
     limitHint: { fontSize: 11, color: theme.colors.mutedForeground, marginTop: 4 },
     orderBoundHint: { fontSize: 12, color: theme.colors.primary, marginBottom: 10, marginTop: -6 },
+    zeroItemBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fef2f2", borderColor: "#fecaca", borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+    zeroItemBannerText: { flex: 1, color: "#991b1b", fontSize: 12, fontWeight: "600", lineHeight: 18 },
+    zeroItemNoticeBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fef2f2", borderColor: "#fecaca", borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, minHeight: 44 },
+    zeroItemNoticeText: { flex: 1, color: "#991b1b", fontSize: 12, fontWeight: "600", lineHeight: 18 },
     summaryCard: { margin: 16, marginTop: 12, borderRadius: 12, padding: 16, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
     summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
     summaryTotal: { borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12, marginTop: 4 },

@@ -16,6 +16,7 @@ interface LineItem {
     productName: string;
     productSku: string;
     systemQty: number;
+    adjustQtyInput: string;
     adjustQty: number; // positive = thêm, negative = giảm
 }
 
@@ -146,6 +147,7 @@ const StockAdjustmentFormScreen = () => {
                     productId: item.productId, productName: item.productName || "",
                     productSku: item.productSku || "",
                     systemQty: 0,
+                    adjustQtyInput: String(item.adjustQty ?? 0),
                     adjustQty: item.adjustQty,
                 })));
             } catch (e) { Alert.alert("Lỗi", "Không thể tải phiếu."); }
@@ -167,13 +169,28 @@ const StockAdjustmentFormScreen = () => {
             productName: prod.name,
             productSku: prod.sku,
             systemQty: stockByProductId[prod.id] ?? 0,
+            adjustQtyInput: "0",
             adjustQty: 0,
         }]);
         setShowProductModal(false);
     };
 
-    const updateItem = (idx: number, val: number) => {
-        setItems(prev => prev.map((it, i) => i === idx ? { ...it, adjustQty: val } : it));
+    const updateItem = (idx: number, rawInput: string) => {
+        // Keep text input flexible so users can type '-' first, then continue with number.
+        const cleaned = rawInput.replace(/[^0-9-]/g, "");
+        const normalized = cleaned.startsWith("-")
+            ? `-${cleaned.slice(1).replace(/-/g, "")}`
+            : cleaned.replace(/-/g, "");
+
+        let parsedQty = 0;
+        if (normalized !== "" && normalized !== "-") {
+            const parsed = Number.parseInt(normalized, 10);
+            parsedQty = Number.isNaN(parsed) ? 0 : parsed;
+        }
+
+        setItems(prev => prev.map((it, i) => i === idx
+            ? { ...it, adjustQtyInput: normalized, adjustQty: parsedQty }
+            : it));
     };
 
     const removeItem = (idx: number) => { setItems(prev => prev.filter((_, i) => i !== idx)); };
@@ -306,8 +323,8 @@ const StockAdjustmentFormScreen = () => {
                             </View>
                             <Text style={styles.lineInputLabel}>Số lượng chênh lệch (dương = tăng, âm = giảm)</Text>
                             <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled, item.adjustQty > 0 && { borderColor: "#16a34a" }, item.adjustQty < 0 && { borderColor: "#dc2626" }]}
-                                keyboardType="numeric" value={String(item.adjustQty)}
-                                onChangeText={v => updateItem(idx, Number(v.replace(/[^-0-9]/g, "")) || 0)} editable={canEdit} />
+                                keyboardType="numbers-and-punctuation" value={item.adjustQtyInput}
+                                onChangeText={v => updateItem(idx, v)} editable={canEdit} />
                             <Text style={styles.lineInputHint}>Không nhập 0 vì backend sẽ từ chối lưu phiếu.</Text>
                         </View>
                     ))}
