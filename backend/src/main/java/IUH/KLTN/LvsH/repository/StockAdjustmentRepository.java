@@ -4,8 +4,11 @@ import IUH.KLTN.LvsH.entity.StockAdjustment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import jakarta.persistence.LockModeType;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -28,6 +31,11 @@ public interface StockAdjustmentRepository extends JpaRepository<StockAdjustment
 
     @Query("SELECT s.adjustNo FROM StockAdjustment s WHERE s.id = :id")
     String findAdjustNoById(@Param("id") Long id);
+
+    // Lock the adjustment row while completing to avoid concurrent double-post.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM StockAdjustment s WHERE s.id = :id")
+    java.util.Optional<StockAdjustment> findByIdForUpdate(@Param("id") Long id);
 
     @Query(value = """
             SELECT

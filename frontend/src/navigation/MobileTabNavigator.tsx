@@ -1,7 +1,10 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
+import { TouchableOpacity } from "react-native";
 import { theme } from "../utils/theme";
+import { useAuthStore } from "../store/authStore";
+import { isRouteAllowedByRole } from "../utils/roleAccess";
 
 import HomeScreen from "../screens/HomeScreen";
 import PosScreen from "../screens/PosScreen";
@@ -23,10 +26,23 @@ const TAB_ICON_BY_ROUTE: Record<
 };
 
 export default function MobileTabNavigator() {
+    const role = useAuthStore((state) => state.role);
+
     return (
         <Tab.Navigator
             initialRouteName="Overview"
             screenOptions={({ route }) => ({
+                tabBarButton: (props) => {
+                    const isAllowed = isRouteAllowedByRole(role, route.name);
+
+                    return (
+                        <TouchableOpacity
+                            {...props}
+                            disabled={!isAllowed}
+                            style={[props.style, !isAllowed && { opacity: 0.45 }]}
+                        />
+                    );
+                },
                 headerStyle: { backgroundColor: theme.colors.primary },
                 headerTintColor: theme.colors.primaryForeground,
                 tabBarActiveTintColor: theme.colors.primary,

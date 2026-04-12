@@ -9,5 +9,6 @@ public interface StockAdjustmentService {
     StockAdjustmentDetailResponseDTO getAdjustmentDetailById(Long id);
     StockAdjustmentDetailResponseDTO createAdjustment(StockAdjustmentRequestDTO request);
     StockAdjustmentDetailResponseDTO updateDraftAdjustment(Long id, StockAdjustmentRequestDTO request);
-    StockAdjustmentDetailResponseDTO completeAdjustment(Long id);
+    StockAdjustmentDetailResponseDTO completeAdjustment(Long id, boolean forceCompleteWhenDrift);
+    StockAdjustmentDetailResponseDTO cancelDraftAdjustment(Long id);
 }

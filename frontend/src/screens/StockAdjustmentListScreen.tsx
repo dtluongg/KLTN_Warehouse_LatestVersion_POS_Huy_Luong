@@ -1,9 +1,9 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, TextInput } from "react-native";
+import { Alert, Platform, StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, TextInput } from "react-native";
 import { DataTableScreen, StatusBadge } from "../components";
 import { useAuthStore } from "../store/authStore";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { theme } from "../utils/theme";
 import { axiosClient } from "../api/axiosClient";
 
@@ -63,6 +63,153 @@ const StockAdjustmentListScreen = () => {
     const { role } = useAuthStore();
     const navigation = useNavigation<any>();
     const [warehouses, setWarehouses] = useState<any[]>([]);
+    const [tableVersion, setTableVersion] = useState(0);
+
+    const canCompleteAdjustment = role === "ADMIN";
+
+    const showMessage = (title: string, message: string) => {
+        if (Platform.OS === "web") {
+            window.alert(`${title}\n${message}`);
+            return;
+        }
+        Alert.alert(title, message);
+    };
+
+    const buildDiffPreviewMessage = (detail: any) => {
+        const items = Array.isArray(detail?.items) ? detail.items : [];
+        const totalIncrease = items
+            .filter((item: any) => Number(item?.adjustQty || 0) > 0)
+            .reduce((sum: number, item: any) => sum + Number(item.adjustQty || 0), 0);
+        const totalDecrease = items
+            .filter((item: any) => Number(item?.adjustQty || 0) < 0)
+            .reduce((sum: number, item: any) => sum + Math.abs(Number(item.adjustQty || 0)), 0);
+
+        const itemLines = items.map((item: any) => {
+            const qty = Number(item?.adjustQty || 0);
+            const prefix = qty > 0 ? "+" : "";
+            return `- ${item?.productSku || "N/A"}: ${prefix}${qty}`;
+        });
+
+        return [
+            `Phiếu: ${detail?.adjustNo || "N/A"}`,
+            `Kho: ${detail?.warehouseName || "N/A"}`,
+            `Tổng tăng: +${totalIncrease}`,
+            `Tổng giảm: -${totalDecrease}`,
+            "",
+            "Chi tiết chênh lệch:",
+            ...itemLines,
+            "",
+            "Bạn có muốn duyệt tiếp không?",
+        ].join("\n");
+    };
+
+    const completeAdjustmentRequest = async (row: any, forceCompleteWhenDrift = false) => {
+        try {
+            await axiosClient.post(`/stock-adjustments/${row.id}/complete`, null, {
+                params: { forceCompleteWhenDrift },
+            });
+            Alert.alert("Thành công", `Đã duyệt ${row?.adjustNo || "phiếu"}.`);
+            setTableVersion((prev) => prev + 1);
+        } catch (err: any) {
+            const errorMessage =
+                err?.response?.data?.message
+                || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`;
+
+            const isDriftError = String(errorMessage).includes("Inventory changed after count for SKU(s)");
+
+            if (!isDriftError) {
+                showMessage("Không thể duyệt", errorMessage);
+                return;
+            }
+
+            const forceMessage = `${errorMessage}\n\nBạn vẫn muốn duyệt theo chênh lệch đã lưu không?`;
+            if (Platform.OS === "web") {
+                const confirmed = window.confirm(forceMessage);
+                if (confirmed) {
+                    completeAdjustmentRequest(row, true);
+                }
+                return;
+            }
+
+            Alert.alert(
+                "Tồn kho đã thay đổi",
+                forceMessage,
+                [
+                    { text: "Không", style: "cancel" },
+                    {
+                        text: "Vẫn duyệt",
+                        style: "default",
+                        onPress: () => completeAdjustmentRequest(row, true),
+                    },
+                ],
+            );
+        }
+    };
+
+    const handleCompleteAdjustment = async (row: any) => {
+        let confirmMessage = `Bạn có chắc muốn duyệt ${row?.adjustNo || "phiếu"} không?`;
+
+        try {
+            const detailRes = await axiosClient.get(`/stock-adjustments/${row.id}`);
+            confirmMessage = buildDiffPreviewMessage(detailRes.data);
+        } catch (error: any) {
+            console.error("Unable to load adjustment detail before complete", error);
+        }
+
+        if (Platform.OS === "web") {
+            const confirmed = window.confirm(confirmMessage);
+            if (!confirmed) {
+                return;
+            }
+            completeAdjustmentRequest(row, false);
+            return;
+        }
+
+        Alert.alert(
+            "Xác nhận duyệt phiếu",
+            confirmMessage,
+            [
+                { text: "Huỷ", style: "cancel" },
+                {
+                    text: "Duyệt",
+                    style: "default",
+                    onPress: () => completeAdjustmentRequest(row, false),
+                },
+            ],
+        );
+    };
+
+    const cancelDraftAdjustment = async (row: any) => {
+        const confirmMessage = `Bạn có chắc muốn hủy ${row?.adjustNo || "phiếu"} không?`;
+
+        if (Platform.OS === "web") {
+            const confirmed = window.confirm(confirmMessage);
+            if (!confirmed) {
+                return;
+            }
+        } else {
+            const nativeConfirmed = await new Promise<boolean>((resolve) => {
+                Alert.alert("Xác nhận hủy phiếu", confirmMessage, [
+                    { text: "Không", style: "cancel", onPress: () => resolve(false) },
+                    { text: "Hủy phiếu", style: "destructive", onPress: () => resolve(true) },
+                ]);
+            });
+            if (!nativeConfirmed) {
+                return;
+            }
+        }
+
+        try {
+            await axiosClient.post(`/stock-adjustments/${row.id}/cancel`);
+            showMessage("Thành công", `Đã hủy ${row?.adjustNo || "phiếu"}.`);
+            setTableVersion((prev) => prev + 1);
+        } catch (err: any) {
+            const errorMessage =
+                err?.response?.data?.message
+                || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`;
+            showMessage("Không thể hủy", errorMessage);
+        }
+    };
 
     useEffect(() => {
         const fetchWarehouses = async () => {
@@ -80,8 +227,16 @@ const StockAdjustmentListScreen = () => {
         fetchWarehouses();
     }, []);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            setTableVersion((prev) => prev + 1);
+            return undefined;
+        }, []),
+    );
+
     return (
         <DataTableScreen
+            key={`stock-adjustments-${tableVersion}`}
             apiUrl="/stock-adjustments"
             title="Kiểm kho / Điều chỉnh"
             searchPlaceholder="Tìm mã phiếu kiểm kho..."
@@ -105,15 +260,20 @@ const StockAdjustmentListScreen = () => {
                 },
                 {
                     label: "Duyệt",
-                    onPress: (row) =>
-                        Alert.alert("Duyệt", `Duyệt ${row?.adjustNo || "phiếu"}.`),
+                    onPress: handleCompleteAdjustment,
                     shouldShow: (row) =>
-                        role === "ADMIN" &&
-                        ["DRAFT", "PENDING"].includes(String(row?.status || "")),
+                        canCompleteAdjustment &&
+                        String(row?.status || "") === "DRAFT",
+                },
+                {
+                    label: "Hủy phiếu",
+                    tone: "danger",
+                    onPress: cancelDraftAdjustment,
+                    shouldShow: (row) => String(row?.status || "") === "DRAFT",
                 },
             ]}
                 renderFilters={(setFilters, currentFilters) => {
-                const statuses = ["DRAFT", "POSTED", "CANCELLED", "COMPLETED"];
+                const statuses = ["DRAFT", "POSTED", "CANCELLED"];
                 
                 const datePresets = [
                     { value: '', label: 'Tất cả thời gian' },

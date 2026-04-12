@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,6 +49,12 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
     private StockAdjustment getStockAdjustmentEntityById(Long id) {
         return adjustRepository.findById(id).orElseThrow(() -> new RuntimeException("Stock Adjustment not found"));
+    }
+
+    private StockAdjustment getStockAdjustmentEntityByIdForUpdate(Long id) {
+        // Acquire DB row lock to serialize complete operation for the same adjustment.
+        return adjustRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new RuntimeException("Stock Adjustment not found"));
     }
 
     @Override
@@ -88,10 +96,13 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
         Staff staff = getAuthenticatedStaff();
+        LocalDate adjustDate = LocalDate.now();
+
+        validateOneCheckPerItemPerDay(dto.getItems(), warehouse.getId(), adjustDate, null);
 
         StockAdjustment adjust = StockAdjustment.builder()
                 .warehouse(warehouse)
-                .adjustDate(dto.getAdjustDate() != null ? dto.getAdjustDate() : LocalDate.now())
+            .adjustDate(adjustDate)
                 .status(DocumentStatus.DRAFT)
                 .reason(dto.getReason())
                 .note(dto.getNote())
@@ -149,9 +160,13 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
+        LocalDate adjustDate = LocalDate.now();
+
+        validateOneCheckPerItemPerDay(dto.getItems(), warehouse.getId(), adjustDate, adjust.getId());
 
         adjust.setWarehouse(warehouse);
-        adjust.setAdjustDate(dto.getAdjustDate() != null ? dto.getAdjustDate() : LocalDate.now());
+        // Business rule: adjustment date is always locked to current date.
+        adjust.setAdjustDate(adjustDate);
         adjust.setReason(dto.getReason());
         adjust.setNote(dto.getNote());
 
@@ -185,8 +200,14 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
 
     @Override
     @Transactional
-    public StockAdjustmentDetailResponseDTO completeAdjustment(Long id) {
-        StockAdjustment adjust = getStockAdjustmentEntityById(id);
+    public StockAdjustmentDetailResponseDTO completeAdjustment(Long id, boolean forceCompleteWhenDrift) {
+        Staff actor = getAuthenticatedStaff();
+        if (!"ADMIN".equals(actor.getRole())) {
+            throw new RuntimeException("Only ADMIN can complete stock adjustment");
+        }
+
+        // Lock the document first to reduce race condition when multiple users complete together.
+        StockAdjustment adjust = getStockAdjustmentEntityByIdForUpdate(id);
 
         if (adjust.getStatus() == DocumentStatus.CANCELLED) {
             throw new RuntimeException("Cancelled adjustment cannot be completed");
@@ -195,10 +216,13 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
             throw new RuntimeException("Adjustment already completed");
         }
         
+        List<StockAdjustmentItem> items = adjustItemRepository.findByAdjustmentId(adjust.getId());
+
+        // Validate against current stock right before posting movements.
+        validateDriftAndNegativePost(items, adjust.getWarehouse().getId(), forceCompleteWhenDrift);
+
         adjust.setStatus(DocumentStatus.POSTED);
         adjustRepository.save(adjust);
-
-        List<StockAdjustmentItem> items = adjustItemRepository.findByAdjustmentId(adjust.getId());
 
         for (StockAdjustmentItem item : items) {
             Product product = item.getProduct();
@@ -226,9 +250,109 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
         return getAdjustmentDetailById(adjust.getId());
     }
 
+    @Override
+    @Transactional
+    public StockAdjustmentDetailResponseDTO cancelDraftAdjustment(Long id) {
+        StockAdjustment adjust = getStockAdjustmentEntityById(id);
+
+        if (adjust.getStatus() == DocumentStatus.POSTED) {
+            throw new RuntimeException("Posted stock adjustment cannot be cancelled");
+        }
+        if (adjust.getStatus() == DocumentStatus.CANCELLED) {
+            throw new RuntimeException("Stock adjustment is already cancelled");
+        }
+
+        Staff actor = getAuthenticatedStaff();
+        if (!adjust.getCreatedBy().getId().equals(actor.getId())) {
+            throw new RuntimeException("Only creator can cancel this draft stock adjustment");
+        }
+
+        adjust.setStatus(DocumentStatus.CANCELLED);
+        adjustRepository.save(adjust);
+        return getAdjustmentDetailById(adjust.getId());
+    }
+
+    private void validateDriftAndNegativePost(List<StockAdjustmentItem> items, Long warehouseId,
+                                              boolean forceCompleteWhenDrift) {
+        List<String> driftSkus = new java.util.ArrayList<>();
+
+        for (StockAdjustmentItem item : items) {
+            int currentQty = productRepository.calculateOnHandByWarehouseAndProductId(
+                    warehouseId, item.getProduct().getId());
+            int expectedPostedQty = currentQty + item.getDiffQty();
+
+            // Guardrail: never allow posting that would drive stock below zero.
+            if (expectedPostedQty < 0) {
+                throw new RuntimeException("Completing adjustment would make stock negative for SKU "
+                        + item.getProduct().getSku() + " (current=" + currentQty
+                        + ", diff=" + item.getDiffQty() + ")");
+            }
+
+            // Drift means stock changed after counting (DRAFT phase had other movements).
+            if (!currentQtyEqualsSnapshot(currentQty, item.getSystemQty())) {
+                driftSkus.add(item.getProduct().getSku());
+            }
+        }
+
+        // Require explicit confirmation when drift exists; if forced, apply saved diff as designed.
+        if (!driftSkus.isEmpty() && !forceCompleteWhenDrift) {
+            throw new RuntimeException("Inventory changed after count for SKU(s): "
+                    + String.join(", ", driftSkus)
+                    + ". Recount/update draft, or re-complete with forceCompleteWhenDrift=true to apply saved diff.");
+        }
+    }
+
+    private boolean currentQtyEqualsSnapshot(int currentQty, Integer snapshotQty) {
+        return snapshotQty != null && currentQty == snapshotQty;
+    }
+
+    private void validateOneCheckPerItemPerDay(
+            List<StockAdjustmentRequestDTO.StockAdjustmentItemRequestDTO> items,
+            Long warehouseId,
+            LocalDate adjustDate,
+            Long excludeAdjustmentId) {
+        Set<Long> productIds = items.stream()
+                .map(StockAdjustmentRequestDTO.StockAdjustmentItemRequestDTO::getProductId)
+                .collect(Collectors.toSet());
+
+        List<Long> duplicatedProductIds = adjustItemRepository.findDuplicateProductIdsByWarehouseAndDate(
+                warehouseId,
+                adjustDate,
+                productIds,
+                DocumentStatus.CANCELLED,
+                excludeAdjustmentId);
+
+        if (!duplicatedProductIds.isEmpty()) {
+            List<String> duplicatedProductNames = productRepository.findAllById(duplicatedProductIds).stream()
+                .map(product -> product.getName() + " (" + product.getSku() + ")")
+                .toList();
+
+            throw new RuntimeException("Sản phẩm đã được kiểm trong ngày ở phiếu khác: "
+                + String.join(", ", duplicatedProductNames));
+        }
+    }
+
     private void validateItemList(List<StockAdjustmentRequestDTO.StockAdjustmentItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Stock adjustment items are required");
+        }
+
+        Set<Long> productIds = new HashSet<>();
+        for (StockAdjustmentRequestDTO.StockAdjustmentItemRequestDTO item : items) {
+            if (item.getProductId() == null) {
+                throw new RuntimeException("Product is required for each stock adjustment item");
+            }
+            if (!productIds.add(item.getProductId())) {
+                // Prevent duplicated rows for the same product in one adjustment document.
+                throw new RuntimeException("Duplicate product in stock adjustment items: " + item.getProductId());
+            }
+            if (item.getAdjustQty() == null) {
+                throw new RuntimeException("adjustQty is required for each stock adjustment item");
+            }
+            if (item.getAdjustQty() == 0) {
+                // Zero-diff lines create noise and should be removed before submit.
+                throw new RuntimeException("adjustQty cannot be 0");
+            }
         }
     }
 }

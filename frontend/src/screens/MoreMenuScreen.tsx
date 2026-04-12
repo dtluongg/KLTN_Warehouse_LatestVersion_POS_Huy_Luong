@@ -9,6 +9,8 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { theme } from "../utils/theme";
+import { useAuthStore } from "../store/authStore";
+import { isRouteAllowedByRole } from "../utils/roleAccess";
 
 type MenuGroup = {
     section: string;
@@ -94,6 +96,7 @@ const MENU_GROUPS: MenuGroup[] = [
 
 const MoreMenuScreen = () => {
     const navigation = useNavigation<any>();
+    const role = useAuthStore((state) => state.role);
 
     return (
         <ScrollView
@@ -104,29 +107,56 @@ const MoreMenuScreen = () => {
                 <View key={group.section} style={styles.groupBox}>
                     <Text style={styles.sectionTitle}>{group.section}</Text>
                     {group.items.map((item) => (
+                        (() => {
+                            const isAllowed = isRouteAllowedByRole(
+                                role,
+                                item.route,
+                            );
+
+                            return (
                         <TouchableOpacity
                             key={item.route}
-                            style={styles.menuItem}
-                            onPress={() => navigation.navigate(item.route)}
+                            disabled={!isAllowed}
+                            style={[
+                                styles.menuItem,
+                                !isAllowed && styles.menuItemDisabled,
+                            ]}
+                            onPress={() => {
+                                if (!isAllowed) {
+                                    return;
+                                }
+                                navigation.navigate(item.route);
+                            }}
                         >
                             <View style={styles.menuLeft}>
                                 <View style={styles.iconBox}>
                                     <Feather
                                         name={item.icon}
                                         size={16}
-                                        color={theme.colors.primary}
+                                        color={
+                                            isAllowed
+                                                ? theme.colors.primary
+                                                : theme.colors.mutedForeground
+                                        }
                                     />
                                 </View>
-                                <Text style={styles.menuText}>
+                                <Text
+                                    style={[
+                                        styles.menuText,
+                                        !isAllowed && styles.menuTextDisabled,
+                                    ]}
+                                >
                                     {item.label}
                                 </Text>
                             </View>
                             <Feather
-                                name="chevron-right"
+                                name={isAllowed ? "chevron-right" : "lock"}
                                 size={16}
                                 color={theme.colors.mutedForeground}
                             />
                         </TouchableOpacity>
+                            );
+                        })()
                     ))}
                 </View>
             ))}
@@ -170,6 +200,9 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: theme.colors.border,
     },
+    menuItemDisabled: {
+        opacity: 0.45,
+    },
     menuLeft: {
         flexDirection: "row",
         alignItems: "center",
@@ -187,5 +220,8 @@ const styles = StyleSheet.create({
         ...theme.typography.body,
         color: theme.colors.foreground,
         fontSize: 15,
+    },
+    menuTextDisabled: {
+        color: theme.colors.mutedForeground,
     },
 });

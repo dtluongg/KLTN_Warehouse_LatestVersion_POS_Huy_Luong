@@ -21,7 +21,13 @@ public class StockAdjustmentSpecification {
                 predicates.add(cb.equal(root.join("warehouse").get("id"), criteria.getWarehouseId()));
             }
             if (criteria.getStatus() != null && !criteria.getStatus().isBlank()) {
-                predicates.add(cb.equal(root.get("status"), DocumentStatus.valueOf(criteria.getStatus())));
+                try {
+                    // Accept status from client regardless of letter case.
+                    DocumentStatus status = DocumentStatus.valueOf(criteria.getStatus().trim().toUpperCase());
+                    predicates.add(cb.equal(root.get("status"), status));
+                } catch (IllegalArgumentException ex) {
+                    throw new RuntimeException("Invalid stock adjustment status: " + criteria.getStatus());
+                }
             }
             if (criteria.getFromDate() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("adjustDate"), criteria.getFromDate()));

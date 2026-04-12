@@ -11,6 +11,7 @@ import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { useAuthStore } from "../store/authStore";
 import { theme } from "../utils/theme";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { isRouteAllowedByRole } from "../utils/roleAccess";
 
 // Type item trong menu
 type MenuItem = {
@@ -171,30 +172,43 @@ export const CustomDrawerContent = (props: any) => {
                             {group.items.map((item, itemIndex) => {
                                 const isActive =
                                     currentRouteName === item.route;
+                                const isAllowed = isRouteAllowedByRole(
+                                    role,
+                                    item.route,
+                                );
                                 const itemColor = isActive
                                     ? theme.colors.primary
                                     : theme.colors.mutedForeground;
                                 return (
                                     <TouchableOpacity
                                         key={itemIndex}
+                                        disabled={!isAllowed}
                                         style={[
                                             styles.menuItem,
                                             isActive && styles.menuItemActive,
                                             item.isHighlight &&
                                                 !isActive &&
                                                 styles.menuItemHighlight,
+                                            !isAllowed &&
+                                                styles.menuItemDisabled,
                                         ]}
-                                        onPress={() =>
+                                        onPress={() => {
+                                            if (!isAllowed) {
+                                                return;
+                                            }
                                             props.navigation.navigate(
                                                 item.route,
-                                            )
-                                        }
+                                            );
+                                        }}
                                     >
                                         <Feather
                                             name={item.icon as any}
                                             size={18}
                                             color={
-                                                item.isHighlight && !isActive
+                                                !isAllowed
+                                                    ? theme.colors.mutedForeground
+                                                    : item.isHighlight &&
+                                                        !isActive
                                                     ? theme.colors.primary
                                                     : itemColor
                                             }
@@ -210,10 +224,22 @@ export const CustomDrawerContent = (props: any) => {
                                                             .primary,
                                                         fontWeight: "600",
                                                     },
+                                                !isAllowed &&
+                                                    styles.menuLabelDisabled,
                                             ]}
                                         >
                                             {item.label}
                                         </Text>
+                                        {!isAllowed && (
+                                            <Feather
+                                                name="lock"
+                                                size={14}
+                                                color={
+                                                    theme.colors.mutedForeground
+                                                }
+                                                style={styles.lockIcon}
+                                            />
+                                        )}
                                     </TouchableOpacity>
                                 );
                             })}
@@ -323,11 +349,20 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: theme.colors.primaryLight,
     },
+    menuItemDisabled: {
+        opacity: 0.45,
+    },
     menuLabel: {
         fontSize: 14,
         fontWeight: "500",
         color: theme.colors.mutedForeground,
         marginLeft: 12,
+    },
+    menuLabelDisabled: {
+        color: theme.colors.mutedForeground,
+    },
+    lockIcon: {
+        marginLeft: "auto",
     },
     menuLabelActive: {
         color: theme.colors.primary,

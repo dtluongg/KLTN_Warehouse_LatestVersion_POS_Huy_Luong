@@ -55,8 +55,17 @@ public class StockAdjustmentController {
     }
 
     @PostMapping("/{id}/complete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StockAdjustmentDetailResponseDTO> completeAdjustment(
+            @PathVariable Long id,
+            // true = still post by saved diff even when stock changed after counting
+            @RequestParam(defaultValue = "false") boolean forceCompleteWhenDrift) {
+        return ResponseEntity.ok(adjustService.completeAdjustment(id, forceCompleteWhenDrift));
+    }
+
+    @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
-    public ResponseEntity<StockAdjustmentDetailResponseDTO> completeAdjustment(@PathVariable Long id) {
-        return ResponseEntity.ok(adjustService.completeAdjustment(id));
+    public ResponseEntity<StockAdjustmentDetailResponseDTO> cancelDraftAdjustment(@PathVariable Long id) {
+        return ResponseEntity.ok(adjustService.cancelDraftAdjustment(id));
     }
 }

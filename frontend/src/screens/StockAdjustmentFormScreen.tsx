@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
     View, Text, TextInput, ScrollView, TouchableOpacity,
-    StyleSheet, Alert, ActivityIndicator, FlatList, Modal,
+    StyleSheet, Alert, ActivityIndicator, FlatList, Modal, Platform,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -9,11 +9,13 @@ import { axiosClient } from "../api/axiosClient";
 import { theme } from "../utils/theme";
 
 interface Warehouse { id: number; name: string; code?: string; }
+interface Category { id: number; name: string; }
 interface Product { id: number; name: string; sku: string; }
 interface LineItem {
     productId: number;
     productName: string;
     productSku: string;
+    systemQty: number;
     adjustQty: number; // positive = thêm, negative = giảm
 }
 
@@ -26,34 +28,109 @@ const StockAdjustmentFormScreen = () => {
     const [warehouseId, setWarehouseId] = useState<number | null>(null);
     const [warehouseName, setWarehouseName] = useState<string>("");
     const [adjustDate, setAdjustDate]   = useState<string>(() => new Date().toISOString().substring(0, 10));
+    const [categoryId, setCategoryId] = useState<number | null>(null);
+    const [categoryName, setCategoryName] = useState<string>("");
     const [reason, setReason]           = useState<string>("");
     const [note, setNote]               = useState<string>("");
     const [items, setItems]             = useState<LineItem[]>([]);
     const [status, setStatus]           = useState<string>("DRAFT");
 
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [products, setProducts]     = useState<Product[]>([]);
+    const [stockByProductId, setStockByProductId] = useState<Record<number, number>>({});
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading]       = useState(isEdit);
     const [showWarehouseModal, setShowWarehouseModal] = useState(false);
+    const [showCategoryModal, setShowCategoryModal]   = useState(false);
     const [showProductModal, setShowProductModal]     = useState(false);
     const [productSearch, setProductSearch]           = useState("");
+    const submitLockRef = React.useRef(false);
 
     const canEdit = !isEdit || status === "DRAFT";
+
+    const showMessage = (title: string, message: string, onOk?: () => void) => {
+        if (Platform.OS === "web") {
+            window.alert(`${title}\n${message}`);
+            if (onOk) {
+                onOk();
+            }
+            return;
+        }
+
+        if (onOk) {
+            Alert.alert(title, message, [{ text: "OK", onPress: onOk }]);
+            return;
+        }
+
+        Alert.alert(title, message);
+    };
 
     useEffect(() => {
         const load = async () => {
             try {
-                const [wRes, pRes] = await Promise.all([
+                const [wRes, cRes] = await Promise.all([
                     axiosClient.get("/warehouses?size=100"),
-                    axiosClient.get("/products?size=500&isActive=true"),
+                    axiosClient.get("/categories?size=200&isActive=true"),
                 ]);
                 setWarehouses(wRes.data.content || wRes.data || []);
-                setProducts(pRes.data.content || pRes.data || []);
+                setCategories(cRes.data.content || cRes.data || []);
             } catch (e) { console.error(e); }
         };
         load();
     }, []);
+
+    useEffect(() => {
+        const loadProducts = async () => {
+            if (!categoryId) {
+                setProducts([]);
+                return;
+            }
+
+            try {
+                const pRes = await axiosClient.get("/products", {
+                    params: { size: 500, isActive: true, categoryId },
+                });
+                setProducts(pRes.data.content || pRes.data || []);
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        loadProducts();
+    }, [categoryId]);
+
+    useEffect(() => {
+        const loadStockByWarehouse = async () => {
+            if (!warehouseId) {
+                setStockByProductId({});
+                return;
+            }
+
+            try {
+                const res = await axiosClient.get("/products/stock-by-warehouse", {
+                    params: { warehouseId },
+                });
+                const stockMap: Record<number, number> = {};
+                (res.data || []).forEach((row: any) => {
+                    stockMap[Number(row.id)] = Number(row.onHand ?? 0);
+                });
+                setStockByProductId(stockMap);
+            } catch (error) {
+                console.error("Failed to load stock-by-warehouse", error);
+                setStockByProductId({});
+            }
+        };
+
+        loadStockByWarehouse();
+    }, [warehouseId]);
+
+    useEffect(() => {
+        setItems((prev) => prev.map((item) => ({
+            ...item,
+            systemQty: stockByProductId[item.productId] ?? 0,
+        })));
+    }, [stockByProductId]);
 
     useEffect(() => {
         if (!isEdit) return;
@@ -67,7 +144,9 @@ const StockAdjustmentFormScreen = () => {
                 setStatus(d.status || "DRAFT");
                 setItems((d.items || []).map((item: any) => ({
                     productId: item.productId, productName: item.productName || "",
-                    productSku: item.productSku || "", adjustQty: item.adjustQty,
+                    productSku: item.productSku || "",
+                    systemQty: 0,
+                    adjustQty: item.adjustQty,
                 })));
             } catch (e) { Alert.alert("Lỗi", "Không thể tải phiếu."); }
             finally { setLoading(false); }
@@ -76,10 +155,20 @@ const StockAdjustmentFormScreen = () => {
     }, [editId]);
 
     const addProduct = (prod: Product) => {
+        if (!categoryId) {
+            Alert.alert("Thiếu thông tin", "Vui lòng chọn danh mục trước khi thêm sản phẩm.");
+            return;
+        }
         if (items.find(i => i.productId === prod.id)) {
             Alert.alert("Trùng sản phẩm", "Sản phẩm đã có."); setShowProductModal(false); return;
         }
-        setItems(prev => [...prev, { productId: prod.id, productName: prod.name, productSku: prod.sku, adjustQty: 0 }]);
+        setItems(prev => [...prev, {
+            productId: prod.id,
+            productName: prod.name,
+            productSku: prod.sku,
+            systemQty: stockByProductId[prod.id] ?? 0,
+            adjustQty: 0,
+        }]);
         setShowProductModal(false);
     };
 
@@ -91,33 +180,41 @@ const StockAdjustmentFormScreen = () => {
 
     const handleSubmit = async () => {
         if (!warehouseId) { Alert.alert("Thiếu thông tin", "Chọn kho hàng."); return; }
-        if (!adjustDate) { Alert.alert("Thiếu thông tin", "Nhập ngày kiểm kê."); return; }
+        if (!categoryId) { Alert.alert("Thiếu thông tin", "Chọn danh mục sản phẩm."); return; }
         if (items.length === 0) { Alert.alert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
         const hasZero = items.some(it => it.adjustQty === 0);
-        if (hasZero) { Alert.alert("Cảnh báo", "Một số sản phẩm có chênh lệch = 0. Bác chắc muốn lưu?", [
-            { text: "Huỷ", style: "cancel" },
-            { text: "Vẫn lưu", onPress: () => doSubmit() },
-        ]); return; }
+        if (hasZero) { Alert.alert("Thiếu thông tin", "Không thể lưu dòng có chênh lệch = 0. Vui lòng nhập số dương hoặc âm."); return; }
         doSubmit();
     };
 
     const doSubmit = async () => {
+        if (submitLockRef.current) {
+            return;
+        }
+
+        const today = new Date().toISOString().substring(0, 10);
+        setAdjustDate(today);
+
         const payload = {
-            warehouseId, adjustDate, reason: reason || null, note: note || null,
+            warehouseId, adjustDate: today, reason: reason || null, note: note || null,
             items: items.map(it => ({ productId: it.productId, adjustQty: it.adjustQty })),
         };
         try {
+            submitLockRef.current = true;
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/stock-adjustments/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật phiếu kiểm kho.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+                showMessage("Thành công", "Đã cập nhật phiếu kiểm kho.", () => navigation.goBack());
             } else {
                 const res = await axiosClient.post("/stock-adjustments", payload);
-                Alert.alert("Thành công", `Đã tạo phiếu ${res.data.adjustNo}.`, [{ text: "OK", onPress: () => navigation.goBack() }]);
+                showMessage("Thành công", `Đã tạo phiếu ${res.data.adjustNo}.`, () => navigation.goBack());
             }
         } catch (err: any) {
-            Alert.alert("Lỗi", err?.response?.data?.message || "Không thể lưu.");
-        } finally { setSubmitting(false); }
+            showMessage("Lỗi", err?.response?.data?.message || "Không thể lưu.");
+        } finally {
+            setSubmitting(false);
+            submitLockRef.current = false;
+        }
     };
 
     if (loading) return <View style={styles.loadingBox}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
@@ -149,10 +246,18 @@ const StockAdjustmentFormScreen = () => {
                         {canEdit && <Feather name="chevron-down" size={16} color={theme.colors.mutedForeground} />}
                     </TouchableOpacity>
 
+                    <Text style={styles.label}>Danh mục sản phẩm <Text style={styles.required}>*</Text></Text>
+                    <TouchableOpacity style={[styles.picker, !canEdit && styles.pickerDisabled]} onPress={() => canEdit && setShowCategoryModal(true)} disabled={!canEdit}>
+                        <Feather name="tag" size={16} color={theme.colors.mutedForeground} />
+                        <Text style={[styles.pickerText, !categoryId && styles.pickerPlaceholder]}>{categoryName || "Chọn danh mục..."}</Text>
+                        {canEdit && <Feather name="chevron-down" size={16} color={theme.colors.mutedForeground} />}
+                    </TouchableOpacity>
+
                     <Text style={styles.label}>Ngày kiểm kê <Text style={styles.required}>*</Text></Text>
-                    <TextInput style={[styles.input, !canEdit && styles.inputDisabled]}
-                        value={adjustDate} onChangeText={setAdjustDate} placeholder="YYYY-MM-DD" editable={canEdit}
+                    <TextInput style={[styles.input, styles.inputDisabled]}
+                        value={adjustDate} onChangeText={setAdjustDate} placeholder="YYYY-MM-DD" editable={false}
                         placeholderTextColor={theme.colors.mutedForeground} />
+                    <Text style={styles.lineInputHint}>Ngày kiểm được áp cứng là ngày hiện tại.</Text>
 
                     <Text style={styles.label}>Lý do điều chỉnh</Text>
                     <TextInput style={[styles.input, !canEdit && styles.inputDisabled]}
@@ -172,7 +277,16 @@ const StockAdjustmentFormScreen = () => {
                             <Text style={styles.sectionHint}>Chênh lệch (+) bổ sung, (-) giảm tồn kho</Text>
                         </View>
                         {canEdit && (
-                            <TouchableOpacity style={styles.addBtn} onPress={() => setShowProductModal(true)}>
+                            <TouchableOpacity
+                                style={styles.addBtn}
+                                onPress={() => {
+                                    if (!categoryId) {
+                                        Alert.alert("Thiếu thông tin", "Vui lòng chọn danh mục trước khi thêm sản phẩm.");
+                                        return;
+                                    }
+                                    setShowProductModal(true);
+                                }}
+                            >
                                 <Feather name="plus" size={16} color="#fff" />
                                 <Text style={styles.addBtnText}>Thêm</Text>
                             </TouchableOpacity>
@@ -186,6 +300,7 @@ const StockAdjustmentFormScreen = () => {
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.lineItemName}>{item.productName}</Text>
                                     <Text style={styles.lineItemSku}>SKU: {item.productSku}</Text>
+                                    <Text style={styles.lineItemStock}>Tồn hệ thống hiện tại: {item.systemQty}</Text>
                                 </View>
                                 {canEdit && <TouchableOpacity onPress={() => removeItem(idx)} style={styles.removeBtn}><Feather name="x" size={18} color={theme.colors.error} /></TouchableOpacity>}
                             </View>
@@ -193,6 +308,7 @@ const StockAdjustmentFormScreen = () => {
                             <TextInput style={[styles.lineInput, !canEdit && styles.inputDisabled, item.adjustQty > 0 && { borderColor: "#16a34a" }, item.adjustQty < 0 && { borderColor: "#dc2626" }]}
                                 keyboardType="numeric" value={String(item.adjustQty)}
                                 onChangeText={v => updateItem(idx, Number(v.replace(/[^-0-9]/g, "")) || 0)} editable={canEdit} />
+                            <Text style={styles.lineInputHint}>Không nhập 0 vì backend sẽ từ chối lưu phiếu.</Text>
                         </View>
                     ))}
                 </View>
@@ -200,10 +316,21 @@ const StockAdjustmentFormScreen = () => {
 
             {canEdit && (
                 <View style={styles.footer}>
-                    <TouchableOpacity style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} onPress={handleSubmit} disabled={submitting}>
-                        {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="save" size={18} color="#fff" />}
-                        <Text style={styles.submitBtnText}>{submitting ? "Đang lưu..." : isEdit ? "Cập nhật phiếu" : "Tạo phiếu kiểm kho"}</Text>
-                    </TouchableOpacity>
+                    <View style={styles.footerActions}>
+                        <TouchableOpacity
+                            style={styles.cancelBtn}
+                            onPress={() => navigation.goBack()}
+                            disabled={submitting}
+                        >
+                            <Feather name="x-circle" size={18} color={theme.colors.foreground} />
+                            <Text style={styles.cancelBtnText}>Hủy</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} onPress={handleSubmit} disabled={submitting}>
+                            {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="save" size={18} color="#fff" />}
+                            <Text style={styles.submitBtnText}>{submitting ? "Đang lưu..." : isEdit ? "Cập nhật phiếu" : "Tạo phiếu kiểm kho"}</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             )}
 
@@ -214,6 +341,24 @@ const StockAdjustmentFormScreen = () => {
                         <TouchableOpacity style={styles.modalItem} onPress={() => { setWarehouseId(item.id); setWarehouseName(item.name); setShowWarehouseModal(false); }}>
                             <Text style={styles.modalItemName}>{item.name}</Text>
                             {item.code && <Text style={styles.modalItemSub}>Mã: {item.code}</Text>}
+                        </TouchableOpacity>
+                    )} />
+                </View></View>
+            </Modal>
+
+            <Modal visible={showCategoryModal} transparent animationType="slide" onRequestClose={() => setShowCategoryModal(false)}>
+                <View style={styles.modalOverlay}><View style={styles.modalBox}>
+                    <View style={styles.modalHeader}><Text style={styles.modalTitle}>Chọn danh mục</Text><TouchableOpacity onPress={() => setShowCategoryModal(false)}><Feather name="x" size={22} color={theme.colors.foreground} /></TouchableOpacity></View>
+                    <FlatList data={categories} keyExtractor={c => String(c.id)} renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.modalItem}
+                            onPress={() => {
+                                setCategoryId(item.id);
+                                setCategoryName(item.name);
+                                setShowCategoryModal(false);
+                            }}
+                        >
+                            <Text style={styles.modalItemName}>{item.name}</Text>
                         </TouchableOpacity>
                     )} />
                 </View></View>
@@ -266,11 +411,28 @@ const styles = StyleSheet.create({
     lineItemHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 },
     lineItemName: { fontSize: 14, fontWeight: "600", color: theme.colors.foreground },
     lineItemSku: { fontSize: 12, color: theme.colors.mutedForeground, marginTop: 2 },
+    lineItemStock: { fontSize: 12, color: theme.colors.foreground, marginTop: 4, fontWeight: "600" },
     removeBtn: { padding: 4 },
     lineInputLabel: { fontSize: 11, color: theme.colors.mutedForeground, marginBottom: 4 },
     lineInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.surface },
+    lineInputHint: { fontSize: 11, color: theme.colors.mutedForeground, marginTop: 4 },
     footer: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: theme.colors.surface, borderTopWidth: 1, borderTopColor: theme.colors.border },
-    submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 16 },
+    footerActions: { flexDirection: "row", gap: 12 },
+    cancelBtn: {
+        minWidth: 120,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.background,
+    },
+    cancelBtnText: { color: theme.colors.foreground, fontSize: 15, fontWeight: "600" },
+    submitBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 16 },
     submitBtnDisabled: { opacity: 0.6 },
     submitBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
