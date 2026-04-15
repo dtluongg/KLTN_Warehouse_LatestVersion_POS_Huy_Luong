@@ -1,12 +1,27 @@
 package IUH.KLTN.LvsH.service.impl;
 
-import IUH.KLTN.LvsH.dto.purchase_order.*;
-import IUH.KLTN.LvsH.entity.*;
+import IUH.KLTN.LvsH.dto.purchase_order.PurchaseOrderDetailResponseDTO;
+import IUH.KLTN.LvsH.dto.purchase_order.PurchaseOrderListResponseDTO;
+import IUH.KLTN.LvsH.dto.purchase_order.PurchaseOrderRequestDTO;
+import IUH.KLTN.LvsH.dto.purchase_order.PurchaseOrderSearchCriteria;
+import IUH.KLTN.LvsH.entity.Product;
+import IUH.KLTN.LvsH.entity.PurchaseOrder;
+import IUH.KLTN.LvsH.entity.PurchaseOrderItem;
+import IUH.KLTN.LvsH.entity.Staff;
+import IUH.KLTN.LvsH.entity.Supplier;
+import IUH.KLTN.LvsH.entity.Warehouse;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
-import IUH.KLTN.LvsH.repository.*;
+import IUH.KLTN.LvsH.enums.PurchaseOrderClosedReason;
+import IUH.KLTN.LvsH.enums.PurchaseOrderReceiptProgress;
+import IUH.KLTN.LvsH.repository.GoodsReceiptItemRepository;
+import IUH.KLTN.LvsH.repository.ProductRepository;
+import IUH.KLTN.LvsH.repository.PurchaseOrderItemRepository;
+import IUH.KLTN.LvsH.repository.PurchaseOrderRepository;
+import IUH.KLTN.LvsH.repository.SupplierRepository;
+import IUH.KLTN.LvsH.repository.WarehouseRepository;
 import IUH.KLTN.LvsH.repository.specification.PurchaseOrderSpecification;
-import IUH.KLTN.LvsH.service.PurchaseOrderService;
 import IUH.KLTN.LvsH.security.CustomUserDetails;
+import IUH.KLTN.LvsH.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,7 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +44,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     private final PurchaseOrderRepository poRepository;
     private final PurchaseOrderItemRepository poItemRepository;
+    private final GoodsReceiptItemRepository grItemRepository;
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
@@ -41,9 +60,13 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .orderDate(po.getOrderDate())
                 .expectedDate(po.getExpectedDate())
                 .status(po.getStatus().name())
+                .receiptProgress(po.getReceiptProgress().name())
                 .totalAmountPayable(po.getTotalAmountPayable())
                 .createdBy(po.getCreatedBy().getFullName())
                 .createdAt(po.getCreatedAt())
+                .closedAt(po.getClosedAt())
+                .closedReason(po.getClosedReason() != null ? po.getClosedReason().name() : null)
+                .allowOverReceipt(Boolean.TRUE.equals(po.getAllowOverReceipt()))
                 .note(po.getNote())
                 .build());
     }
@@ -55,42 +78,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     @Transactional(readOnly = true)
     public PurchaseOrderDetailResponseDTO getPurchaseOrderDetailById(Long id) {
-        PurchaseOrder po = getPurchaseOrderEntityById(id);
-        List<PurchaseOrderItem> items = poItemRepository.findByPurchaseOrderId(po.getId());
-        
-        List<PurchaseOrderDetailResponseDTO.PurchaseOrderItemResponseDTO> itemDTOs = items.stream().map(i -> 
-                PurchaseOrderDetailResponseDTO.PurchaseOrderItemResponseDTO.builder()
-                        .id(i.getId())
-                        .productId(i.getProduct().getId())
-                        .productSku(i.getProduct().getSku())
-                        .productName(i.getProduct().getName())
-                        .orderedQty(i.getOrderedQty())
-                        .expectedUnitCost(i.getExpectedUnitCost())
-                        .vatRate(i.getProduct().getVatRate())
-                        .lineTotal(i.getLineTotal())
-                        .build()
-        ).collect(Collectors.toList());
-
-        return PurchaseOrderDetailResponseDTO.builder()
-                .id(po.getId())
-                .poNo(po.getPoNo())
-                .supplierId(po.getSupplier() != null ? po.getSupplier().getId() : null)
-                .supplierName(po.getSupplier() != null ? po.getSupplier().getName() : null)
-                .warehouseId(po.getWarehouse() != null ? po.getWarehouse().getId() : null)
-                .warehouseName(po.getWarehouse() != null ? po.getWarehouse().getName() : null)
-                .orderDate(po.getOrderDate())
-                .expectedDate(po.getExpectedDate())
-                .status(po.getStatus().name())
-                .note(po.getNote())
-                .totalAmount(po.getTotalAmount())
-                .totalVat(po.getTotalVat())
-                .discountAmount(po.getDiscountAmount())
-                .surchargeAmount(po.getSurchargeAmount())
-                .totalAmountPayable(po.getTotalAmountPayable())
-                .createdBy(po.getCreatedBy().getFullName())
-                .createdAt(po.getCreatedAt())
-                .items(itemDTOs)
-                .build();
+        return toDetailResponseDTO(getPurchaseOrderEntityById(id));
     }
 
     @Override
@@ -102,8 +90,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
         Staff staff = getAuthenticatedStaff();
 
-        Warehouse warehouse = dto.getWarehouseId() != null 
-                ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null) 
+        Warehouse warehouse = dto.getWarehouseId() != null
+                ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null)
                 : null;
 
         BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
@@ -117,6 +105,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .orderDate(LocalDate.now())
                 .expectedDate(dto.getExpectedDate())
                 .status(DocumentStatus.DRAFT)
+                .receiptProgress(PurchaseOrderReceiptProgress.NOT_RECEIVED)
+                .allowOverReceipt(Boolean.TRUE.equals(dto.getAllowOverReceipt()))
                 .note(dto.getNote())
                 .discountAmount(discount)
                 .surchargeAmount(surcharge)
@@ -129,33 +119,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         poRepository.saveAndFlush(po);
         String generatedPoNo = poRepository.findPoNoById(po.getId());
         po.setPoNo(generatedPoNo);
-        
-        for (PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO itemDto : dto.getItems()) {
-            Product product = productRepository.findById(itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
 
-            BigDecimal lineTotal = itemDto.getExpectedUnitCost().multiply(BigDecimal.valueOf(itemDto.getOrderedQty()));
-
-            PurchaseOrderItem item = PurchaseOrderItem.builder()
-                    .purchaseOrder(po)
-                    .product(product)
-                    .orderedQty(itemDto.getOrderedQty())
-                    .expectedUnitCost(itemDto.getExpectedUnitCost())
-                    .lineTotal(lineTotal)
-                    .build();
-
-            poItemRepository.save(item);
-        }
-
-        return getPurchaseOrderDetailById(po.getId());
-    }
-
-    private Staff getAuthenticatedStaff() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
-            throw new RuntimeException("Unauthenticated request");
-        }
-        return userDetails.getStaff();
+        savePurchaseOrderItems(po, dto.getItems());
+        return toDetailResponseDTO(po);
     }
 
     @Override
@@ -183,33 +149,22 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         po.setSupplier(supplier);
         po.setWarehouse(warehouse);
         po.setExpectedDate(dto.getExpectedDate());
+        po.setAllowOverReceipt(Boolean.TRUE.equals(dto.getAllowOverReceipt()));
         po.setNote(dto.getNote());
         po.setDiscountAmount(discount);
         po.setSurchargeAmount(surcharge);
         po.setTotalAmount(totals.totalAmount);
         po.setTotalVat(totals.totalVat);
         po.setTotalAmountPayable(totals.totalAmountPayable);
+        po.setReceiptProgress(PurchaseOrderReceiptProgress.NOT_RECEIVED);
+        po.setClosedAt(null);
+        po.setClosedReason(null);
 
         poItemRepository.deleteByPurchaseOrderId(po.getId());
-        for (PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO itemDto : dto.getItems()) {
-            Product product = productRepository.findById(itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
-
-            BigDecimal lineTotal = itemDto.getExpectedUnitCost().multiply(BigDecimal.valueOf(itemDto.getOrderedQty()));
-
-            PurchaseOrderItem item = PurchaseOrderItem.builder()
-                    .purchaseOrder(po)
-                    .product(product)
-                    .orderedQty(itemDto.getOrderedQty())
-                    .expectedUnitCost(itemDto.getExpectedUnitCost())
-                    .lineTotal(lineTotal)
-                    .build();
-
-            poItemRepository.save(item);
-        }
+        savePurchaseOrderItems(po, dto.getItems());
 
         poRepository.save(po);
-        return getPurchaseOrderDetailById(po.getId());
+        return toDetailResponseDTO(po);
     }
 
     @Override
@@ -232,8 +187,119 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         }
 
         po.setStatus(requestedStatus);
+        if (requestedStatus == DocumentStatus.CANCELLED) {
+            po.setClosedAt(null);
+            po.setClosedReason(null);
+            po.setReceiptProgress(PurchaseOrderReceiptProgress.NOT_RECEIVED);
+        }
         poRepository.save(po);
-        return getPurchaseOrderDetailById(po.getId());
+        return toDetailResponseDTO(po);
+    }
+
+    @Override
+    @Transactional
+    public PurchaseOrderDetailResponseDTO closePurchaseOrder(Long id, PurchaseOrderClosedReason reason) {
+        PurchaseOrder po = getPurchaseOrderEntityById(id);
+        if (po.getStatus() != DocumentStatus.POSTED) {
+            throw new RuntimeException("Only POSTED purchase order can be closed");
+        }
+        if (po.getClosedAt() != null) {
+            throw new RuntimeException("Purchase order is already closed");
+        }
+        if (reason == null || reason == PurchaseOrderClosedReason.FULLY_RECEIVED) {
+            throw new RuntimeException("Manual close requires a non-FULLY_RECEIVED reason");
+        }
+
+        po.setClosedAt(LocalDateTime.now());
+        po.setClosedReason(reason);
+        poRepository.save(po);
+        return toDetailResponseDTO(po);
+    }
+
+    private Staff getAuthenticatedStaff() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
+            throw new RuntimeException("Unauthenticated request");
+        }
+        return userDetails.getStaff();
+    }
+
+    private PurchaseOrderDetailResponseDTO toDetailResponseDTO(PurchaseOrder po) {
+        List<PurchaseOrderItem> items = poItemRepository.findByPurchaseOrderId(po.getId());
+        Map<Long, Integer> postedReceivedByPoItemId = getPostedReceivedQtyByPurchaseOrderId(po.getId());
+
+        List<PurchaseOrderDetailResponseDTO.PurchaseOrderItemResponseDTO> itemDTOs = items.stream()
+                .map(item -> {
+                    int receivedQty = postedReceivedByPoItemId.getOrDefault(item.getId(), 0);
+                    int orderedQty = item.getOrderedQty() == null ? 0 : item.getOrderedQty();
+                    int remainingQty = Math.max(orderedQty - receivedQty, 0);
+                    return PurchaseOrderDetailResponseDTO.PurchaseOrderItemResponseDTO.builder()
+                            .id(item.getId())
+                            .productId(item.getProduct().getId())
+                            .productSku(item.getProduct().getSku())
+                            .productName(item.getProduct().getName())
+                            .orderedQty(orderedQty)
+                            .receivedQty(receivedQty)
+                            .remainingQty(remainingQty)
+                            .expectedUnitCost(item.getExpectedUnitCost())
+                            .vatRate(item.getProduct().getVatRate())
+                            .lineTotal(item.getLineTotal())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return PurchaseOrderDetailResponseDTO.builder()
+                .id(po.getId())
+                .poNo(po.getPoNo())
+                .supplierId(po.getSupplier() != null ? po.getSupplier().getId() : null)
+                .supplierName(po.getSupplier() != null ? po.getSupplier().getName() : null)
+                .warehouseId(po.getWarehouse() != null ? po.getWarehouse().getId() : null)
+                .warehouseName(po.getWarehouse() != null ? po.getWarehouse().getName() : null)
+                .orderDate(po.getOrderDate())
+                .expectedDate(po.getExpectedDate())
+                .status(po.getStatus().name())
+                .receiptProgress(po.getReceiptProgress().name())
+                .closedAt(po.getClosedAt())
+                .closedReason(po.getClosedReason() != null ? po.getClosedReason().name() : null)
+                .allowOverReceipt(Boolean.TRUE.equals(po.getAllowOverReceipt()))
+                .note(po.getNote())
+                .totalAmount(po.getTotalAmount())
+                .totalVat(po.getTotalVat())
+                .discountAmount(po.getDiscountAmount())
+                .surchargeAmount(po.getSurchargeAmount())
+                .totalAmountPayable(po.getTotalAmountPayable())
+                .createdBy(po.getCreatedBy().getFullName())
+                .createdAt(po.getCreatedAt())
+                .items(itemDTOs)
+                .build();
+    }
+
+    private Map<Long, Integer> getPostedReceivedQtyByPurchaseOrderId(Long purchaseOrderId) {
+        return grItemRepository.sumReceivedQtyByPurchaseOrderIdAndReceiptStatus(purchaseOrderId, DocumentStatus.POSTED)
+                .stream()
+                .collect(Collectors.toMap(
+                        GoodsReceiptItemRepository.PoItemReceivedQtyProjection::getPoItemId,
+                        projection -> projection.getReceivedQty() == null ? 0 : projection.getReceivedQty()
+                ));
+    }
+
+    private void savePurchaseOrderItems(PurchaseOrder po, List<PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO> itemDtos) {
+        for (PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO itemDto : itemDtos) {
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            BigDecimal lineTotal = itemDto.getExpectedUnitCost().multiply(BigDecimal.valueOf(itemDto.getOrderedQty()));
+
+            PurchaseOrderItem item = PurchaseOrderItem.builder()
+                    .purchaseOrder(po)
+                    .product(product)
+                    .orderedQty(itemDto.getOrderedQty())
+                    .expectedUnitCost(itemDto.getExpectedUnitCost())
+                    .lineTotal(lineTotal)
+                    .build();
+
+            poItemRepository.save(item);
+        }
     }
 
     private Totals calculateTotals(List<PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO> items, BigDecimal surcharge, BigDecimal discount) {

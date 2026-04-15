@@ -1,6 +1,7 @@
 package IUH.KLTN.LvsH.controller;
 
 import IUH.KLTN.LvsH.dto.purchase_order.*;
+import IUH.KLTN.LvsH.enums.PurchaseOrderClosedReason;
 import IUH.KLTN.LvsH.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -60,5 +61,18 @@ public class PurchaseOrderController {
             @PathVariable Long id, 
             @RequestParam String status) {
         return ResponseEntity.ok(poService.updateStatus(id, status));
+    }
+
+    @PostMapping("/{id}/close")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<PurchaseOrderDetailResponseDTO> closePurchaseOrder(
+            @PathVariable Long id,
+            @RequestParam String reason) {
+        try {
+            PurchaseOrderClosedReason closeReason = PurchaseOrderClosedReason.valueOf(reason.trim().toUpperCase());
+            return ResponseEntity.ok(poService.closePurchaseOrder(id, closeReason));
+        } catch (IllegalArgumentException ex) {
+            throw new RuntimeException("Invalid close reason: " + reason);
+        }
     }
 }

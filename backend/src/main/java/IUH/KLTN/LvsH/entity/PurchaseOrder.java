@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
+import IUH.KLTN.LvsH.enums.PurchaseOrderClosedReason;
+import IUH.KLTN.LvsH.enums.PurchaseOrderReceiptProgress;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
@@ -38,6 +40,22 @@ public class PurchaseOrder {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DocumentStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "receipt_progress", nullable = false)
+    @Builder.Default
+    private PurchaseOrderReceiptProgress receiptProgress = PurchaseOrderReceiptProgress.NOT_RECEIVED;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "closed_reason")
+    private PurchaseOrderClosedReason closedReason;
+
+    @Column(name = "allow_over_receipt", nullable = false)
+    @Builder.Default
+    private Boolean allowOverReceipt = Boolean.FALSE;
 
     private String note;
 

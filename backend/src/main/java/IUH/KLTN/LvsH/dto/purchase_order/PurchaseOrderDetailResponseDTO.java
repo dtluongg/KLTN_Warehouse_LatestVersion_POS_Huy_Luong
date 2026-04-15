@@ -23,6 +23,10 @@ public class PurchaseOrderDetailResponseDTO {
     private LocalDate orderDate;
     private LocalDate expectedDate;
     private String status;
+    private String receiptProgress;
+    private LocalDateTime closedAt;
+    private String closedReason;
+    private Boolean allowOverReceipt;
     private String note;
     
     private BigDecimal totalAmount;
@@ -44,6 +48,8 @@ public class PurchaseOrderDetailResponseDTO {
         private String productSku;
         private String productName;
         private Integer orderedQty;
+        private Integer receivedQty;
+        private Integer remainingQty;
         private BigDecimal expectedUnitCost;
         private BigDecimal vatRate;
         private BigDecimal lineTotal;

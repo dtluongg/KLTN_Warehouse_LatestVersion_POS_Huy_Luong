@@ -37,6 +37,7 @@ public class GoodsReceiptDetailResponseDTO {
     @Builder
     public static class GrItemResponseDTO {
         private Long id;
+        private Long poItemId;
         private Long productId;
         private String productSku;
         private String productName;

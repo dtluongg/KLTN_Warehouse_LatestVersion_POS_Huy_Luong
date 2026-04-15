@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -13,7 +14,7 @@ import java.util.UUID;
 
 @Data
 public class PurchaseOrderRequestDTO {
-    
+
     @NotNull(message = "Vui lòng chọn nhà cung cấp")
     private UUID supplierId;
 
@@ -29,6 +30,8 @@ public class PurchaseOrderRequestDTO {
 
     @PositiveOrZero(message = "Phụ phí không được âm")
     private BigDecimal surchargeAmount = BigDecimal.ZERO;
+
+    private Boolean allowOverReceipt = Boolean.FALSE;
 
     @NotEmpty(message = "Đơn nhập hàng chờ phải có ít nhất 1 sản phẩm")
     @Valid

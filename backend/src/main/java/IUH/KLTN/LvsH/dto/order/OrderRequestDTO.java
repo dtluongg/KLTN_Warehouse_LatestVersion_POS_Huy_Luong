@@ -12,7 +12,6 @@ import java.util.UUID;
 @Data
 public class OrderRequestDTO {
     
-    @NotNull(message = "Vui lòng chọn khách hàng")
     private UUID customerId;
 
     @NotNull(message = "Vui lòng chọn kho hàng")

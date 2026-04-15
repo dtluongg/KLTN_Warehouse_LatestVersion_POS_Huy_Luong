@@ -1,6 +1,7 @@
 package IUH.KLTN.LvsH.service;
 
 import IUH.KLTN.LvsH.dto.purchase_order.*;
+import IUH.KLTN.LvsH.enums.PurchaseOrderClosedReason;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -10,4 +11,5 @@ public interface PurchaseOrderService {
     PurchaseOrderDetailResponseDTO createPurchaseOrder(PurchaseOrderRequestDTO request);
     PurchaseOrderDetailResponseDTO updateDraftPurchaseOrder(Long id, PurchaseOrderRequestDTO request);
     PurchaseOrderDetailResponseDTO updateStatus(Long id, String newStatus);
+    PurchaseOrderDetailResponseDTO closePurchaseOrder(Long id, PurchaseOrderClosedReason reason);
 }
