@@ -215,9 +215,9 @@ export const PosScreen = () => {
 
         const debounce = setTimeout(async () => {
             try {
-                const res = await axiosClient.get("/orders/coupon-preview", {
+                const res = await axiosClient.get("/orders/preview-coupon", {
                     params: {
-                        couponCode: code,
+                        code,
                         grossAmount,
                     },
                 });
@@ -294,6 +294,7 @@ export const PosScreen = () => {
         const payload = {
             customerId: customerId || null,
             warehouseId: warehouseId,
+            salesChannel: "POS",
             discountAmount: discountAmount || 0,
             couponCode: couponCode || null,
             surchargeAmount: surchargeAmount || 0,
@@ -301,7 +302,7 @@ export const PosScreen = () => {
             note: note || "",
             items: cart.map((i) => ({
                 productId: i.id,
-                quantity: i.quantity,
+                qty: i.quantity,
                 salePrice: i.salePrice,
             })),
         };
