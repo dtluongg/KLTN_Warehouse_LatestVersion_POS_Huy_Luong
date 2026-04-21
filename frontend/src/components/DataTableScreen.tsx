@@ -6,7 +6,6 @@ import {
     Modal,
     RefreshControl,
     StyleSheet,
-    Text,
     TouchableOpacity,
     View,
     Pressable,
@@ -16,9 +15,10 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { EmptyState, ScreenHeader, SearchBar } from "./ui";
-import { theme } from "../utils/theme";
 import { useResponsive } from "../utils/responsive";
 import { useTablePagination } from "../hooks/useTablePagination";
+import { useTheme } from "../hooks/useTheme";
+import { Typography } from "./ui/Typography";
 
 export interface Column {
     key: string;
@@ -56,25 +56,26 @@ export interface DataTableScreenProps {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-    DRAFT: { bg: "#fef3c7", text: "#92400e" },
-    POSTED: { bg: "#d1fae5", text: "#065f46" },
-    COMPLETED: { bg: "#d1fae5", text: "#065f46" },
-    CANCELLED: { bg: "#fee2e2", text: "#991b1b" },
-    PENDING: { bg: "#dbeafe", text: "#1e40af" },
-    NOT_RECEIVED: { bg: "#e2e8f0", text: "#334155" },
-    PARTIALLY_RECEIVED: { bg: "#fef3c7", text: "#92400e" },
-    FULLY_RECEIVED: { bg: "#d1fae5", text: "#065f46" },
-    ACTIVE: { bg: "#ccfbf1", text: "#0f766e" },
-    INACTIVE: { bg: "#f1f5f9", text: "#64748b" },
+    DRAFT: { bg: "rgba(245, 158, 11, 0.15)", text: "#92400e" },
+    POSTED: { bg: "rgba(16, 185, 129, 0.15)", text: "#065f46" },
+    CANCELLED: { bg: "rgba(239, 68, 68, 0.15)", text: "#991b1b" },
+    PENDING: { bg: "rgba(59, 130, 246, 0.15)", text: "#1e40af" },
+    NOT_RECEIVED: { bg: "rgba(148, 163, 184, 0.2)", text: "#334155" },
+    PARTIALLY_RECEIVED: { bg: "rgba(245, 158, 11, 0.15)", text: "#92400e" },
+    FULLY_RECEIVED: { bg: "rgba(16, 185, 129, 0.15)", text: "#065f46" },
+    ACTIVE: { bg: "rgba(20, 184, 166, 0.15)", text: "#0f766e" },
+    INACTIVE: { bg: "rgba(100, 116, 139, 0.15)", text: "#475569" },
 };
 
 export const StatusBadge = ({ status }: { status: string }) => {
-    const colors = STATUS_COLORS[status] || { bg: "#f1f5f9", text: "#475569" };
+    const colors = STATUS_COLORS[status] || { bg: "rgba(100, 116, 139, 0.15)", text: "#475569" };
+    
     return (
-        <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-            <Text style={[styles.badgeText, { color: colors.text }]}>
-                {status}
-            </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.text, marginRight: 6 }} />
+            <Typography variant="body" style={{ color: colors.text, fontWeight: "600", textTransform: "capitalize" }}>
+                {status.toLowerCase()}
+            </Typography>
         </View>
     );
 };
@@ -83,7 +84,7 @@ export const formatMoney = (v: any) => {
     if (v == null) return "-";
     const num = typeof v === "number" ? v : parseFloat(v);
     if (isNaN(num)) return "-";
-    return `${num.toLocaleString("vi-VN")}d`;
+    return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 };
 
 const getNestedValue = (obj: any, path: string): any => {
@@ -93,26 +94,6 @@ const getNestedValue = (obj: any, path: string): any => {
 const getTextValue = (value: any): string => {
     if (value == null) return "-";
     return String(value);
-};
-
-const getActionToneStyle = (tone?: "primary" | "neutral" | "danger") => {
-    switch (tone) {
-        case "danger":
-            return {
-                button: styles.rowActionButtonDanger,
-                text: styles.rowActionTextDanger,
-            };
-        case "neutral":
-            return {
-                button: styles.rowActionButtonNeutral,
-                text: styles.rowActionTextNeutral,
-            };
-        default:
-            return {
-                button: styles.rowActionButtonPrimary,
-                text: styles.rowActionTextPrimary,
-            };
-    }
 };
 
 const DataTableScreen: React.FC<DataTableScreenProps> = ({
@@ -129,6 +110,7 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
     renderDetailContent,
 }) => {
     const tablePagination = useTablePagination(apiUrl);
+    const { colors, metrics } = useTheme();
     const {
         data,
         loading,
@@ -137,7 +119,6 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
         totalElements,
         totalPages,
         setPage,
-        setSize,
         setSort,
         search,
         refresh,
@@ -145,11 +126,10 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
 
     const [searchInput, setSearchInput] = useState("");
     const [selectedRow, setSelectedRow] = useState<any | null>(null);
-    const [showFilters, setShowFilters] = useState(false);
+    const [showFilters, setShowFilters] = useState(true); // Default show filters in SaaS layout
 
     const { isDesktop } = useResponsive();
 
-    // Prevent immediate API firing on every keystroke
     const handleSearchSubmit = () => {
         search(searchInput);
     };
@@ -158,10 +138,15 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
         setSort(colKey);
     };
 
+    const refreshRef = React.useRef(refresh);
+    React.useEffect(() => {
+        refreshRef.current = refresh;
+    }, [refresh]);
+
     useFocusEffect(
         React.useCallback(() => {
-            refresh();
-        }, [refresh]),
+            refreshRef.current();
+        }, []),
     );
 
     const handleRowAction = async (
@@ -182,55 +167,39 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
         rowActions.some((a) => a.showOnDesktop !== false);
 
     const renderPaginationFooter = () => {
+        const pages = [];
+        const start = Math.max(0, pageState.page - 1);
+        const end = Math.min(totalPages - 1, pageState.page + 1);
+        for(let i=start; i<=end; i++) pages.push(i);
+
         return (
-            <View style={styles.paginationFooter}>
-                <Text style={styles.paginationText}>
-                    Tổng {totalElements} | Trang {pageState.page + 1}/
-                    {Math.max(1, totalPages)}
-                </Text>
+            <View style={[styles.paginationFooter, { borderColor: "transparent", flexDirection: isDesktop ? "row" : "column", gap: isDesktop ? 0 : 16 }]}>
+                <Typography variant="body" color={colors.textSecondary}>
+                    Hiển thị {data.length > 0 ? pageState.page * 20 + 1 : 0} đến {Math.min((pageState.page + 1) * 20, totalElements)} trong tổng {totalElements} kết quả
+                </Typography>
                 <View style={styles.paginationActions}>
                     <TouchableOpacity
-                        style={[
-                            styles.pageButton,
-                            pageState.page === 0 && styles.pageButtonDisabled,
-                        ]}
+                        style={[styles.pageButton]}
                         disabled={pageState.page === 0}
                         onPress={() => setPage(pageState.page - 1)}
                     >
-                        <Feather
-                            name="chevron-left"
-                            size={16}
-                            color={
-                                pageState.page === 0
-                                    ? theme.colors.mutedForeground
-                                    : theme.colors.foreground
-                            }
-                        />
-                        {!isDesktop ? null : (
-                            <Text style={styles.pageButtonText}>Trước</Text>
-                        )}
+                        <Feather name="chevron-left" size={14} color={pageState.page === 0 ? colors.textDisabled : colors.textPrimary} />
+                        {isDesktop && <Typography variant="captionBold" color={pageState.page === 0 ? colors.textDisabled : colors.textPrimary}>Trước</Typography>}
                     </TouchableOpacity>
+
+                    {pages.map(p => (
+                        <TouchableOpacity key={p} style={[styles.pageCircle, p === pageState.page && {backgroundColor: colors.primary}]} onPress={() => setPage(p)}>
+                            <Typography variant="captionBold" color={p === pageState.page ? colors.buttonText : colors.textPrimary}>{p + 1}</Typography>
+                        </TouchableOpacity>
+                    ))}
+
                     <TouchableOpacity
-                        style={[
-                            styles.pageButton,
-                            pageState.page >= totalPages - 1 &&
-                                styles.pageButtonDisabled,
-                        ]}
+                        style={[styles.pageButton]}
                         disabled={pageState.page >= totalPages - 1}
                         onPress={() => setPage(pageState.page + 1)}
                     >
-                        {!isDesktop ? null : (
-                            <Text style={styles.pageButtonText}>Sau</Text>
-                        )}
-                        <Feather
-                            name="chevron-right"
-                            size={16}
-                            color={
-                                pageState.page >= totalPages - 1
-                                    ? theme.colors.mutedForeground
-                                    : theme.colors.foreground
-                            }
-                        />
+                        {isDesktop && <Typography variant="captionBold" color={pageState.page >= totalPages - 1 ? colors.textDisabled : colors.textPrimary}>Sau</Typography>}
+                        <Feather name="chevron-right" size={14} color={pageState.page >= totalPages - 1 ? colors.textDisabled : colors.textPrimary} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -242,41 +211,27 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
             data={data}
             keyExtractor={(item, index) => String(item[idField] ?? index)}
             contentContainerStyle={styles.mobileListContent}
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={refresh}
-                    colors={[theme.colors.primary]}
-                />
-            }
-            renderItem={({ item }) => {
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} />}
+            renderItem={({ item }: { item: any }) => {
                 const previewCols = columns.slice(0, mobilePreviewCount);
                 return (
                     <TouchableOpacity
-                        style={styles.mobileCard}
+                        style={[styles.mobileCard, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: "rgba(0,0,0,0.05)" }]}
                         onPress={() => setSelectedRow(item)}
                         activeOpacity={0.7}
                     >
-                        {previewCols.map((col) => (
-                            <View key={col.key} style={styles.cardRow}>
-                                <Text style={styles.cardLabel}>
+                        {previewCols.map((col, index) => (
+                            <View key={col.key} style={[styles.cardRow, index !== previewCols.length - 1 && { borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.03)" }]}>
+                                <Typography variant="body" color={colors.textSecondary} style={{ width: "40%" }}>
                                     {col.label}
-                                </Text>
+                                </Typography>
                                 <View style={styles.cardValueBox}>
                                     {col.render ? (
-                                        col.render(
-                                            getNestedValue(item, col.key),
-                                            item,
-                                        )
+                                        col.render(getNestedValue(item, col.key), item)
                                     ) : (
-                                        <Text
-                                            style={styles.cardValue}
-                                            numberOfLines={1}
-                                        >
-                                            {getTextValue(
-                                                getNestedValue(item, col.key),
-                                            )}
-                                        </Text>
+                                        <Typography variant="bodyEmphasized" color={colors.textPrimary} numberOfLines={2} style={{ textAlign: "right" }}>
+                                            {getTextValue(getNestedValue(item, col.key))}
+                                        </Typography>
                                     )}
                                 </View>
                             </View>
@@ -284,123 +239,54 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
                     </TouchableOpacity>
                 );
             }}
-            ListEmptyComponent={<EmptyState title="Không có dữ liệu" />}
+            ListEmptyComponent={<EmptyState title="No content here" />}
             ListFooterComponent={renderPaginationFooter}
         />
     );
 
     const renderDesktopTable = () => (
-        <View style={styles.tableContainer}>
-            <View style={styles.tableHeaderRow}>
+        <View style={[styles.tableIsland, { backgroundColor: colors.surface, borderRadius: 32, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 30, elevation: 10, marginHorizontal: isDesktop ? 24 : 16, padding: isDesktop ? 16 : 8 }]}>
+            <View style={[styles.tableHeaderRow, { borderBottomWidth: 0, paddingHorizontal: isDesktop ? 24 : 16 }]}>
                 {columns.map((col) => (
                     <TouchableOpacity
                         key={col.key}
-                        style={[
-                            styles.tableHeaderCell,
-                            col.width
-                                ? { width: col.width }
-                                : { flex: col.flex || 1 },
-                        ]}
+                        style={[col.width ? { width: col.width } : { flex: col.flex || 1 }]}
                         onPress={() => handleSort(col.key)}
                         activeOpacity={0.6}
                     >
-                        <Text style={styles.tableHeaderText}>{col.label}</Text>
-                        {pageState.sortBy === col.key && (
-                            <Feather
-                                name={
-                                    pageState.direction === "asc"
-                                        ? "chevron-up"
-                                        : "chevron-down"
-                                }
-                                size={14}
-                                color={theme.colors.primary}
-                            />
-                        )}
+                        <Typography variant="micro" color={colors.textSecondary} style={{ textTransform: "uppercase", letterSpacing: 1, fontWeight: "600" }}>{col.label}</Typography>
                     </TouchableOpacity>
                 ))}
                 {hasActionColumn && (
-                    <View style={[styles.tableHeaderCell, { width: 140 }]}>
-                        <Text style={styles.tableHeaderText}>Hành động</Text>
-                    </View>
+                    <View style={[{ width: 40 }]} />
                 )}
             </View>
 
             <FlatList
                 data={data}
                 keyExtractor={(item, index) => String(item[idField] ?? index)}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={refresh}
-                        colors={[theme.colors.primary]}
-                    />
-                }
-                renderItem={({ item, index }) => (
-                    <View
-                        style={[
-                            styles.tableRow,
-                            index % 2 === 0 && styles.tableRowEven,
-                        ]}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} />}
+                renderItem={({ item }: { item: any }) => (
+                    <TouchableOpacity 
+                        style={[styles.tableRow, { borderBottomWidth: 0, paddingVertical: 14, paddingHorizontal: isDesktop ? 24 : 16 }]} 
+                        activeOpacity={0.7}
+                        onPress={() => setSelectedRow(item)}
                     >
                         {columns.map((col) => (
-                            <View
-                                key={col.key}
-                                style={[
-                                    styles.tableCell,
-                                    col.width
-                                        ? { width: col.width }
-                                        : { flex: col.flex || 1 },
-                                ]}
-                            >
-                                {col.render ? (
-                                    col.render(
-                                        getNestedValue(item, col.key),
-                                        item,
-                                    )
-                                ) : (
-                                    <Text
-                                        style={styles.tableCellText}
-                                        numberOfLines={1}
-                                    >
-                                        {getTextValue(
-                                            getNestedValue(item, col.key),
-                                        )}
-                                    </Text>
+                            <View key={col.key} style={[col.width ? { width: col.width } : { flex: col.flex || 1 }, { justifyContent: "center" }]}>
+                                {col.render ? col.render(getNestedValue(item, col.key), item) : (
+                                    <Typography variant="body" color={colors.textPrimary} numberOfLines={1}>
+                                        {getTextValue(getNestedValue(item, col.key))}
+                                    </Typography>
                                 )}
                             </View>
                         ))}
                         {hasActionColumn && (
-                            <View
-                                style={[
-                                    styles.tableCell,
-                                    {
-                                        width: 140,
-                                        flexDirection: "row",
-                                        gap: 8,
-                                    },
-                                ]}
-                            >
-                                {!hideDefaultDetailAction && (
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.rowActionButton,
-                                            styles.rowActionButtonPrimary,
-                                        ]}
-                                        onPress={() => setSelectedRow(item)}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.rowActionText,
-                                                styles.rowActionTextPrimary,
-                                            ]}
-                                        >
-                                            Mở
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
+                            <View style={[{ width: 40, alignItems: "flex-end", justifyContent: "center" }]}>
+                                <Feather name="chevron-right" size={20} color={colors.textSecondary} />
                             </View>
                         )}
-                    </View>
+                    </TouchableOpacity>
                 )}
                 ListEmptyComponent={<EmptyState title="Không có dữ liệu" />}
             />
@@ -409,130 +295,54 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
     );
 
     const renderSidebarModal = () => (
-        <Modal
-            visible={selectedRow !== null}
-            transparent
-            animationType={isDesktop ? "none" : "slide"}
-            onRequestClose={() => setSelectedRow(null)}
-        >
-            <View
-                style={[
-                    styles.modalOverlay,
-                    !isDesktop && styles.modalOverlayBottomSheet,
-                ]}
-            >
-                <Pressable
-                    style={styles.modalBackdrop}
-                    onPress={() => setSelectedRow(null)}
-                />
-                <View
-                    style={[
-                        styles.sidebarBox,
-                        !isDesktop && styles.sidebarBoxMobile,
-                    ]}
-                >
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Chi tiết bản ghi</Text>
-                        <TouchableOpacity
-                            style={styles.modalCloseBtn}
-                            onPress={() => setSelectedRow(null)}
-                        >
-                            <Feather
-                                name="x"
-                                size={20}
-                                color={theme.colors.foreground}
-                            />
+        <Modal visible={selectedRow !== null} transparent animationType={isDesktop ? "none" : "slide"} onRequestClose={() => setSelectedRow(null)}>
+            <View style={[styles.modalOverlay, !isDesktop && styles.modalOverlayBottomSheet, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                <Pressable style={styles.modalBackdrop} onPress={() => setSelectedRow(null)} />
+                <View style={[styles.sidebarBox, !isDesktop && { height: "90%", width: "100%", borderTopLeftRadius: 32, borderTopRightRadius: 32 }, { backgroundColor: colors.surface }]}>
+                    <View style={[styles.modalHeader, { borderColor: colors.border, borderBottomWidth: 0 }]}>
+                        <Typography variant="heading2" color={colors.textPrimary}>Thông tin chi tiết</Typography>
+                        <TouchableOpacity style={{ padding: 8, backgroundColor: colors.background, borderRadius: 20 }} onPress={() => setSelectedRow(null)}>
+                            <Feather name="x" size={20} color={colors.textPrimary} />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView
-                        style={styles.modalList}
-                        contentContainerStyle={{ paddingBottom: 40 }}
-                    >
-                        {/* Auto-render basic info */}
+                    <ScrollView style={styles.modalList} contentContainerStyle={{ paddingBottom: 40 }}>
                         <View style={styles.autoDetailSection}>
                             {columns.map((col) => (
-                                <View key={col.key} style={styles.modalRow}>
-                                    <Text style={styles.modalLabel}>
-                                        {col.label}
-                                    </Text>
+                                <View key={col.key} style={[styles.modalRow, { borderBottomColor: "rgba(0,0,0,0.03)" }]}>
+                                    <Typography variant="body" color={colors.textSecondary} style={{ width: "40%" }}>{col.label}</Typography>
                                     <View style={styles.modalValueBox}>
-                                        {col.render && selectedRow ? (
-                                            col.render(
-                                                getNestedValue(
-                                                    selectedRow,
-                                                    col.key,
-                                                ),
-                                                selectedRow,
-                                            )
-                                        ) : (
-                                            <Text style={styles.modalValue}>
-                                                {selectedRow
-                                                    ? getTextValue(
-                                                          getNestedValue(
-                                                              selectedRow,
-                                                              col.key,
-                                                          ),
-                                                      )
-                                                    : "-"}
-                                            </Text>
+                                        {col.render && selectedRow ? col.render(getNestedValue(selectedRow, col.key), selectedRow) : (
+                                            <Typography variant="bodyEmphasized" color={colors.textPrimary} style={{ textAlign: "right" }}>
+                                                {selectedRow ? getTextValue(getNestedValue(selectedRow, col.key)) : "-"}
+                                            </Typography>
                                         )}
                                     </View>
                                 </View>
                             ))}
                         </View>
-
-                        {/* Custom content mapping like item list */}
                         {renderDetailContent && selectedRow && (
-                            <View style={styles.customDetailWrap}>
-                                {renderDetailContent(selectedRow)}
-                            </View>
+                            <View style={styles.customDetailWrap}>{renderDetailContent(selectedRow)}</View>
                         )}
                     </ScrollView>
 
-                    {/* Actions bar */}
                     {selectedRow && rowActions.length > 0 && (
-                        <View style={styles.modalActionsWrap}>
-                            {rowActions
-                                .filter(
-                                    (a) =>
-                                        !a.shouldShow ||
-                                        a.shouldShow(selectedRow),
-                                )
-                                .map((action, i) => {
-                                    const toneStyle = getActionToneStyle(
-                                        action.tone,
-                                    );
-                                    return (
-                                        <TouchableOpacity
-                                            key={i}
-                                            style={[
-                                                styles.rowActionButton,
-                                                toneStyle.button,
-                                                {
-                                                    flex: 1,
-                                                    paddingVertical: 12,
-                                                },
-                                            ]}
-                                            onPress={() =>
-                                                handleRowAction(
-                                                    action,
-                                                    selectedRow,
-                                                )
-                                            }
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.rowActionText,
-                                                    toneStyle.text,
-                                                    { fontSize: 13 },
-                                                ]}
-                                            >
-                                                {action.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
+                        <View style={[styles.modalActionsWrap, { backgroundColor: colors.surface }]}>
+                            {rowActions.filter((a) => !a.shouldShow || a.shouldShow(selectedRow)).map((action, i) => {
+                                const isDanger = action.tone === "danger";
+                                const isNeutral = action.tone === "neutral";
+                                const bg = isDanger ? "rgba(239, 68, 68, 0.1)" : isNeutral ? colors.background : colors.primary;
+                                const textC = isDanger ? colors.danger : isNeutral ? colors.textPrimary : colors.buttonText;
+                                return (
+                                    <TouchableOpacity
+                                        key={i}
+                                        style={[styles.rowActionButtonModal, { backgroundColor: bg, borderRadius: 99 }]}
+                                        onPress={() => handleRowAction(action, selectedRow)}
+                                    >
+                                        <Typography variant="bodyEmphasized" color={textC}>{action.label}</Typography>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     )}
                 </View>
@@ -541,86 +351,60 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
     );
 
     return (
-        <View style={styles.container}>
-            <ScreenHeader
-                title={title}
-                subtitle={`Danh sách tự động cập nhật`}
-                rightSlot={
-                    <View style={styles.rightHeaderWrap}>
-                        {createAction && (
-                            <TouchableOpacity
-                                style={styles.createButton}
-                                onPress={createAction.onPress}
-                            >
-                                <Feather
-                                    name="plus"
-                                    size={16}
-                                    color={theme.colors.primaryForeground}
-                                />
-                                <Text style={styles.createButtonText}>
-                                    {createAction.label}
-                                </Text>
+        <View style={[{ flex: 1, backgroundColor: colors.background }]}>
+            <View style={styles.topSection}>
+                <ScreenHeader
+                    title={title}
+                    subtitle=""
+                    rightSlot={
+                        <View style={styles.rightHeaderWrap}>
+                            {isDesktop && (
+                                <View style={{ width: 300, marginRight: 16 }}>
+                                    <SearchBar
+                                        value={searchInput}
+                                        onChangeText={setSearchInput}
+                                        placeholder={searchPlaceholder}
+                                    />
+                                </View>
+                            )}
+                            {createAction && (
+                                <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: 99 }]} onPress={createAction.onPress}>
+                                    <Typography variant="bodyEmphasized" color={colors.buttonText}>{createAction.label}</Typography>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    }
+                />
+
+                {!isDesktop && (
+                    <View style={{ paddingBottom: 16, flexDirection: "row", gap: 8, paddingHorizontal: 16 }}>
+                        <View style={{ flex: 1 }}>
+                            <SearchBar
+                                value={searchInput}
+                                onChangeText={setSearchInput}
+                                placeholder={searchPlaceholder}
+                            />
+                        </View>
+                        {renderFilters && (
+                            <TouchableOpacity style={[styles.filterMobileBtn, { backgroundColor: "rgba(0, 113, 227, 0.08)" }]} onPress={() => setShowFilters(!showFilters)}>
+                                <Feather name="filter" size={20} color={colors.primary} />
                             </TouchableOpacity>
                         )}
                     </View>
-                }
-            />
-
-            <View style={styles.searchWrapper}>
-                <View style={{ flex: 1, flexDirection: "row", gap: 10 }}>
-                    <View style={{ flex: 1 }}>
-                        <SearchBar
-                            value={searchInput}
-                            onChangeText={setSearchInput}
-                            placeholder={searchPlaceholder}
-                            onSubmitEditing={handleSearchSubmit}
-                        />
-                    </View>
-                    {renderFilters && (
-                        <TouchableOpacity
-                            style={[
-                                styles.searchButton,
-                                showFilters && {
-                                    backgroundColor: theme.colors.primaryDark,
-                                },
-                            ]}
-                            onPress={() => setShowFilters(!showFilters)}
-                        >
-                            <Feather
-                                name="filter"
-                                size={16}
-                                color={theme.colors.primaryForeground}
-                            />
-                        </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                        style={styles.searchButton}
-                        onPress={handleSearchSubmit}
-                    >
-                        <Feather
-                            name="search"
-                            size={16}
-                            color={theme.colors.primaryForeground}
-                        />
-                    </TouchableOpacity>
-                </View>
+                )}
 
                 {showFilters && renderFilters && (
-                    <View style={styles.filterPanel}>
-                        {renderFilters(
-                            tablePagination.setFilters,
-                            pageState.filters || {},
-                        )}
+                    <View style={[styles.filterPanel]}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                            {renderFilters(tablePagination.setFilters, pageState.filters || {})}
+                        </ScrollView>
                     </View>
                 )}
             </View>
 
             {loading && data.length === 0 ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator
-                        size="large"
-                        color={theme.colors.primary}
-                    />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : isDesktop ? (
                 renderDesktopTable()
@@ -636,253 +420,42 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
 export default DataTableScreen;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.colors.background },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    searchWrapper: {
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
-    },
-    searchButton: {
-        backgroundColor: theme.colors.primary,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        borderRadius: theme.borderRadius.md,
-        ...theme.shadows.sm,
-    },
-    filterPanel: {
-        marginTop: 12,
-        padding: theme.spacing.md,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        ...theme.shadows.sm,
-    },
-    rightHeaderWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
-    createButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        backgroundColor: theme.colors.primary,
-        borderRadius: theme.borderRadius.md,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        ...theme.shadows.sm,
-    },
-    createButtonText: {
-        color: theme.colors.primaryForeground,
-        fontSize: 13,
-        fontWeight: "700",
-    },
+    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+    topSection: { paddingHorizontal: 16, paddingBottom: 16 },
+    searchWrapper: { paddingHorizontal: 16, paddingVertical: 12 },
+    searchButton: { justifyContent: "center", alignItems: "center", paddingHorizontal: 16 },
+    filterPanel: { paddingHorizontal: 16, paddingBottom: 16 },
+    rightHeaderWrap: { flexDirection: "row", alignItems: "center" },
+    createButton: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24, paddingVertical: 12 },
+    
+    // Island UI
+    tableIsland: { flex: 1, marginBottom: 24, overflow: "hidden" },
+    tableHeaderRow: { flexDirection: "row", paddingVertical: 16 },
+    tableRow: { flexDirection: "row", marginVertical: 4 },
+    
+    filterMobileBtn: { height: 48, width: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
 
-    tableContainer: {
-        flex: 1,
-        backgroundColor: theme.colors.surface,
-        margin: theme.spacing.md,
-        borderRadius: theme.borderRadius.lg,
-        ...theme.shadows.md,
-        overflow: "hidden",
-    },
-    tableHeaderRow: {
-        flexDirection: "row",
-        backgroundColor: theme.colors.surfaceRaised,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderColor: theme.colors.border,
-    },
-    tableHeaderCell: {
-        paddingHorizontal: 8,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-    },
-    tableHeaderText: {
-        fontSize: 13,
-        fontWeight: "700",
-        color: theme.colors.foreground,
-        textTransform: "uppercase",
-    },
-    tableRow: {
-        flexDirection: "row",
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-        backgroundColor: theme.colors.surface,
-    },
-    tableRowEven: { backgroundColor: "#fafbfc" },
-    tableCell: { paddingHorizontal: 8, justifyContent: "center" },
-    tableCellText: { fontSize: 14, color: theme.colors.foreground },
-
-    mobileListContent: { padding: theme.spacing.md },
-    mobileCard: {
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.md,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: "transparent",
-        ...theme.shadows.sm,
-    },
-    cardRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingVertical: 6,
-    },
-    cardLabel: {
-        fontSize: 13,
-        color: theme.colors.mutedForeground,
-        fontWeight: "600",
-        width: "40%",
-    },
+    mobileListContent: { padding: 16 },
+    mobileCard: { paddingHorizontal: 16, paddingVertical: 8, marginBottom: 12 },
+    cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },
     cardValueBox: { flex: 1, alignItems: "flex-end" },
-    cardValue: {
-        fontSize: 14,
-        color: theme.colors.foreground,
-        fontWeight: "600",
-        textAlign: "right",
-    },
-
-    paginationFooter: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: theme.spacing.md,
-        borderTopWidth: 1,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surface,
-    },
-    paginationText: { fontSize: 13, color: theme.colors.mutedForeground },
-    paginationActions: { flexDirection: "row", gap: 10 },
-    pageButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: theme.borderRadius.md,
-        backgroundColor: theme.colors.surfaceRaised,
-    },
-    pageButtonDisabled: { opacity: 0.5 },
-    pageButtonText: {
-        fontSize: 13,
-        color: theme.colors.foreground,
-        fontWeight: "600",
-    },
-
-    rowActionButton: {
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: theme.borderRadius.sm,
-        borderWidth: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-    },
-    rowActionText: { fontSize: 12, fontWeight: "700" },
-    rowActionButtonPrimary: {
-        borderColor: theme.colors.ring,
-        backgroundColor: theme.colors.primaryLight,
-    },
-    rowActionTextPrimary: { color: theme.colors.primary },
-    rowActionButtonNeutral: {
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surfaceRaised,
-    },
-    rowActionTextNeutral: { color: theme.colors.foreground },
-    rowActionButtonDanger: {
-        borderColor: "#fecaca",
-        backgroundColor: "#fef2f2",
-    },
-    rowActionTextDanger: { color: theme.colors.error },
-
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: theme.colors.overlay,
-        flexDirection: "row",
-        justifyContent: "flex-end",
-    },
-    modalOverlayBottomSheet: {
-        flexDirection: "column",
-        justifyContent: "flex-end",
-    },
+    
+    // Pagination
+    paginationFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 24, paddingVertical: 20 },
+    paginationActions: { flexDirection: "row", gap: 6, alignItems: "center" },
+    pageButton: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8 },
+    pageCircle: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+    
+    rowActionButtonModal: { flex: 1, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
+    modalOverlay: { flex: 1, flexDirection: "row", justifyContent: "flex-end" },
+    modalOverlayBottomSheet: { flexDirection: "column", justifyContent: "flex-end" },
     modalBackdrop: { ...StyleSheet.absoluteFillObject },
-    sidebarBox: {
-        width: 450,
-        maxWidth: "100%",
-        height: "100%",
-        backgroundColor: theme.colors.surface,
-        ...theme.shadows.float,
-    },
-    sidebarBoxMobile: {
-        height: "85%",
-        width: "100%",
-        borderTopLeftRadius: theme.borderRadius.xl,
-        borderTopRightRadius: theme.borderRadius.xl,
-    },
-    modalHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: theme.spacing.lg,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-    },
-    modalTitle: { ...theme.typography.h3, color: theme.colors.foreground },
-    modalCloseBtn: {
-        padding: 8,
-        backgroundColor: theme.colors.surfaceRaised,
-        borderRadius: 20,
-    },
+    sidebarBox: { width: 500, maxWidth: "100%", height: "100%", elevation: 20, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 30 },
+    modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 24 },
     modalList: { flex: 1 },
-    autoDetailSection: {
-        paddingHorizontal: theme.spacing.lg,
-        paddingTop: theme.spacing.lg,
-    },
-    customDetailWrap: {
-        paddingHorizontal: theme.spacing.lg,
-        paddingBottom: theme.spacing.lg,
-    },
-    modalRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-        borderStyle: "dashed",
-    },
-    modalLabel: {
-        width: "40%",
-        fontSize: 13,
-        color: theme.colors.mutedForeground,
-        fontWeight: "600",
-    },
-    modalValueBox: { flex: 1, alignItems: "flex-end" },
-    modalValue: {
-        fontSize: 14,
-        color: theme.colors.foreground,
-        textAlign: "right",
-        fontWeight: "600",
-    },
-    modalActionsWrap: {
-        flexDirection: "row",
-        gap: 10,
-        padding: theme.spacing.lg,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
-        backgroundColor: theme.colors.surface,
-    },
-
-    badge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 999,
-        alignSelf: "flex-end",
-    },
-    badgeText: { fontSize: 12, fontWeight: "700" },
+    autoDetailSection: { paddingHorizontal: 24, paddingTop: 10 },
+    customDetailWrap: { paddingHorizontal: 24, paddingBottom: 24 },
+    modalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderStyle: "solid" },
+    modalValueBox: { flex: 1, alignItems: "flex-end", justifyContent: "center" },
+    modalActionsWrap: { flexDirection: "row", gap: 16, padding: 24 }
 });

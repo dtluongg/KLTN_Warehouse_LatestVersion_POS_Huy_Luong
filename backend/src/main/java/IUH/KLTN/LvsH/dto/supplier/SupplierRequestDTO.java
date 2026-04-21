@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 public class SupplierRequestDTO {
-    @NotBlank(message = "Vui lòng nhập mã nhà cung cấp")
+    // Để trống → trigger SQL tự sinh theo format NCC-XXXXX
     private String supplierCode;
 
     @NotBlank(message = "Vui lòng nhập tên nhà cung cấp")

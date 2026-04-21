@@ -1,6 +1,7 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { theme } from "../../utils/theme";
+import { StyleSheet, View } from "react-native";
+import { useTheme } from "../../../src/hooks/useTheme";
+import { Typography } from "./Typography";
 
 type ScreenHeaderProps = {
     title: string;
@@ -13,12 +14,27 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({
     subtitle,
     rightSlot,
 }) => {
+    const { colors, metrics } = useTheme();
+
     return (
-        <View style={styles.container}>
+        <View style={[
+            styles.container, 
+            { 
+                backgroundColor: colors.surface,
+                borderBottomColor: colors.border,
+                paddingHorizontal: metrics.spacing.md,
+                paddingTop: metrics.spacing.md,
+                paddingBottom: metrics.spacing.sm,
+            }
+        ]}>
             <View style={styles.textBlock}>
-                <Text style={styles.title}>{title}</Text>
+                <Typography variant="heading2" color={colors.textHero}>
+                    {title}
+                </Typography>
                 {subtitle ? (
-                    <Text style={styles.subtitle}>{subtitle}</Text>
+                    <Typography variant="caption" color={colors.textSecondary}>
+                        {subtitle}
+                    </Typography>
                 ) : null}
             </View>
             {rightSlot ? (
@@ -35,25 +51,12 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "flex-start",
         justifyContent: "space-between",
-        paddingHorizontal: theme.spacing.md,
-        paddingTop: theme.spacing.md,
-        paddingBottom: theme.spacing.sm,
-        gap: theme.spacing.sm,
-        backgroundColor: theme.colors.surface,
+        gap: 8,
         borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
     },
     textBlock: {
         flex: 1,
-        gap: 2,
-    },
-    title: {
-        ...theme.typography.title,
-        color: theme.colors.foreground,
-    },
-    subtitle: {
-        ...theme.typography.caption,
-        color: theme.colors.mutedForeground,
+        gap: 4,
     },
     rightSlot: {
         alignItems: "flex-end",

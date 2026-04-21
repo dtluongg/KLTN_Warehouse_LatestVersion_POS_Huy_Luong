@@ -90,32 +90,32 @@ export function useTablePagination<T>(apiUrl: string, defaultSort = 'id') {
 
     useEffect(() => {
         fetchData();
-    }, [pageState.page, pageState.size, pageState.sortBy, pageState.direction, pageState.filters]);
+    }, [pageState.page, pageState.size, pageState.sortBy, pageState.direction, pageState.filters, fetchData]);
 
-    const setPage = (page: number) => setPageState(prev => ({ ...prev, page }));
+    const setPage = useCallback((page: number) => setPageState(prev => ({ ...prev, page })), []);
     
-    const setSize = (size: number) => setPageState(prev => ({ ...prev, size, page: 0 }));
+    const setSize = useCallback((size: number) => setPageState(prev => ({ ...prev, size, page: 0 })), []);
     
-    const setSort = (sortBy: string) => setPageState(prev => ({
+    const setSort = useCallback((sortBy: string) => setPageState(prev => ({
         ...prev,
         sortBy,
         direction: prev.sortBy === sortBy && prev.direction === 'desc' ? 'asc' : 'desc',
         page: 0
-    }));
+    })), []);
     
-    const search = (keyword: string) => {
+    const search = useCallback((keyword: string) => {
         setPageState(prev => ({ ...prev, keyword, page: 0 }));
         fetchData(false, { keyword, page: 0 });
-    };
+    }, [fetchData]);
 
-    const setFilters = (filters: Record<string, any>) => {
+    const setFilters = useCallback((filters: Record<string, any>) => {
         setPageState(prev => ({ ...prev, filters, page: 0 }));
-    };
+    }, []);
 
-    const refresh = () => {
+    const refresh = useCallback(() => {
         setRefreshing(true);
         fetchData(true);
-    };
+    }, [fetchData]);
 
     return {
         data,

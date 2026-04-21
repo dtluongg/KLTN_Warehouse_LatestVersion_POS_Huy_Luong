@@ -6,7 +6,7 @@ import java.time.LocalDate;
 
 @Data
 public class StaffRequestDTO {
-    @NotBlank(message = "Vui lòng nhập mã nhân viên")
+    // Để trống → trigger SQL tự sinh theo format NV-XXXXX
     private String staffCode;
 
     @NotBlank(message = "Vui lòng nhập tên nhân viên")

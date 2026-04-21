@@ -2,26 +2,27 @@ import React from "react";
 import { useWindowDimensions } from "react-native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { CustomDrawerContent } from "../components/CustomDrawerContent";
+import { useTheme } from "../hooks/useTheme";
 
 // Screens
-import HomeScreen from "../screens/HomeScreen";
-import PosScreen from "../screens/PosScreen";
-import OrderListScreen from "../screens/OrderListScreen";
-import CustomerListScreen from "../screens/CustomerListScreen";
-import PurchaseOrderListScreen from "../screens/PurchaseOrderListScreen";
-import GoodsReceiptListScreen from "../screens/GoodsReceiptScreen";
-import SupplierListScreen from "../screens/SupplierListScreen";
-import CustomerReturnListScreen from "../screens/CustomerReturnListScreen";
-import SupplierReturnListScreen from "../screens/SupplierReturnListScreen";
-import WarehouseListScreen from "../screens/WarehouseListScreen";
-import StockAdjustmentListScreen from "../screens/StockAdjustmentListScreen";
-import InventoryMovementListScreen from "../screens/InventoryMovementListScreen";
-import InventoryStockScreen from "../screens/InventoryStockScreen";
-import ProductListScreen from "../screens/ProductListScreen";
-import CategoryListScreen from "../screens/CategoryListScreen";
-import CouponListScreen from "../screens/CouponListScreen";
-import StaffListScreen from "../screens/StaffListScreen";
-import AiSqlChatScreen from "../screens/AiSqlChatScreen";
+import HomeScreen from "../features/overview/screens/HomeScreen";
+import PosScreen from "../features/pos/screens/PosScreen";
+import OrderListScreen from "../features/orders/screens/OrderListScreen";
+import CustomerListScreen from "../features/customers/screens/CustomerListScreen";
+import PurchaseOrderListScreen from "../features/purchase-orders/screens/PurchaseOrderListScreen";
+import GoodsReceiptListScreen from "../features/goods-receipts/screens/GoodsReceiptScreen";
+import SupplierListScreen from "../features/suppliers/screens/SupplierListScreen";
+import CustomerReturnListScreen from "../features/customer-returns/screens/CustomerReturnListScreen";
+import SupplierReturnListScreen from "../features/supplier-returns/screens/SupplierReturnListScreen";
+import WarehouseListScreen from "../features/warehouses/screens/WarehouseListScreen";
+import StockAdjustmentListScreen from "../features/stock-adjustments/screens/StockAdjustmentListScreen";
+import InventoryMovementListScreen from "../features/inventory-movements/screens/InventoryMovementListScreen";
+import InventoryStockScreen from "../features/inventory-stock/screens/InventoryStockScreen";
+import ProductListScreen from "../features/products/screens/ProductListScreen";
+import CategoryListScreen from "../features/categories/screens/CategoryListScreen";
+import CouponListScreen from "../features/coupons/screens/CouponListScreen";
+import StaffListScreen from "../features/staff/screens/StaffListScreen";
+import AiSqlChatScreen from "../features/ai-sql-chat/screens/AiSqlChatScreen";
 import { BREAKPOINTS } from "../utils/responsive";
 
 const Drawer = createDrawerNavigator();
@@ -29,6 +30,7 @@ const Drawer = createDrawerNavigator();
 export default function MainDrawerNavigator() {
     const { width } = useWindowDimensions();
     const isLargeScreen = width >= BREAKPOINTS.desktop;
+    const { colors } = useTheme();
 
     return (
         <Drawer.Navigator
@@ -38,9 +40,9 @@ export default function MainDrawerNavigator() {
                 drawerType: isLargeScreen ? "permanent" : "front",
                 headerLeft: isLargeScreen ? () => null : undefined,
                 headerStyle: {
-                    backgroundColor: "#059669",
+                    backgroundColor: colors.primary,
                 },
-                headerTintColor: "#fff",
+                headerTintColor: colors.buttonText,
             }}
             initialRouteName="Overview"
         >

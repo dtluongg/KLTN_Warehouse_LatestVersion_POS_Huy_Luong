@@ -2,15 +2,15 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { TouchableOpacity } from "react-native";
-import { theme } from "../utils/theme";
+import { useTheme } from "../hooks/useTheme";
 import { useAuthStore } from "../store/authStore";
 import { isRouteAllowedByRole } from "../utils/roleAccess";
 
-import HomeScreen from "../screens/HomeScreen";
-import PosScreen from "../screens/PosScreen";
-import InventoryStockScreen from "../screens/InventoryStockScreen";
-import OrderListScreen from "../screens/OrderListScreen";
-import MoreMenuScreen from "../screens/MoreMenuScreen";
+import HomeScreen from "../features/overview/screens/HomeScreen";
+import PosScreen from "../features/pos/screens/PosScreen";
+import InventoryStockScreen from "../features/inventory-stock/screens/InventoryStockScreen";
+import OrderListScreen from "../features/orders/screens/OrderListScreen";
+import MoreMenuScreen from "../features/settings/screens/MoreMenuScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -27,6 +27,7 @@ const TAB_ICON_BY_ROUTE: Record<
 
 export default function MobileTabNavigator() {
     const role = useAuthStore((state) => state.role);
+    const { colors, metrics } = useTheme();
 
     return (
         <Tab.Navigator
@@ -34,25 +35,26 @@ export default function MobileTabNavigator() {
             screenOptions={({ route }) => ({
                 tabBarButton: (props) => {
                     const isAllowed = isRouteAllowedByRole(role, route.name);
+                    const { href, to, ...rest } = props as any;
 
                     return (
                         <TouchableOpacity
-                            {...props}
+                            {...rest}
                             disabled={!isAllowed}
                             style={[props.style, !isAllowed && { opacity: 0.45 }]}
                         />
                     );
                 },
-                headerStyle: { backgroundColor: theme.colors.primary },
-                headerTintColor: theme.colors.primaryForeground,
-                tabBarActiveTintColor: theme.colors.primary,
-                tabBarInactiveTintColor: theme.colors.mutedForeground,
+                headerStyle: { backgroundColor: colors.primary },
+                headerTintColor: colors.buttonText,
+                tabBarActiveTintColor: colors.primary,
+                tabBarInactiveTintColor: colors.textDisabled,
                 tabBarStyle: {
                     height: 64,
                     paddingTop: 6,
                     paddingBottom: 8,
-                    borderTopColor: theme.colors.border,
-                    backgroundColor: theme.colors.surface,
+                    borderTopColor: colors.border,
+                    backgroundColor: colors.surface,
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,

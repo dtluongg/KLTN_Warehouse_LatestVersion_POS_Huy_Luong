@@ -1,0 +1,324 @@
+import React, { useEffect, useState } from "react";
+import {
+    View, Text, TextInput, ScrollView, TouchableOpacity,
+    StyleSheet, Alert, ActivityIndicator, Switch, FlatList, Modal,
+} from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { Feather } from "@expo/vector-icons";
+import { axiosClient } from "../../../api/axiosClient";
+import { theme } from "../../../utils/theme";
+
+interface Category { id: number; name: string; }
+
+const ProductFormScreen = () => {
+    const navigation = useNavigation<any>();
+    const route = useRoute<any>();
+    const editId: number | undefined = route.params?.id;
+    const isEdit = !!editId;
+
+    const [sku, setSku] = useState("");
+    const [barcode, setBarcode] = useState("");
+    const [name, setName] = useState("");
+    const [shortName, setShortName] = useState("");
+    const [categoryId, setCategoryId] = useState<number | null>(null);
+    const [categoryName, setCategoryName] = useState("");
+    const [salePrice, setSalePrice] = useState("");
+    const [vatRate, setVatRate] = useState("0");
+    const [imageUrl, setImageUrl] = useState("");
+    const [isActive, setIsActive] = useState(true);
+
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [categorySearch, setCategorySearch] = useState("");
+
+    // Tự sinh SKU dựa vào tên sản phẩm + timestamp ngắn
+    const generateSku = () => {
+        const base = name.trim()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d").replace(/Đ/g, "D")
+            .replace(/[^a-zA-Z0-9\s]/g, "")
+            .trim().split(/\s+/)
+            .map(w => w[0]?.toUpperCase() || "")
+            .join("") || "SP";
+        const rand = Date.now().toString(36).toUpperCase().slice(-4);
+        setSku(`${base}-${rand}`);
+    };
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const catRes = await axiosClient.get("/categories?size=200&isActive=true");
+                setCategories(catRes.data.content || []);
+
+                if (isEdit) {
+                    const res = await axiosClient.get(`/products/${editId}`);
+                    setSku(res.data.sku || "");
+                    setBarcode(res.data.barcode || "");
+                    setName(res.data.name || "");
+                    setShortName(res.data.shortName || "");
+                    setCategoryId(res.data.categoryId || null);
+                    setCategoryName(res.data.categoryName || "");
+                    setSalePrice(String(res.data.salePrice ?? ""));
+                    setVatRate(String(res.data.vatRate ?? "0"));
+                    setImageUrl(res.data.imageUrl || "");
+                    setIsActive(res.data.isActive ?? true);
+                }
+            } catch (e) {
+                Alert.alert("Lỗi", "Không thể tải dữ liệu.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, [editId]);
+
+    const handleSubmit = async () => {
+        if (!sku.trim()) { Alert.alert("Thiếu thông tin", "Vui lòng nhập mã SKU."); return; }
+        if (!name.trim()) { Alert.alert("Thiếu thông tin", "Vui lòng nhập tên sản phẩm."); return; }
+        if (!categoryId) { Alert.alert("Thiếu thông tin", "Vui lòng chọn danh mục."); return; }
+        if (!salePrice || Number(salePrice) < 0) { Alert.alert("Thiếu thông tin", "Vui lòng nhập giá bán hợp lệ."); return; }
+
+        const payload = {
+            sku: sku.trim(),
+            barcode: barcode.trim() || null,
+            name: name.trim(),
+            shortName: shortName.trim() || null,
+            categoryId,
+            salePrice: Number(salePrice),
+            vatRate: Number(vatRate) || 0,
+            imageUrl: imageUrl.trim() || null,
+            isActive,
+        };
+        try {
+            setSubmitting(true);
+            if (isEdit) {
+                await axiosClient.put(`/products/${editId}`, payload);
+                Alert.alert("Thành công", "Đã cập nhật sản phẩm.");
+            } else {
+                await axiosClient.post("/products", payload);
+                Alert.alert("Thành công", "Đã tạo sản phẩm mới.");
+            }
+            navigation.goBack();
+        } catch (err: any) {
+            Alert.alert("Lỗi", err?.response?.data?.message || "Không thể lưu sản phẩm.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={styles.loadingText}>Đang tải...</Text>
+            </View>
+        );
+    }
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Feather name="arrow-left" size={22} color={theme.colors.foreground} />
+                </TouchableOpacity>
+                <Text style={styles.title}>{isEdit ? "Sửa sản phẩm" : "Thêm sản phẩm"}</Text>
+            </View>
+
+            <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+                {/* Định danh */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>Thông tin định danh</Text>
+
+                    <View style={styles.rowInputs}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.label}>Mã SKU <Text style={styles.required}>*</Text></Text>
+                            <View style={styles.inputWithBtn}>
+                                <TextInput
+                                    style={[styles.input, { flex: 1 }]}
+                                    value={sku} onChangeText={setSku}
+                                    placeholder="SP-001" placeholderTextColor={theme.colors.mutedForeground}
+                                    autoCapitalize="characters"
+                                />
+                                <TouchableOpacity style={styles.genBtn} onPress={generateSku}>
+                                    <Feather name="zap" size={14} color={theme.colors.primary} />
+                                    <Text style={styles.genBtnText}>Tự sinh</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.label}>Mã vạch (Barcode)</Text>
+                            <TextInput style={styles.input} value={barcode} onChangeText={setBarcode}
+                                placeholder="8935xxx" placeholderTextColor={theme.colors.mutedForeground} keyboardType="numeric" />
+                        </View>
+                    </View>
+
+                    <Text style={styles.label}>Tên sản phẩm <Text style={styles.required}>*</Text></Text>
+                    <TextInput style={styles.input} value={name} onChangeText={setName}
+                        placeholder="Tên sản phẩm đầy đủ" placeholderTextColor={theme.colors.mutedForeground} />
+
+                    <Text style={styles.label}>Tên viết tắt / thương hiệu</Text>
+                    <TextInput style={styles.input} value={shortName} onChangeText={setShortName}
+                        placeholder="Tên ngắn gọn hiển thị trên hóa đơn" placeholderTextColor={theme.colors.mutedForeground} />
+
+                    <Text style={styles.label}>Danh mục <Text style={styles.required}>*</Text></Text>
+                    <TouchableOpacity style={styles.picker} onPress={() => setShowCategoryModal(true)}>
+                        <Feather name="grid" size={16} color={theme.colors.mutedForeground} />
+                        <Text style={[styles.pickerText, !categoryId && styles.pickerPlaceholder]}>
+                            {categoryName || "Chọn danh mục..."}
+                        </Text>
+                        <Feather name="chevron-down" size={16} color={theme.colors.mutedForeground} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Giá cả */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>Giá & Thuế</Text>
+
+                    <View style={styles.rowInputs}>
+                        <View style={{ flex: 2 }}>
+                            <Text style={styles.label}>Giá bán (VND) <Text style={styles.required}>*</Text></Text>
+                            <TextInput style={styles.input} value={salePrice} onChangeText={setSalePrice}
+                                placeholder="0" placeholderTextColor={theme.colors.mutedForeground} keyboardType="numeric" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.label}>Thuế VAT (%)</Text>
+                            <TextInput style={styles.input} value={vatRate} onChangeText={setVatRate}
+                                placeholder="0" placeholderTextColor={theme.colors.mutedForeground} keyboardType="numeric" />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Khác */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>Thông tin khác</Text>
+
+                    <Text style={styles.label}>Đường dẫn ảnh (URL)</Text>
+                    <TextInput style={styles.input} value={imageUrl} onChangeText={setImageUrl}
+                        placeholder="https://..." placeholderTextColor={theme.colors.mutedForeground}
+                        keyboardType="url" autoCapitalize="none" />
+
+                    <View style={styles.switchRow}>
+                        <Text style={styles.label}>Đang kinh doanh</Text>
+                        <Switch value={isActive} onValueChange={setIsActive} trackColor={{ true: theme.colors.primary }} />
+                    </View>
+                </View>
+            </ScrollView>
+
+            <View style={styles.footer}>
+                <TouchableOpacity
+                    style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+                    onPress={handleSubmit} disabled={submitting}
+                >
+                    {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="save" size={18} color="#fff" />}
+                    <Text style={styles.submitBtnText}>
+                        {submitting ? "Đang lưu..." : isEdit ? "Cập nhật sản phẩm" : "Tạo sản phẩm"}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Category Picker Modal */}
+            <Modal visible={showCategoryModal} transparent animationType="slide" onRequestClose={() => setShowCategoryModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Chọn danh mục</Text>
+                            <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                                <Feather name="x" size={22} color={theme.colors.foreground} />
+                            </TouchableOpacity>
+                        </View>
+                        <TextInput
+                            style={styles.modalSearch}
+                            placeholder="Tìm danh mục..."
+                            placeholderTextColor={theme.colors.mutedForeground}
+                            value={categorySearch} onChangeText={setCategorySearch}
+                        />
+                        <FlatList
+                            data={categories.filter(c => c.name.toLowerCase().includes(categorySearch.toLowerCase()))}
+                            keyExtractor={c => String(c.id)}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity style={[styles.modalItem, item.id === categoryId && styles.modalItemSelected]}
+                                    onPress={() => { setCategoryId(item.id); setCategoryName(item.name); setShowCategoryModal(false); setCategorySearch(""); }}>
+                                    <Text style={[styles.modalItemName, item.id === categoryId && { color: theme.colors.primary }]}>{item.name}</Text>
+                                    {item.id === categoryId && <Feather name="check" size={16} color={theme.colors.primary} />}
+                                </TouchableOpacity>
+                            )}
+                        />
+                    </View>
+                </View>
+            </Modal>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    loadingBox: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
+    loadingText: { color: theme.colors.mutedForeground, fontSize: 14 },
+    header: {
+        flexDirection: "row", alignItems: "center", gap: 12,
+        paddingHorizontal: 16, paddingTop: 54, paddingBottom: 16,
+        backgroundColor: theme.colors.surface,
+        borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+    },
+    backBtn: { padding: 4 },
+    title: { fontSize: 18, fontWeight: "700", color: theme.colors.foreground },
+    body: { flex: 1 },
+    card: {
+        backgroundColor: theme.colors.surface, margin: 16, marginBottom: 0,
+        borderRadius: 12, padding: 16,
+        borderWidth: 1, borderColor: theme.colors.border,
+    },
+    sectionTitle: { fontSize: 15, fontWeight: "700", color: theme.colors.foreground, marginBottom: 14 },
+    label: { fontSize: 13, fontWeight: "600", color: theme.colors.mutedForeground, marginBottom: 6, marginTop: 12 },
+    required: { color: theme.colors.error },
+    input: {
+        borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8,
+        paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
+        color: theme.colors.foreground, backgroundColor: theme.colors.background,
+    },
+    rowInputs: { flexDirection: "row", gap: 12 },
+    inputWithBtn: { flexDirection: "row", gap: 6, alignItems: "center" },
+    genBtn: {
+        flexDirection: "row", alignItems: "center", gap: 4,
+        borderWidth: 1, borderColor: theme.colors.primary, borderRadius: 8,
+        paddingHorizontal: 10, paddingVertical: 10,
+    },
+    genBtnText: { fontSize: 12, color: theme.colors.primary, fontWeight: "600" },
+    picker: {
+        flexDirection: "row", alignItems: "center", gap: 8,
+        borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8,
+        paddingHorizontal: 12, paddingVertical: 11, backgroundColor: theme.colors.background,
+    },
+    pickerText: { flex: 1, fontSize: 14, color: theme.colors.foreground },
+    pickerPlaceholder: { color: theme.colors.mutedForeground },
+    switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+    footer: {
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        padding: 16, backgroundColor: theme.colors.surface,
+        borderTopWidth: 1, borderTopColor: theme.colors.border,
+    },
+    submitBtn: {
+        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+        backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 16,
+    },
+    submitBtnDisabled: { opacity: 0.6 },
+    submitBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+    modalBox: {
+        backgroundColor: theme.colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+        padding: 20, maxHeight: "75%",
+    },
+    modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+    modalTitle: { fontSize: 17, fontWeight: "700", color: theme.colors.foreground },
+    modalSearch: {
+        borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10,
+        padding: 12, fontSize: 14, color: theme.colors.foreground, marginBottom: 10,
+    },
+    modalItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+    modalItemSelected: { backgroundColor: `${theme.colors.primary}10` },
+    modalItemName: { fontSize: 14, fontWeight: "600", color: theme.colors.foreground },
+});
+
+export default ProductFormScreen;

@@ -46,7 +46,8 @@ public class StaffServiceImpl implements StaffService {
         }
 
         Staff staff = Staff.builder()
-                .staffCode(request.getStaffCode())
+                // staffCode = null → trigger SQL sẽ tự sinh NV-XXXXX
+                .staffCode(null)
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .email(request.getEmail())
@@ -70,7 +71,12 @@ public class StaffServiceImpl implements StaffService {
     @Override
     public StaffResponseDTO updateStaff(Long id, StaffRequestDTO request) {
         Staff staff = getStaffById(id);
-        staff.setStaffCode(request.getStaffCode());
+
+        // Check username trùng với nhân viên khác (không tính chính mình)
+        if (staffRepository.existsByUsernameAndIdNot(request.getUsername() != null ? request.getUsername() : staff.getUsername(), id)) {
+            throw new RuntimeException("Tên đăng nhập đã được dùng bởi nhân viên khác.");
+        }
+
         staff.setFullName(request.getFullName());
         staff.setPhone(request.getPhone());
         staff.setEmail(request.getEmail());
@@ -78,7 +84,7 @@ public class StaffServiceImpl implements StaffService {
         staff.setAddress(request.getAddress());
         staff.setHireDate(request.getHireDate());
         staff.setRole(request.getRole());
-        
+
         if (request.getIsActive() != null) {
             staff.setIsActive(request.getIsActive());
         }

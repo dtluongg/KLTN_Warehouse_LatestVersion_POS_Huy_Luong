@@ -16,6 +16,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
 	java.util.Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
+	boolean existsBySkuAndDeletedAtIsNull(String sku);
+	boolean existsBySkuAndIdNotAndDeletedAtIsNull(String sku, Long id);
+	boolean existsByBarcodeAndDeletedAtIsNull(String barcode);
+	boolean existsByBarcodeAndIdNotAndDeletedAtIsNull(String barcode, Long id);
+
 	interface ProductStockByWarehouseProjection {
 		Long getId();
 		String getSku();

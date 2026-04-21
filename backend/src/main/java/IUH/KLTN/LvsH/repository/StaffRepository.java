@@ -13,6 +13,6 @@ public interface StaffRepository extends JpaRepository<Staff, Long>, JpaSpecific
     Optional<Staff> findByUsername(String username);
     Optional<Staff> findByUsernameAndDeletedAtIsNull(String username);
     List<Staff> findByDeletedAtIsNull();
-
     Optional<Staff> findByIdAndDeletedAtIsNull(Long id);
+    boolean existsByUsernameAndIdNot(String username, Long id);
 }

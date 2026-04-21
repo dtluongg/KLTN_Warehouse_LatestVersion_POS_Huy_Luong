@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 public class CustomerRequestDTO {
-    @NotBlank(message = "Vui lòng nhập mã khách hàng")
+    // Để trống → trigger SQL tự sinh theo format KH-XXXXX
     private String customerCode;
 
     @NotBlank(message = "Vui lòng nhập tên khách hàng")

@@ -38,7 +38,8 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     public SupplierResponseDTO createSupplier(SupplierRequestDTO request) {
         Supplier supplier = Supplier.builder()
-                .supplierCode(request.getSupplierCode())
+                // supplierCode = null → trigger SQL sẽ tự sinh NCC-XXXXX
+                .supplierCode(null)
                 .name(request.getName())
                 .phone(request.getPhone())
                 .taxCode(request.getTaxCode())

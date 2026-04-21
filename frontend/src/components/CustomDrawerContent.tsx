@@ -1,19 +1,16 @@
 import React from "react";
 import {
     View,
-    Text,
     StyleSheet,
     TouchableOpacity,
-    ScrollView,
-    Image,
 } from "react-native";
 import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { useAuthStore } from "../store/authStore";
-import { theme } from "../utils/theme";
+import { useTheme } from "../hooks/useTheme";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { isRouteAllowedByRole } from "../utils/roleAccess";
+import { Typography } from "./ui/Typography";
 
-// Type item trong menu
 type MenuItem = {
     label: string;
     icon: string;
@@ -22,7 +19,6 @@ type MenuItem = {
 };
 type MenuSection = { section: string | null; items: MenuItem[] };
 
-// Các nhóm Menu theo nghiệp vụ
 const MENU_SECTIONS: MenuSection[] = [
     {
         section: null,
@@ -31,12 +27,7 @@ const MENU_SECTIONS: MenuSection[] = [
     {
         section: "BÁN HÀNG",
         items: [
-            {
-                label: "Bán hàng POS",
-                icon: "shopping-bag",
-                route: "Pos",
-                isHighlight: true,
-            },
+            { label: "Bán hàng POS", icon: "shopping-bag", route: "Pos", isHighlight: true },
             { label: "Đơn hàng", icon: "shopping-cart", route: "Orders" },
             { label: "Khách hàng", icon: "users", route: "Customers" },
         ],
@@ -44,49 +35,24 @@ const MENU_SECTIONS: MenuSection[] = [
     {
         section: "MUA HÀNG & NHẬP KHO",
         items: [
-            {
-                label: "Đặt hàng NCC",
-                icon: "clipboard",
-                route: "PurchaseOrders",
-            },
-            {
-                label: "Nhập hàng (GR)",
-                icon: "file-text",
-                route: "GoodsReceipt",
-                isHighlight: true,
-            },
+            { label: "Đặt hàng NCC", icon: "clipboard", route: "PurchaseOrders" },
+            { label: "Nhập hàng (GR)", icon: "file-text", route: "GoodsReceipt", isHighlight: true },
             { label: "Nhà cung cấp", icon: "truck", route: "Suppliers" },
         ],
     },
     {
         section: "TRẢ HÀNG",
         items: [
-            {
-                label: "Trả hàng KH",
-                icon: "corner-down-left",
-                route: "CustomerReturns",
-            },
-            {
-                label: "Trả hàng NCC",
-                icon: "corner-up-right",
-                route: "SupplierReturns",
-            },
+            { label: "Trả hàng KH", icon: "corner-down-left", route: "CustomerReturns" },
+            { label: "Trả hàng NCC", icon: "corner-up-right", route: "SupplierReturns" },
         ],
     },
     {
         section: "TỒN KHO VÀ KIỂM KHO",
         items: [
             { label: "Tồn kho", icon: "box", route: "InventoryStock" },
-            {
-                label: "Kiểm kho / Điều chỉnh",
-                icon: "sliders",
-                route: "StockAdjustments",
-            },
-            {
-                label: "Lịch sử nhập xuất kho",
-                icon: "activity",
-                route: "InventoryMovements",
-            },
+            { label: "Kiểm kho / Điều chỉnh", icon: "sliders", route: "StockAdjustments" },
+            { label: "Lịch sử nhập xuất kho", icon: "activity", route: "InventoryMovements" },
         ],
     },
     {
@@ -102,141 +68,125 @@ const MENU_SECTIONS: MenuSection[] = [
     {
         section: "AI & HỖ TRỢ",
         items: [
-            {
-                label: "AI Chat SQL",
-                icon: "message-circle",
-                route: "AiSqlChat",
-            },
+            { label: "AI Chat SQL", icon: "message-circle", route: "AiSqlChat" },
         ],
     },
 ];
 
 export const CustomDrawerContent = (props: any) => {
     const { username, role, logout } = useAuthStore();
+    const { colors, metrics, mode } = useTheme();
 
-    // Trạng thái màn hình hiện tại để tô màu Active chữ xanh
     const currentRouteName = props.state.routeNames[props.state.index];
+    const isDark = mode === 'dark';
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.surface }]}>
             {/* Header (Logo + Brand) */}
-            <View style={styles.header}>
-                <View style={styles.logoBox}>
+            <View style={[styles.header, { backgroundColor: colors.primary }]}>
+                <View style={[styles.logoBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <MaterialCommunityIcons
                         name="leaf"
                         size={24}
-                        color={theme.colors.primary}
+                        color={colors.buttonText}
                     />
                 </View>
-                <Text style={styles.headerTitle}>Sáu Hiệp</Text>
+                <Typography variant="heading2" color={colors.buttonText}>Sáu Hiệp</Typography>
             </View>
 
             <DrawerContentScrollView
                 {...props}
                 contentContainerStyle={{ paddingTop: 0 }}
             >
-                {/* User Card - compact ngang */}
-                <View style={styles.userCard}>
-                    <View style={styles.avatarCircle}>
-                        <Text style={styles.avatarText}>
+                {/* User Card */}
+                <View style={[
+                    styles.userCard, 
+                    { 
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                        borderBottomColor: colors.border 
+                    }
+                ]}>
+                    <View style={[
+                        styles.avatarCircle, 
+                        { backgroundColor: 'rgba(0,113,227,0.1)', borderColor: colors.primary }
+                    ]}>
+                        <Typography variant="captionBold" color={colors.primary}>
                             {username ? username.charAt(0).toUpperCase() : "?"}
-                        </Text>
+                        </Typography>
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.userName} numberOfLines={1}>
+                        <Typography variant="bodyEmphasized" color={colors.textPrimary} numberOfLines={1}>
                             {username || "Nhân viên"}
-                        </Text>
-                        <View style={styles.roleBadge}>
-                            <Text style={styles.roleText}>
+                        </Typography>
+                        <View style={[styles.roleBadge, { backgroundColor: 'rgba(0,113,227,0.1)', borderColor: colors.primary }]}>
+                            <Typography variant="micro" color={colors.primary}>
                                 {role === "ADMIN"
                                     ? "Quản trị viên"
                                     : role === "SALES_STAFF"
                                       ? "Bán hàng"
                                       : "Kho"}
-                            </Text>
+                            </Typography>
                         </View>
                     </View>
                 </View>
 
                 {/* Menu Groups */}
-                <View style={styles.menuContainer}>
+                <View style={[styles.menuContainer, { padding: metrics.spacing.md }]}>
                     {MENU_SECTIONS.map((group, groupIndex) => (
                         <View key={groupIndex}>
                             {/* Section Header */}
                             {group.section && (
-                                <Text style={styles.sectionHeader}>
+                                <Typography 
+                                    variant="micro" 
+                                    color={colors.textDisabled} 
+                                    style={styles.sectionHeader}
+                                >
                                     {group.section}
-                                </Text>
+                                </Typography>
                             )}
                             {/* Section Items */}
                             {group.items.map((item, itemIndex) => {
-                                const isActive =
-                                    currentRouteName === item.route;
-                                const isAllowed = isRouteAllowedByRole(
-                                    role,
-                                    item.route,
-                                );
+                                const isActive = currentRouteName === item.route;
+                                const isAllowed = isRouteAllowedByRole(role, item.route);
                                 const itemColor = isActive
-                                    ? theme.colors.primary
-                                    : theme.colors.mutedForeground;
+                                    ? colors.primary
+                                    : colors.textSecondary;
+
                                 return (
                                     <TouchableOpacity
                                         key={itemIndex}
                                         disabled={!isAllowed}
                                         style={[
                                             styles.menuItem,
-                                            isActive && styles.menuItemActive,
-                                            item.isHighlight &&
-                                                !isActive &&
-                                                styles.menuItemHighlight,
-                                            !isAllowed &&
-                                                styles.menuItemDisabled,
+                                            { borderRadius: metrics.borderRadius.medium },
+                                            isActive && { backgroundColor: 'rgba(0,113,227,0.1)' },
+                                            item.isHighlight && !isActive && { 
+                                                borderWidth: 1, 
+                                                borderColor: 'rgba(0,113,227,0.2)' 
+                                            },
+                                            !isAllowed && { opacity: 0.45 },
                                         ]}
                                         onPress={() => {
-                                            if (!isAllowed) {
-                                                return;
-                                            }
-                                            props.navigation.navigate(
-                                                item.route,
-                                            );
+                                            if (!isAllowed) return;
+                                            props.navigation.navigate(item.route);
                                         }}
                                     >
                                         <Feather
                                             name={item.icon as any}
                                             size={18}
-                                            color={
-                                                !isAllowed
-                                                    ? theme.colors.mutedForeground
-                                                    : item.isHighlight &&
-                                                        !isActive
-                                                    ? theme.colors.primary
-                                                    : itemColor
-                                            }
+                                            color={!isAllowed ? colors.textDisabled : itemColor}
                                         />
-                                        <Text
-                                            style={[
-                                                styles.menuLabel,
-                                                isActive &&
-                                                    styles.menuLabelActive,
-                                                item.isHighlight &&
-                                                    !isActive && {
-                                                        color: theme.colors
-                                                            .primary,
-                                                        fontWeight: "600",
-                                                    },
-                                                !isAllowed &&
-                                                    styles.menuLabelDisabled,
-                                            ]}
+                                        <Typography
+                                            variant={isActive ? "bodyEmphasized" : "body"}
+                                            style={[styles.menuLabel, { color: !isAllowed ? colors.textDisabled : itemColor }]}
                                         >
                                             {item.label}
-                                        </Text>
+                                        </Typography>
                                         {!isAllowed && (
                                             <Feather
                                                 name="lock"
                                                 size={14}
-                                                color={
-                                                    theme.colors.mutedForeground
-                                                }
+                                                color={colors.textDisabled}
                                                 style={styles.lockIcon}
                                             />
                                         )}
@@ -249,14 +199,16 @@ export const CustomDrawerContent = (props: any) => {
             </DrawerContentScrollView>
 
             {/* Footer Drawer */}
-            <View style={styles.footer}>
+            <View style={[styles.footer, { padding: metrics.spacing.lg, borderTopColor: colors.border }]}>
                 <TouchableOpacity style={styles.logoutButton} onPress={logout}>
                     <Feather
                         name="log-out"
                         size={20}
-                        color={theme.colors.error}
+                        color={colors.danger}
                     />
-                    <Text style={styles.logoutText}>Đăng xuất</Text>
+                    <Typography variant="bodyEmphasized" color={colors.danger} style={{ marginLeft: 12 }}>
+                        Đăng xuất
+                    </Typography>
                 </TouchableOpacity>
             </View>
         </View>
@@ -266,131 +218,68 @@ export const CustomDrawerContent = (props: any) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.surface,
     },
     header: {
         height: 64,
-        backgroundColor: theme.colors.primary,
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: theme.spacing.lg,
+        paddingHorizontal: 16,
     },
     logoBox: {
-        backgroundColor: theme.colors.primaryLight,
         padding: 6,
-        borderRadius: theme.borderRadius.sm,
+        borderRadius: 8,
         marginRight: 10,
-    },
-    headerTitle: {
-        ...theme.typography.h3,
-        color: theme.colors.primaryForeground,
     },
     userCard: {
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
-        paddingVertical: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.md,
-        backgroundColor: "#f8fafc",
+        paddingVertical: 12,
+        paddingHorizontal: 16,
         borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
     },
     avatarCircle: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: theme.colors.primaryLight,
         borderWidth: 1.5,
-        borderColor: theme.colors.primary,
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
     },
-    avatarText: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: theme.colors.primary,
-    },
-    userName: {
-        fontSize: 13,
-        fontWeight: "700",
-        color: theme.colors.foreground,
-        marginBottom: 2,
-    },
     roleBadge: {
-        backgroundColor: theme.colors.primaryLight,
         paddingHorizontal: 6,
         paddingVertical: 1,
-        borderRadius: theme.borderRadius.full,
+        borderRadius: 999,
         borderWidth: 1,
-        borderColor: "#a7f3d0",
         alignSelf: "flex-start",
+        marginTop: 4,
     },
-    roleText: {
-        fontSize: 9,
-        fontWeight: "600",
-        color: theme.colors.primary,
-    },
-    menuContainer: {
-        padding: theme.spacing.md,
-    },
+    menuContainer: {},
     menuItem: {
         flexDirection: "row",
         alignItems: "center",
         paddingVertical: 12,
         paddingHorizontal: 16,
-        borderRadius: theme.borderRadius.md,
         marginBottom: 4,
     },
-    menuItemActive: {
-        backgroundColor: theme.colors.primaryLight,
-    },
-    menuItemHighlight: {
-        borderWidth: 1,
-        borderColor: theme.colors.primaryLight,
-    },
-    menuItemDisabled: {
-        opacity: 0.45,
-    },
     menuLabel: {
-        fontSize: 14,
-        fontWeight: "500",
-        color: theme.colors.mutedForeground,
         marginLeft: 12,
-    },
-    menuLabelDisabled: {
-        color: theme.colors.mutedForeground,
     },
     lockIcon: {
         marginLeft: "auto",
     },
-    menuLabelActive: {
-        color: theme.colors.primary,
-        fontWeight: "700",
-    },
     sectionHeader: {
-        fontSize: 10,
-        fontWeight: "700",
-        color: theme.colors.mutedForeground,
         letterSpacing: 0.8,
         paddingHorizontal: 16,
         paddingTop: 16,
-        paddingBottom: 4,
-        opacity: 0.6,
+        paddingBottom: 8,
     },
     footer: {
-        padding: theme.spacing.lg,
         borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
     },
     logoutButton: {
         flexDirection: "row",
         alignItems: "center",
-    },
-    logoutText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: theme.colors.error,
-        marginLeft: 12,
     },
 });

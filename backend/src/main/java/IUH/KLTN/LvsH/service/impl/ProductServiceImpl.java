@@ -51,6 +51,16 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductResponseDTO createProduct(ProductRequestDTO request) {
+        // Chống trùng SKU
+        if (productRepository.existsBySkuAndDeletedAtIsNull(request.getSku())) {
+            throw new RuntimeException("Mã SKU '" + request.getSku() + "' đã tồn tại.");
+        }
+        // Chống trùng Barcode (chỉ check khi có giá trị)
+        if (request.getBarcode() != null && !request.getBarcode().isBlank()
+                && productRepository.existsByBarcodeAndDeletedAtIsNull(request.getBarcode())) {
+            throw new RuntimeException("Mã barcode '" + request.getBarcode() + "' đã tồn tại.");
+        }
+
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
 
@@ -71,7 +81,17 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductResponseDTO updateProduct(Long id, ProductRequestDTO request) {
         Product product = getProductById(id);
-        
+
+        // Chống trùng SKU với sản phẩm khác
+        if (productRepository.existsBySkuAndIdNotAndDeletedAtIsNull(request.getSku(), id)) {
+            throw new RuntimeException("Mã SKU '" + request.getSku() + "' đã được dùng bởi sản phẩm khác.");
+        }
+        // Chống trùng Barcode với sản phẩm khác
+        if (request.getBarcode() != null && !request.getBarcode().isBlank()
+                && productRepository.existsByBarcodeAndIdNotAndDeletedAtIsNull(request.getBarcode(), id)) {
+            throw new RuntimeException("Mã barcode '" + request.getBarcode() + "' đã được dùng bởi sản phẩm khác.");
+        }
+
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
 
@@ -83,7 +103,7 @@ public class ProductServiceImpl implements ProductService {
         product.setSalePrice(request.getSalePrice());
         product.setVatRate(request.getVatRate());
         product.setImageUrl(request.getImageUrl());
-        
+
         if (request.getIsActive() != null) {
             product.setIsActive(request.getIsActive());
         }

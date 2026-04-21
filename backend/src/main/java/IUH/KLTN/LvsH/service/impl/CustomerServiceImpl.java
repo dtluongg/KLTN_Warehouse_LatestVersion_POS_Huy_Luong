@@ -38,7 +38,8 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public CustomerResponseDTO createCustomer(CustomerRequestDTO request) {
         Customer customer = Customer.builder()
-                .customerCode(request.getCustomerCode())
+                // customerCode = null → trigger SQL sẽ tự sinh KH-XXXXX
+                .customerCode(null)
                 .name(request.getName())
                 .phone(request.getPhone())
                 .email(request.getEmail())
