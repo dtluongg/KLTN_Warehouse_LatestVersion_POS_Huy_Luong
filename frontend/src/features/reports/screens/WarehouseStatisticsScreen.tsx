@@ -419,7 +419,7 @@ const WarehouseStatisticsScreen = () => {
                         <Typography variant="heading2" color={colors.textPrimary}>{summary.warningCoverage}</Typography>
                     </Card>
                     <Card style={styles.metricCard} elevated>
-                        <Typography variant="caption" color={colors.textSecondary}>Giá trị hàng chết</Typography>
+                        <Typography variant="caption" color={colors.textSecondary}>Giá trị hàng không bán được</Typography>
                         <Typography variant="heading2" color={colors.textPrimary}>{formatCurrency(summary.deadStockValue)} đ</Typography>
                     </Card>
                 </View>
