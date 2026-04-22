@@ -91,6 +91,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderTime(o.getOrderTime())
                 .status(o.getStatus().name())
                 .paymentMethod(o.getPaymentMethod().name())
+                .payosOrderCode(o.getPayosOrderCode())
                 .note(o.getNote())
                 .grossAmount(o.getGrossAmount())
                 .discountAmount(o.getDiscountAmount())
@@ -103,6 +104,46 @@ public class OrderServiceImpl implements OrderService {
                 .items(itemDTOs)
                 .build();
     }
+    
+        @Override
+        @Transactional
+        public OrderDetailResponseDTO changePaymentMethod(Long orderId, PaymentMethod paymentMethod) {
+            Order order = getOrderEntityById(orderId);
+            if (order.getStatus() != DocumentStatus.DRAFT) {
+                throw new RuntimeException("Chỉ được đổi phương thức thanh toán khi đơn hàng đang ở trạng thái DRAFT");
+            }
+            order.setPaymentMethod(paymentMethod);
+            // Nếu đổi sang tiền mặt thì chuyển sang POSTED
+            if (paymentMethod == PaymentMethod.CASH) {
+                order.setStatus(DocumentStatus.POSTED);
+            }
+            orderRepository.save(order);
+            return getOrderDetailById(orderId);
+        }
+    
+        @Override
+        @Transactional
+        public OrderDetailResponseDTO cancelOrder(Long orderId) {
+            Order order = getOrderEntityById(orderId);
+            if (order.getStatus() != DocumentStatus.DRAFT) {
+                throw new RuntimeException("Chỉ được huỷ đơn hàng khi đang ở trạng thái DRAFT");
+            }
+            order.setStatus(DocumentStatus.CANCELLED);
+            orderRepository.save(order);
+            return getOrderDetailById(orderId);
+        }
+    
+        @Override
+        @Transactional
+        public Object reopenQr(Long orderId) {
+            Order order = getOrderEntityById(orderId);
+            if (order.getStatus() != DocumentStatus.DRAFT) {
+                throw new RuntimeException("Chỉ mở lại QR cho đơn hàng DRAFT");
+            }
+            // Nếu đã có payosOrderCode thì trả về QR cũ, chưa có thì tạo mới
+            // Giả định PaymentService được inject vào đây (hoặc gọi qua controller)
+            throw new UnsupportedOperationException("Cần inject PaymentService để tạo lại QR hoặc trả về QR cũ. Hãy xử lý ở PaymentController hoặc inject vào đây nếu cần.");
+        }
 
     @Override
     @Transactional
@@ -118,6 +159,9 @@ public class OrderServiceImpl implements OrderService {
         PaymentMethod pMethod = PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase());
         if (pMethod == PaymentMethod.DEBT && customer == null) {
             throw new RuntimeException("Customer is required for DEBT payment");
+        }
+        else if (pMethod == PaymentMethod.TRANSFER) {
+            
         }
 
         Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
@@ -162,19 +206,24 @@ public class OrderServiceImpl implements OrderService {
         }
 
         BigDecimal couponDiscountAmount = couponCalculation != null ? couponCalculation.discountAmount : BigDecimal.ZERO;
+        BigDecimal discountAmount = req.getDiscountAmount() != null ? req.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal surchargeAmount = req.getSurchargeAmount() != null ? req.getSurchargeAmount() : BigDecimal.ZERO;
 
+        DocumentStatus orderStatus = (pMethod == PaymentMethod.TRANSFER) ? DocumentStatus.DRAFT : DocumentStatus.POSTED;
         Order order = Order.builder()
-                .salesChannel(SalesChannel.valueOf(req.getSalesChannel().toUpperCase()))
-                .customer(customer)
-                .warehouse(warehouse)
-                .orderTime(LocalDateTime.now())
-                .status(DocumentStatus.POSTED)
-                .couponCode(couponCalculation != null ? couponCalculation.coupon.getCode() : null)
-                .couponDiscountAmount(couponDiscountAmount)
-                .paymentMethod(pMethod)
-                .note(req.getNote())
-                .createdBy(staff)
-                .build();
+            .salesChannel(SalesChannel.valueOf(req.getSalesChannel().toUpperCase()))
+            .customer(customer)
+            .warehouse(warehouse)
+            .orderTime(LocalDateTime.now())
+            .status(orderStatus)
+            .couponCode(couponCalculation != null ? couponCalculation.coupon.getCode() : null)
+            .couponDiscountAmount(couponDiscountAmount)
+            .discountAmount(discountAmount)
+            .surchargeAmount(surchargeAmount)
+            .paymentMethod(pMethod)
+            .note(req.getNote())
+            .createdBy(staff)
+            .build();
 
         for (OrderItem orderItem : orderItems) {
             orderItem.setOrder(order);
@@ -183,9 +232,9 @@ public class OrderServiceImpl implements OrderService {
         order.setGrossAmount(grossAmount);
         
         BigDecimal netAmount = grossAmount
-                .subtract(order.getDiscountAmount())
-                .subtract(order.getCouponDiscountAmount())
-                .add(order.getSurchargeAmount());
+                .subtract(discountAmount)
+                .subtract(couponDiscountAmount)
+                .add(surchargeAmount);
 
         order.setNetAmount(netAmount.max(BigDecimal.ZERO));
 

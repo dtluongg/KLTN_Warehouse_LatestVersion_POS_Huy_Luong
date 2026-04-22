@@ -6,6 +6,7 @@ import { useAuthStore } from "../../../store/authStore";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../../../hooks/useTheme";
 import { axiosClient } from "../../../api/axiosClient";
+import { paymentApi } from "../../../api/paymentApi";
 import { Typography } from "../../../components/ui/Typography";
 
 const OrderDetailView = ({ id }: { id: number }) => {
@@ -126,10 +127,58 @@ const OrderListScreen = () => {
                     showOnDesktop: true,
                     showOnMobile: true,
                 },
+                // Action cho đơn DRAFT, QR
                 {
-                    label: "Duyệt",
-                    onPress: (row) => Alert.alert("Duyệt", `Duyệt ${row?.orderNo || "đơn"}.`),
-                    shouldShow: (row) => role === "ADMIN" && ["DRAFT", "PENDING"].includes(String(row?.status || "")),
+                    label: "Mở lại QR",
+                    tone: "primary",
+                    onPress: async (row) => {
+                        try {
+                            await paymentApi.reopenQr(row.id);
+                            Alert.alert("Thành công", "Đã mở lại/mở mới QR cho đơn hàng.");
+                        } catch (e) {
+                            Alert.alert("Lỗi", "Không thể mở lại QR: " + (e?.message || e));
+                        }
+                    },
+                    shouldShow: (row) => row.status === "DRAFT" && row.paymentMethod === "TRANSFER",
+                },
+                {
+                    label: "Đổi sang tiền mặt",
+                    tone: "primary",
+                    onPress: async (row) => {
+                        try {
+                            await paymentApi.changePaymentMethod(row.id, "CASH");
+                            Alert.alert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
+                        } catch (e) {
+                            Alert.alert("Lỗi", "Không thể đổi phương thức: " + (e?.message || e));
+                        }
+                    },
+                    shouldShow: (row) => row.status === "DRAFT" && row.paymentMethod === "TRANSFER",
+                },
+                {
+                    label: "Hủy đơn",
+                    tone: "danger",
+                    onPress: async (row) => {
+                        Alert.alert(
+                            "Xác nhận",
+                            "Bạn có chắc muốn hủy đơn này?",
+                            [
+                                { text: "Không", style: "cancel" },
+                                {
+                                    text: "Hủy đơn",
+                                    style: "destructive",
+                                    onPress: async () => {
+                                        try {
+                                            await paymentApi.cancelOrder(row.id);
+                                            Alert.alert("Thành công", "Đơn hàng đã được hủy.");
+                                        } catch (e) {
+                                            Alert.alert("Lỗi", "Không thể hủy đơn: " + (e?.message || e));
+                                        }
+                                    },
+                                },
+                            ]
+                        );
+                    },
+                    shouldShow: (row) => row.status === "DRAFT",
                 },
             ]}
             renderFilters={(setFilters, currentFilters) => {

@@ -27,6 +27,10 @@ public class OrderRequestDTO {
     
     private String couponCode;
 
+    private BigDecimal discountAmount;
+
+    private BigDecimal surchargeAmount;
+
     @NotEmpty(message = "Đơn hàng phải có ít nhất 1 sản phẩm")
     @Valid
     private List<OrderItemRequestDTO> items;

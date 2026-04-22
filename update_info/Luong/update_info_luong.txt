@@ -1,1 +1,40 @@
 port: 9999
+
+reset database supabase:
+DO $$ 
+DECLARE 
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT proname, oid FROM pg_proc WHERE pronamespace = 'public'::regnamespace) LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS public.' || quote_ident(r.proname) || ' CASCADE';
+    END LOOP;
+END $$;
+
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+
+DROP TABLE IF EXISTS flyway_schema_history CASCADE;
+
+
+Tôi thấy khi tạo đơn với hình thức thanh toán QR, dù ẩn QR đi thì đơn hàng đã mặc định POSTED điều này sai với logic mà tôi và bạn đã thảo luận:
+
+Nếu là thanh toán qua QR, khi đơn hàng chưa xử lý xong, đang chờ thanh toán thì đơn hàng luôn trong trạng thái DRAFT, chỉ khi check thanh toán thành công bởi payos thì mới POSTED, nếu ko thanh toán thành công thì mới là CANCELLED.
+
+Nếu như đang bán cho khách 1, khách 1 chọn phương thức thanh toán QR, thì hiện QR với đơn hàng của khách 1, nếu như khách ko đủ tiền trong tk hoặc khách đổi ý chuyển sang thanh toán tiền mặt thì sẽ có thao tác đổi lại hình thức thanh toán. Và trong khi chờ khách 1 thanh toán, sẽ có khách 2 vào mua, sẽ có nút ẩn thanh toán đơn hiện tại và tiếp tục giao dịch cho khách 2, khi khách 2 cũng muốn chuyển khoản ngân hàng và khách 2 chuyển xong thì khách 1 sẽ chuyển lại, nhân viên cần vô danh sách đơn hàng và chọn và mở QR đang chờ cho khách 1 thanh toán tiếp. Nếu tài khoản ngân hàng của khách bị lỗi, thì nhân viên sẽ đổi hình thức thanh toán tiền mặt cho khách hàng, nếu khách hàng không trả hoặc đơn hàng vẫn ở QR và hết thời gian chờ thì đơn hàng sẽ CANCELLED. 
+
+
+
+Frontend → Tạo order (POST /api/orders) với discountAmount, surchargeAmount
+Backend → Tính netAmount = gross - discount - couponDiscount + surcharge (cứng ở server)
+Frontend → Tạo QR (POST /api/payments/create-qr/{orderId})
+Backend → Gọi PayOS API, lưu payosOrderCode
+Frontend → Hiển thị QR + netAmount + mã đơn
+Khách → Quét QR và thanh toán
+PayOS → Gửi webhook verify callback
+Backend → Xác minh chữ ký + verify số tiền, update status = POSTED
+Frontend → Hiển thị "Thanh toán thành công"
+
+
+

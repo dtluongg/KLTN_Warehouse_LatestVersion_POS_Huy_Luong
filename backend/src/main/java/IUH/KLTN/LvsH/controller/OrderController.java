@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -37,10 +38,30 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getAllOrders(criteria, pageable));
     }
 
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
     public ResponseEntity<OrderDetailResponseDTO> getOrderById(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getOrderDetailById(id));
+    }
+
+    @PostMapping("/{id}/change-payment-method")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
+    public ResponseEntity<OrderDetailResponseDTO> changePaymentMethod(@PathVariable Long id, @RequestParam IUH.KLTN.LvsH.enums.PaymentMethod paymentMethod) {
+        return ResponseEntity.ok(orderService.changePaymentMethod(id, paymentMethod));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
+    public ResponseEntity<OrderDetailResponseDTO> cancelOrder(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.cancelOrder(id));
+    }
+
+    @PostMapping("/{id}/reopen-qr")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
+    public ResponseEntity<?> reopenQr(@PathVariable Long id) {
+        // Gọi PaymentService để tạo lại QR nếu cần
+        return ResponseEntity.ok(orderService.reopenQr(id));
     }
 
     @PostMapping
@@ -49,11 +70,19 @@ public class OrderController {
         return ResponseEntity.ok(orderService.createOrder(request));
     }
 
-    @GetMapping("/preview-coupon")
+    @GetMapping("/{id}/payment-status")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
-    public ResponseEntity<CouponPreviewResponseDTO> previewCoupon(
-            @RequestParam String code,
-            @RequestParam BigDecimal grossAmount) {
-        return ResponseEntity.ok(orderService.previewCoupon(code, grossAmount));
+    public ResponseEntity<Map<String, Object>> getOrderPaymentStatus(@PathVariable Long id) {
+        try {
+            OrderDetailResponseDTO order = orderService.getOrderDetailById(id);
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "orderStatus", order.getStatus(),
+                    "netAmount", order.getNetAmount()
+                ));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
+

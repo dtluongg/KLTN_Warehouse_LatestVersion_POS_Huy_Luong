@@ -69,6 +69,10 @@ public class Order {
     @Column(name = "payment_method", nullable = false)
     private PaymentMethod paymentMethod;
 
+
+    @Column(name = "payos_order_code", unique = true)
+    private String payosOrderCode;
+
     private String note;
 
     @ManyToOne(fetch = FetchType.LAZY)

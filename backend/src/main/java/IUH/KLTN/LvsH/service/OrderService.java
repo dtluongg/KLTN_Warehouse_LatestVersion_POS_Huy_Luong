@@ -11,4 +11,8 @@ public interface OrderService {
     OrderDetailResponseDTO getOrderDetailById(Long id);
     OrderDetailResponseDTO createOrder(OrderRequestDTO request);
     CouponPreviewResponseDTO previewCoupon(String couponCode, BigDecimal grossAmount);
+
+    OrderDetailResponseDTO changePaymentMethod(Long orderId, IUH.KLTN.LvsH.enums.PaymentMethod paymentMethod);
+    OrderDetailResponseDTO cancelOrder(Long orderId);
+    Object reopenQr(Long orderId);
 }
