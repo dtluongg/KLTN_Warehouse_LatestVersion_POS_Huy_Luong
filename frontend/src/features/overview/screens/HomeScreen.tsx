@@ -33,6 +33,7 @@ const HomeScreen = () => {
         { label: "Bán hàng POS", route: "Pos", icon: "shopping-bag" as const },
         { label: "Đơn hàng", route: "Orders", icon: "file-text" as const },
         { label: "Tồn kho", route: "InventoryStock", icon: "archive" as const },
+        { label: "Thống kê kho", route: "WarehouseStatistics", icon: "bar-chart-2" as const },
         { label: "Nhập hàng", route: "GoodsReceipt", icon: "download" as const },
         { label: "AI Chat SQL", route: "AiSqlChat", icon: "message-circle" as const },
     ];
@@ -45,7 +46,7 @@ const HomeScreen = () => {
             />
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Card elevated style={[styles.heroCard, { backgroundColor: colors.primary }]}>
+                <Card elevated style={{ ...styles.heroCard, backgroundColor: colors.primary }}>
                     <View style={styles.heroLeft}>
                         <Typography variant="heading2" color={colors.buttonText}>
                             Xin chào, {username || "Nhân viên"}

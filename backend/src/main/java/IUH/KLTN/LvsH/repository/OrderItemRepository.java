@@ -75,4 +75,64 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 			@Param("fromTime") LocalDateTime fromTime,
 			@Param("toTime") LocalDateTime toTime,
 			@Param("topN") Integer topN);
+
+	@Query(value = """
+			SELECT COALESCE(SUM(oi.qty), 0)
+			FROM order_items oi
+			JOIN orders o ON o.id = oi.order_id
+			WHERE o.status = 'POSTED'
+			  AND oi.product_id = :productId
+			  AND o.warehouse_id = :warehouseId
+			  AND o.order_time >= :fromTime
+			  AND o.order_time < :toTime
+			""", nativeQuery = true)
+	long sumQtyOrderedInPeriod(
+			@Param("warehouseId") Long warehouseId,
+			@Param("productId") Long productId,
+			@Param("fromTime") LocalDateTime fromTime,
+			@Param("toTime") LocalDateTime toTime);
+
+	@Query(value = """
+			SELECT MAX(o.order_time)
+			FROM order_items oi
+			JOIN orders o ON o.id = oi.order_id
+			WHERE o.status = 'POSTED'
+			  AND oi.product_id = :productId
+			  AND o.warehouse_id = :warehouseId
+			""", nativeQuery = true)
+	LocalDateTime getLastOrderItemMovementTime(
+			@Param("warehouseId") Long warehouseId,
+			@Param("productId") Long productId);
+
+	@Query(value = """
+			SELECT COALESCE(SUM(oi.line_revenue), 0)
+			FROM order_items oi
+			JOIN orders o ON o.id = oi.order_id
+			WHERE o.status = 'POSTED'
+			  AND oi.product_id = :productId
+			  AND o.warehouse_id = :warehouseId
+			  AND o.order_time >= :fromTime
+			  AND o.order_time < :toTime
+			""", nativeQuery = true)
+	BigDecimal sumLineRevenueInPeriod(
+			@Param("warehouseId") Long warehouseId,
+			@Param("productId") Long productId,
+			@Param("fromTime") LocalDateTime fromTime,
+			@Param("toTime") LocalDateTime toTime);
+
+	@Query(value = """
+			SELECT COALESCE(SUM(oi.line_cogs), 0)
+			FROM order_items oi
+			JOIN orders o ON o.id = oi.order_id
+			WHERE o.status = 'POSTED'
+			  AND oi.product_id = :productId
+			  AND o.warehouse_id = :warehouseId
+			  AND o.order_time >= :fromTime
+			  AND o.order_time < :toTime
+			""", nativeQuery = true)
+	BigDecimal sumLineCOGSInPeriod(
+			@Param("warehouseId") Long warehouseId,
+			@Param("productId") Long productId,
+			@Param("fromTime") LocalDateTime fromTime,
+			@Param("toTime") LocalDateTime toTime);
 }

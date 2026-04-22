@@ -24,6 +24,7 @@ const WAREHOUSE_ALLOWED_ROUTES = new Set<string>([
     "StockAdjustments",
     "StockAdjustmentForm",
     "InventoryMovements",
+    "WarehouseStatistics",
     "AiSqlChat",
 ]);
 

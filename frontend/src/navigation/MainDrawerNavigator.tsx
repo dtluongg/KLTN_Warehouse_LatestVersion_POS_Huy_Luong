@@ -23,6 +23,7 @@ import CategoryListScreen from "../features/categories/screens/CategoryListScree
 import CouponListScreen from "../features/coupons/screens/CouponListScreen";
 import StaffListScreen from "../features/staff/screens/StaffListScreen";
 import AiSqlChatScreen from "../features/ai-sql-chat/screens/AiSqlChatScreen";
+import WarehouseStatisticsScreen from "../features/reports/screens/WarehouseStatisticsScreen";
 import { BREAKPOINTS } from "../utils/responsive";
 
 const Drawer = createDrawerNavigator();
@@ -114,6 +115,11 @@ export default function MainDrawerNavigator() {
                 name="InventoryMovements"
                 component={InventoryMovementListScreen}
                 options={{ title: "Lịch sử nhập xuất kho" }}
+            />
+            <Drawer.Screen
+                name="WarehouseStatistics"
+                component={WarehouseStatisticsScreen}
+                options={{ title: "Thống kê kho" }}
             />
 
             {/* ── CẤU HÌNH ── */}

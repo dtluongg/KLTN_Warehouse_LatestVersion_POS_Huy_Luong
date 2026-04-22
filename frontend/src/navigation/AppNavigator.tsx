@@ -37,6 +37,7 @@ import CouponFormScreen from "../features/coupons/screens/CouponFormScreen";
 import StaffFormScreen from "../features/staff/screens/StaffFormScreen";
 import CustomerFormScreen from "../features/customers/screens/CustomerFormScreen";
 import WarehouseFormScreen from "../features/warehouses/screens/WarehouseFormScreen";
+import WarehouseStatisticsScreen from "../features/reports/screens/WarehouseStatisticsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -157,6 +158,11 @@ export default function AppNavigator() {
                             name="AiSqlChat"
                             component={AiSqlChatScreen}
                             options={{ title: "AI Chat SQL" }}
+                        />
+                        <Stack.Screen
+                            name="WarehouseStatistics"
+                            component={WarehouseStatisticsScreen}
+                            options={{ title: "Thống kê kho" }}
                         />
                         <Stack.Screen
                             name="PurchaseOrderForm"

@@ -71,6 +71,11 @@ const MENU_GROUPS: MenuGroup[] = [
         section: "Tồn kho và kiểm kho",
         items: [
             {
+                label: "Thống kê kho",
+                route: "WarehouseStatistics",
+                icon: "bar-chart-2",
+            },
+            {
                 label: "Kiểm kho / điều chỉnh",
                 route: "StockAdjustments",
                 icon: "sliders",
@@ -184,7 +189,9 @@ const styles = StyleSheet.create({
         overflow: "hidden",
     },
     sectionTitle: {
-        ...theme.typography.label,
+        fontSize: 12,
+        fontWeight: "600",
+        lineHeight: 16,
         color: theme.colors.mutedForeground,
         textTransform: "uppercase",
         paddingHorizontal: 12,

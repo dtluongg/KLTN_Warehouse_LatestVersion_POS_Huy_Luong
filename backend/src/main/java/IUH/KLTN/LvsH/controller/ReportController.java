@@ -1,11 +1,6 @@
 package IUH.KLTN.LvsH.controller;
 
-import IUH.KLTN.LvsH.dto.CurrentInventoryReportDTO;
-import IUH.KLTN.LvsH.dto.DailyRevenueProfitReportDTO;
-import IUH.KLTN.LvsH.dto.LowStockAlertReportDTO;
-import IUH.KLTN.LvsH.dto.StockMovementPeriodReportDTO;
-import IUH.KLTN.LvsH.dto.StockAdjustmentSummaryReportDTO;
-import IUH.KLTN.LvsH.dto.TopSellingProductReportDTO;
+import IUH.KLTN.LvsH.dto.*;
 import IUH.KLTN.LvsH.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,6 +20,8 @@ import java.util.List;
 public class ReportController {
 
     private final ReportService reportService;
+
+    // ============ Các endpoint báo cáo cũ ============
 
     @GetMapping("/current-inventory")
     @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
@@ -75,5 +72,52 @@ public class ReportController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @RequestParam(required = false) Integer topN) {
         return ResponseEntity.ok(reportService.getTopSellingProducts(warehouseId, fromDate, toDate, topN));
+    }
+
+    // ============ Các endpoint thống kê kho mới ============
+
+    @GetMapping("/inventory-value")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<InventoryValueReportDTO>> getInventoryValue(@RequestParam Long warehouseId) {
+        return ResponseEntity.ok(reportService.getInventoryValue(warehouseId));
+    }
+
+    @GetMapping("/days-of-coverage")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<DaysOfCoverageReportDTO>> getDaysOfCoverage(
+            @RequestParam Long warehouseId,
+            @RequestParam(required = false, defaultValue = "30") Integer analysisDays) {
+        return ResponseEntity.ok(reportService.getDaysOfCoverage(warehouseId, analysisDays));
+    }
+
+    @GetMapping("/stockout-risk")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<StockoutRiskReportDTO>> getStockoutRisk(
+            @RequestParam Long warehouseId,
+            @RequestParam(required = false, defaultValue = "30") Integer analysisDays) {
+        return ResponseEntity.ok(reportService.getStockoutRisk(warehouseId, analysisDays));
+    }
+
+    @GetMapping("/slow-moving-products")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<SlowMovingProductReportDTO>> getSlowMovingProducts(
+            @RequestParam Long warehouseId,
+            @RequestParam(required = false, defaultValue = "30") Integer inactiveDays) {
+        return ResponseEntity.ok(reportService.getSlowMovingProducts(warehouseId, inactiveDays));
+    }
+
+    @GetMapping("/inventory-detail")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<CurrentInventoryWarehouseReportDTO>> getCurrentInventoryDetail(@RequestParam Long warehouseId) {
+        return ResponseEntity.ok(reportService.getCurrentInventoryDetail(warehouseId));
+    }
+
+    @GetMapping("/inventory-turnover")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<List<InventoryTurnoverReportDTO>> getInventoryTurnover(
+            @RequestParam Long warehouseId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        return ResponseEntity.ok(reportService.getInventoryTurnover(warehouseId, fromDate, toDate));
     }
 }

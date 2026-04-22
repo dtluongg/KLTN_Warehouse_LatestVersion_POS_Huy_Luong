@@ -53,6 +53,7 @@ const MENU_SECTIONS: MenuSection[] = [
             { label: "Tồn kho", icon: "box", route: "InventoryStock" },
             { label: "Kiểm kho / Điều chỉnh", icon: "sliders", route: "StockAdjustments" },
             { label: "Lịch sử nhập xuất kho", icon: "activity", route: "InventoryMovements" },
+            { label: "Thống kê kho", icon: "bar-chart-2", route: "WarehouseStatistics", isHighlight: true },
         ],
     },
     {
