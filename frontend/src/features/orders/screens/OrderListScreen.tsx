@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, View, ActivityIndicator, TouchableOpacity, TextInput } from "react-native";
+import { Alert, StyleSheet, View, ActivityIndicator, TouchableOpacity, TextInput, Modal, Image, Linking, Platform } from "react-native";
 import { DataTableScreen, StatusBadge, formatMoney } from "../../../components";
 import { useAuthStore } from "../../../store/authStore";
 import { useNavigation } from "@react-navigation/native";
@@ -8,24 +8,43 @@ import { useTheme } from "../../../hooks/useTheme";
 import { axiosClient } from "../../../api/axiosClient";
 import { paymentApi } from "../../../api/paymentApi";
 import { Typography } from "../../../components/ui/Typography";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { QRPaymentModal } from "../../pos/components/QRPaymentModal";
 
-const OrderDetailView = ({ id }: { id: number }) => {
+const OrderDetailView = ({ id, onShowQr, onStatusChanged }: { id: number, onShowQr?: (data: any) => void, onStatusChanged?: () => void }) => {
     const [detail, setDetail] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const { colors, metrics } = useTheme();
 
     useEffect(() => {
-        const fetchDetail = async () => {
+        const checkAndFetchDetail = async () => {
             try {
-                const res = await axiosClient.get(`/orders/${id}`);
-                setDetail(res.data);
+                // Lấy thông tin cơ bản trước
+                let res = await axiosClient.get(`/orders/${id}`);
+                let orderData = res.data;
+
+                // Nếu là DRAFT và chuyển khoản, tự động check trạng thái thanh toán
+                if (orderData.status === "DRAFT" && orderData.paymentMethod === "TRANSFER") {
+                    try {
+                        const checkRes = await paymentApi.checkPaymentStatus(id);
+                        if (checkRes.success && checkRes.orderStatus !== "DRAFT") {
+                            // Nếu trạng thái đã thay đổi thành POSTED hoặc CANCELLED
+                            // Báo cho OrderListScreen refresh lại
+                            if (onStatusChanged) onStatusChanged();
+                            return; 
+                        }
+                    } catch (e) {
+                        console.log("Error auto-checking payment status:", e);
+                    }
+                }
+                setDetail(orderData);
             } catch (error) {
                 console.error("Error fetching order detail", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchDetail();
+        checkAndFetchDetail();
     }, [id]);
 
     if (loading || !detail) {
@@ -93,6 +112,25 @@ const OrderListScreen = () => {
     const [warehouses, setWarehouses] = useState<any[]>([]);
     const { colors, metrics } = useTheme();
 
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    // QR States
+    const [showQrModal, setShowQrModal] = useState(false);
+    const [qrData, setQrData] = useState<any>(null);
+    const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
+    const [pendingOrderNo, setPendingOrderNo] = useState<string>("");
+    const [pendingAmount, setPendingAmount] = useState<number>(0);
+    const [timeLeftSec, setTimeLeftSec] = useState(120);
+
+    const handleShowQr = (data: any) => {
+        setQrData(data.qrData);
+        setTimeLeftSec(data.timeLeftSec);
+        setPendingOrderId(data.pendingOrderId);
+        setPendingOrderNo(data.pendingOrderNo);
+        setPendingAmount(data.pendingAmount);
+        setShowQrModal(true);
+    };
+
     useEffect(() => {
         const fetchWarehouses = async () => {
             try {
@@ -110,7 +148,9 @@ const OrderListScreen = () => {
     }, []);
 
     return (
+        <>
         <DataTableScreen
+            key={refreshKey}
             apiUrl="/orders"
             title="Đơn hàng"
             searchPlaceholder="Tìm mã đơn hàng..."
@@ -118,7 +158,7 @@ const OrderListScreen = () => {
                 label: "Thêm đơn POS",
                 onPress: () => navigation.navigate("Pos"),
             }}
-            renderDetailContent={(row) => <OrderDetailView id={row.id} />}
+            renderDetailContent={(row) => <OrderDetailView id={row.id} onShowQr={handleShowQr} onStatusChanged={() => setRefreshKey(prev => prev + 1)} />}
             rowActions={[
                 {
                     label: "In",
@@ -127,16 +167,20 @@ const OrderListScreen = () => {
                     showOnDesktop: true,
                     showOnMobile: true,
                 },
-                // Action cho đơn DRAFT, QR
                 {
                     label: "Mở lại QR",
                     tone: "primary",
                     onPress: async (row) => {
                         try {
-                            await paymentApi.reopenQr(row.id);
-                            Alert.alert("Thành công", "Đã mở lại/mở mới QR cho đơn hàng.");
-                        } catch (e) {
-                            Alert.alert("Lỗi", "Không thể mở lại QR: " + (e?.message || e));
+                            const res = await paymentApi.reopenQr(row.id);
+                            if (res.success && res.data) {
+                                handleShowQr(res.data);
+                            } else {
+                                Alert.alert("Lỗi", "Không thể mở lại QR");
+                            }
+                        } catch (e: any) {
+                            Alert.alert("Lỗi", "Không thể mở lại QR: " + (e?.response?.data?.message || e?.message || e));
+                            setRefreshKey(prev => prev + 1);
                         }
                     },
                     shouldShow: (row) => row.status === "DRAFT" && row.paymentMethod === "TRANSFER",
@@ -145,11 +189,26 @@ const OrderListScreen = () => {
                     label: "Đổi sang tiền mặt",
                     tone: "primary",
                     onPress: async (row) => {
-                        try {
-                            await paymentApi.changePaymentMethod(row.id, "CASH");
-                            Alert.alert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
-                        } catch (e) {
-                            Alert.alert("Lỗi", "Không thể đổi phương thức: " + (e?.message || e));
+                        const message = "Bạn có chắc muốn đổi sang thanh toán tiền mặt?";
+                        const execute = async () => {
+                            try {
+                                await paymentApi.changePaymentMethod(row.id, "CASH");
+                                Alert.alert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
+                                setRefreshKey(prev => prev + 1);
+                            } catch (e: any) {
+                                Alert.alert("Lỗi", "Không thể đổi phương thức: " + (e?.message || e));
+                            }
+                        };
+
+                        if (Platform.OS === "web") {
+                            if (window.confirm(message)) {
+                                await execute();
+                            }
+                        } else {
+                            Alert.alert("Xác nhận", message, [
+                                { text: "Không", style: "cancel" },
+                                { text: "Xác nhận", onPress: execute }
+                            ]);
                         }
                     },
                     shouldShow: (row) => row.status === "DRAFT" && row.paymentMethod === "TRANSFER",
@@ -158,32 +217,34 @@ const OrderListScreen = () => {
                     label: "Hủy đơn",
                     tone: "danger",
                     onPress: async (row) => {
-                        Alert.alert(
-                            "Xác nhận",
-                            "Bạn có chắc muốn hủy đơn này?",
-                            [
+                        const message = "Bạn có chắc muốn hủy đơn này?";
+                        const execute = async () => {
+                            try {
+                                await paymentApi.cancelOrder(row.id);
+                                Alert.alert("Thành công", "Đơn hàng đã được hủy.");
+                                setRefreshKey(prev => prev + 1);
+                            } catch (e: any) {
+                                Alert.alert("Lỗi", "Không thể hủy đơn: " + (e?.message || e));
+                            }
+                        };
+
+                        if (Platform.OS === "web") {
+                            if (window.confirm(message)) {
+                                await execute();
+                            }
+                        } else {
+                            Alert.alert("Xác nhận", message, [
                                 { text: "Không", style: "cancel" },
-                                {
-                                    text: "Hủy đơn",
-                                    style: "destructive",
-                                    onPress: async () => {
-                                        try {
-                                            await paymentApi.cancelOrder(row.id);
-                                            Alert.alert("Thành công", "Đơn hàng đã được hủy.");
-                                        } catch (e) {
-                                            Alert.alert("Lỗi", "Không thể hủy đơn: " + (e?.message || e));
-                                        }
-                                    },
-                                },
-                            ]
-                        );
+                                { text: "Hủy đơn", style: "destructive", onPress: execute }
+                            ]);
+                        }
                     },
                     shouldShow: (row) => row.status === "DRAFT",
                 },
             ]}
             renderFilters={(setFilters, currentFilters) => {
                 const statuses = ["DRAFT", "POSTED", "CANCELLED"];
-                
+
                 const datePresets = [
                     { value: '', label: 'Tất cả thời gian' },
                     { value: 'today', label: 'Hôm nay' },
@@ -221,7 +282,7 @@ const OrderListScreen = () => {
                         fromDateStr = toDateStr;
                     } else if (preset === 'this_week') {
                         const monday = new Date(today);
-                        const day = monday.getDay() || 7; 
+                        const day = monday.getDay() || 7;
                         monday.setDate(monday.getDate() - day + 1);
                         fromDateStr = formatDate(monday);
                     } else if (preset === '7days') {
@@ -265,7 +326,7 @@ const OrderListScreen = () => {
                                 <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
                                     <View style={{ flex: 1 }}>
                                         <Typography variant="micro" color={colors.textSecondary} style={{ marginBottom: 4 }}>Từ ngày:</Typography>
-                                        <TextInput 
+                                        <TextInput
                                             style={[styles.dateInput, { borderColor: colors.border, borderRadius: metrics.borderRadius.md, color: colors.textPrimary, backgroundColor: colors.background }]}
                                             placeholder="YYYY-MM-DD"
                                             value={currentFilters.fromDate?.split("T")[0] || ''}
@@ -274,7 +335,7 @@ const OrderListScreen = () => {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Typography variant="micro" color={colors.textSecondary} style={{ marginBottom: 4 }}>Đến ngày:</Typography>
-                                        <TextInput 
+                                        <TextInput
                                             style={[styles.dateInput, { borderColor: colors.border, borderRadius: metrics.borderRadius.md, color: colors.textPrimary, backgroundColor: colors.background }]}
                                             placeholder="YYYY-MM-DD"
                                             value={currentFilters.toDate?.split("T")[0] || ''}
@@ -374,6 +435,31 @@ const OrderListScreen = () => {
                 { key: "note", label: "Ghi chú", flex: 1.5 },
             ]}
         />
+        <QRPaymentModal
+            visible={showQrModal}
+            qrData={qrData}
+            pendingOrderId={pendingOrderId}
+            pendingOrderNo={pendingOrderNo}
+            pendingAmount={pendingAmount}
+            initialTimeLeftSec={timeLeftSec}
+            onClose={() => {
+                setShowQrModal(false);
+                setPendingOrderId(null);
+            }}
+            onSuccess={() => {
+                setShowQrModal(false);
+                setPendingOrderId(null);
+                Alert.alert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
+                setRefreshKey(prev => prev + 1);
+            }}
+            onCancel={() => {
+                setShowQrModal(false);
+                setPendingOrderId(null);
+                Alert.alert("Hủy", `Đơn #${pendingOrderNo} đã bị huỷ.`);
+                setRefreshKey(prev => prev + 1);
+            }}
+        />
+        </>
     );
 };
 

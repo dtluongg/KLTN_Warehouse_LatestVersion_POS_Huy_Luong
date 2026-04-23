@@ -76,6 +76,73 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
+    public Map<String, Object> reopenPaymentLink(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+
+        if (order.getStatus() != DocumentStatus.DRAFT) {
+            throw new RuntimeException("Chỉ có thể mở lại QR cho đơn hàng ở trạng thái DRAFT");
+        }
+
+        // Tính thời gian còn lại (2 phút = 120 giây)
+        long elapsedSeconds = java.time.Duration.between(order.getCreatedAt(), java.time.LocalDateTime.now()).getSeconds();
+        long timeLeftSec = 120 - elapsedSeconds;
+
+        if (timeLeftSec <= 0) {
+            order.setStatus(DocumentStatus.CANCELLED);
+            orderRepository.save(order);
+            throw new RuntimeException("Đã quá thời gian thanh toán (2 phút). Đơn hàng đã tự động bị huỷ.");
+        }
+
+        // Nếu còn thời gian, cancel cái cũ (nếu có) và tạo mới QR
+        if (order.getPayosOrderCode() != null && !order.getPayosOrderCode().isEmpty()) {
+            try {
+                payOS.paymentRequests().cancel(Long.parseLong(order.getPayosOrderCode()), "Huy QR cu de mo lai");
+            } catch (Exception e) {
+                // Bỏ qua lỗi nếu payos đã cancel hoặc không tìm thấy
+            }
+        }
+
+        long orderCode = orderId + System.currentTimeMillis() / 1000;
+        String payosDescription = buildPayosDescription(order.getOrderNo());
+
+        try {
+            CreatePaymentLinkRequest paymentRequest = CreatePaymentLinkRequest.builder()
+                    .orderCode(orderCode)
+                    .amount(order.getNetAmount().longValue())
+                    .description(payosDescription)
+                    .returnUrl("http://localhost:3000/success")
+                    .cancelUrl("http://localhost:3000/cancel")
+                    .build();
+
+            CreatePaymentLinkResponse paymentResponse = payOS.paymentRequests().create(paymentRequest);
+
+            order.setPayosOrderCode(String.valueOf(orderCode));
+            orderRepository.save(order);
+
+            CreatePaymentLinkResponseDTO qrData = new CreatePaymentLinkResponseDTO();
+            qrData.setOrderCode(String.valueOf(orderCode));
+            qrData.setAmount(order.getNetAmount().toPlainString());
+            qrData.setDescription(paymentResponse.getDescription());
+            qrData.setCheckoutUrl(paymentResponse.getCheckoutUrl());
+            qrData.setQrCode(paymentResponse.getQrCode());
+            qrData.setStatus(String.valueOf(paymentResponse.getStatus()));
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("qrData", qrData);
+            result.put("timeLeftSec", timeLeftSec);
+            result.put("pendingOrderId", order.getId());
+            result.put("pendingOrderNo", order.getOrderNo());
+            result.put("pendingAmount", order.getNetAmount());
+
+            return result;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to reopen payment link: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional
     public Map<String, Object> verifyWebhook(Object body) {
         Map<String, Object> result = new HashMap<>();
         try {

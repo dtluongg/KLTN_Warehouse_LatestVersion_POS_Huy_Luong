@@ -3,6 +3,7 @@ package IUH.KLTN.LvsH.controller;
 import IUH.KLTN.LvsH.dto.CouponPreviewResponseDTO;
 import IUH.KLTN.LvsH.dto.order.*;
 import IUH.KLTN.LvsH.service.OrderService;
+import IUH.KLTN.LvsH.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
+    private final PaymentService paymentService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
@@ -31,13 +33,12 @@ public class OrderController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "desc") String direction) {
-            
+
         Sort sort = direction.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
                 : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
         return ResponseEntity.ok(orderService.getAllOrders(criteria, pageable));
     }
-
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
@@ -47,7 +48,8 @@ public class OrderController {
 
     @PostMapping("/{id}/change-payment-method")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
-    public ResponseEntity<OrderDetailResponseDTO> changePaymentMethod(@PathVariable Long id, @RequestParam IUH.KLTN.LvsH.enums.PaymentMethod paymentMethod) {
+    public ResponseEntity<OrderDetailResponseDTO> changePaymentMethod(@PathVariable Long id,
+            @RequestParam IUH.KLTN.LvsH.enums.PaymentMethod paymentMethod) {
         return ResponseEntity.ok(orderService.changePaymentMethod(id, paymentMethod));
     }
 
@@ -60,8 +62,15 @@ public class OrderController {
     @PostMapping("/{id}/reopen-qr")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
     public ResponseEntity<?> reopenQr(@PathVariable Long id) {
-        // Gọi PaymentService để tạo lại QR nếu cần
-        return ResponseEntity.ok(orderService.reopenQr(id));
+        try {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", paymentService.reopenPaymentLink(id)));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()));
+        }
     }
 
     @PostMapping
@@ -75,14 +84,12 @@ public class OrderController {
     public ResponseEntity<Map<String, Object>> getOrderPaymentStatus(@PathVariable Long id) {
         try {
             OrderDetailResponseDTO order = orderService.getOrderDetailById(id);
-                return ResponseEntity.ok(Map.of(
+            return ResponseEntity.ok(Map.of(
                     "success", true,
                     "orderStatus", order.getStatus(),
-                    "netAmount", order.getNetAmount()
-                ));
+                    "netAmount", order.getNetAmount()));
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
     }
 }
-

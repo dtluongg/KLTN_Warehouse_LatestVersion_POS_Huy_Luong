@@ -20,6 +20,7 @@ import { paymentApi, type CreateQrData } from "../../../api/paymentApi";
 
 import { ProductGrid } from "../components/ProductGrid";
 import { CartSummary } from "../components/CartSummary";
+import { QRPaymentModal } from "../components/QRPaymentModal";
 
 export const PosScreen = () => {
     const { colors, metrics } = useTheme();
@@ -44,7 +45,7 @@ export const PosScreen = () => {
     const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
     const [pendingOrderNo, setPendingOrderNo] = useState<string>("");
     const [pendingAmount, setPendingAmount] = useState<number>(0);
-    const [timeLeftSec, setTimeLeftSec] = useState(300);
+    const [timeLeftSec, setTimeLeftSec] = useState(120);
     const [checkoutError, setCheckoutError] = useState<string>("");
 
     const {
@@ -67,70 +68,6 @@ export const PosScreen = () => {
     useEffect(() => {
         fetchProductsByWarehouse();
     }, [warehouseId]);
-
-    useEffect(() => {
-        if (!showQrModal || !pendingOrderId) {
-            return;
-        }
-
-        const poller = setInterval(async () => {
-            try {
-                const res = await paymentApi.checkPaymentStatus(pendingOrderId);
-
-                if (!res.success) return;
-
-                const { orderStatus, payosStatus } = res;
-
-                console.log("PayOS:", payosStatus, "| DB:", orderStatus);
-
-                // ✅ Thanh toán thành công
-                if (orderStatus === "POSTED") {
-                    clearInterval(poller);
-                    clearInterval(countdown);
-
-                    setShowQrModal(false);
-                    setPendingOrderId(null);
-
-                    Alert.alert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
-                    fetchProductsByWarehouse();
-                    return;
-                }
-
-                // ❌ Bị huỷ
-                if (orderStatus === "CANCELLED") {
-                    clearInterval(poller);
-                    clearInterval(countdown);
-
-                    setShowQrModal(false);
-                    setPendingOrderId(null);
-
-                    Alert.alert("Thanh toán thất bại", `Đơn #${pendingOrderNo} đã bị huỷ.`);
-                }
-
-            } catch (e) {
-                console.log("Lỗi check payment:", e);
-            }
-        }, 3000);
-
-        const countdown = setInterval(() => {
-            setTimeLeftSec((prev) => {
-                if (prev <= 1) {
-                    clearInterval(poller);
-                    clearInterval(countdown);
-                    setShowQrModal(false);
-                    setPendingOrderId(null);
-                    Alert.alert("Hết thời gian", "QR đã hết thời gian chờ. Vui lòng tạo giao dịch mới.");
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => {
-            clearInterval(poller);
-            clearInterval(countdown);
-        };
-    }, [showQrModal, pendingOrderId, pendingOrderNo]);
 
     const fetchWarehouses = async () => {
         try {
@@ -227,7 +164,7 @@ export const PosScreen = () => {
                 setPendingOrderId(orderId);
                 setPendingOrderNo(orderNo);
                 setPendingAmount(netAmount);
-                setTimeLeftSec(300);
+                setTimeLeftSec(120);
                 setShowQrModal(true);
 
                 Alert.alert(
@@ -255,128 +192,12 @@ export const PosScreen = () => {
         }
     };
 
-    const renderQrPaymentModal = () => {
-        const minutes = Math.floor(timeLeftSec / 60)
-            .toString()
-            .padStart(2, "0");
-        const seconds = (timeLeftSec % 60).toString().padStart(2, "0");
-
-        const buildQrImageUri = () => {
-            const rawQr = (qrData?.qrCode || "").trim();
-            if (rawQr) {
-                if (rawQr.startsWith("data:image") || rawQr.startsWith("http://") || rawQr.startsWith("https://")) {
-                    return rawQr;
-                }
-                return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(rawQr)}`;
-            }
-
-            const checkout = (qrData?.checkoutUrl || "").trim();
-            if (checkout) {
-                return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(checkout)}`;
-            }
-
-            return "";
-        };
-
-        const qrImageUri = buildQrImageUri();
-
-        return (
-            <Modal visible={showQrModal} transparent animationType="fade">
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalBox, { backgroundColor: colors.surface }]}>
-                        <View style={styles.modalHeader}>
-                            <MaterialCommunityIcons name="qrcode-scan" size={28} color={colors.primary} />
-                            <Typography variant="heading2" color={colors.textPrimary}>Thanh Toán QR</Typography>
-                        </View>
-
-                        <Typography variant="body" color={colors.textSecondary} style={{ marginBottom: 8 }}>
-                            Đơn #{pendingOrderNo}
-                        </Typography>
-                        <Typography variant="heading2" color={colors.primary} style={{ marginBottom: 12 }}>
-                            {pendingAmount.toLocaleString("vi-VN")} đ
-                        </Typography>
-
-                        <View style={[styles.qrWrap, { borderColor: colors.border }]}>
-                            {!!qrImageUri ? (
-                                <Image source={{ uri: qrImageUri }} style={styles.qrImage} resizeMode="contain" />
-                            ) : (
-                                <Typography variant="body" color={colors.textSecondary}>Không có dữ liệu QR hợp lệ</Typography>
-                            )}
-                        </View>
-
-                        <Typography variant="caption" color={colors.textSecondary} style={{ marginTop: 12, textAlign: "center" }}>
-                            Thời gian còn lại: {minutes}:{seconds}
-                        </Typography>
-
-                        {!!qrData?.checkoutUrl && (
-                            <TouchableOpacity
-                                style={[styles.modalConfirmBtn, { backgroundColor: colors.primary, borderRadius: metrics.borderRadius.medium, marginTop: 12 }]}
-                                onPress={() => Linking.openURL(qrData.checkoutUrl as string)}
-                            >
-                                <Typography variant="bodyEmphasized" color={colors.buttonText}>Mở Trang Thanh Toán</Typography>
-                            </TouchableOpacity>
-                        )}
-
-                        <TouchableOpacity
-                            style={[styles.modalConfirmBtn, { backgroundColor: colors.primary, borderRadius: metrics.borderRadius.medium, marginTop: 12 }]}
-                            onPress={async () => {
-                                try {
-                                    await paymentApi.changePaymentMethod(pendingOrderId, "CASH");
-                                    setShowQrModal(false);
-                                    Alert.alert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
-                                } catch (e) {
-                                    Alert.alert("Lỗi", "Không thể đổi phương thức: " + (e?.message || e));
-                                }
-                            }}
-                        >
-                            <Typography variant="bodyEmphasized" color={colors.buttonText}>Đổi sang tiền mặt</Typography>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.modalCloseBtn, { borderColor: colors.danger, borderRadius: metrics.borderRadius.medium }]}
-                            onPress={() => {
-                                Alert.alert(
-                                    "Xác nhận hủy đơn",
-                                    "Bạn có chắc muốn hủy đơn này?",
-                                    [
-                                        { text: "Không", style: "cancel" },
-                                        {
-                                            text: "Hủy đơn",
-                                            style: "destructive",
-                                            onPress: async () => {
-                                                try {
-                                                    await paymentApi.cancelOrder(pendingOrderId);
-                                                    setShowQrModal(false);
-                                                    Alert.alert("Thành công", "Đơn hàng đã được hủy.");
-                                                } catch (e) {
-                                                    Alert.alert("Lỗi", "Không thể hủy đơn: " + (e?.message || e));
-                                                }
-                                            },
-                                        },
-                                    ]
-                                );
-                            }}
-                        >
-                            <Typography variant="bodyEmphasized" color={colors.danger}>Hủy đơn</Typography>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.modalCloseBtn, { borderColor: colors.border, borderRadius: metrics.borderRadius.medium }]}
-                            onPress={() => setShowQrModal(false)}
-                        >
-                            <Typography variant="bodyEmphasized" color={colors.textPrimary}>Ẩn QR</Typography>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-        );
-    };
-
     const renderWarehouseModal = () => (
         <Modal
             visible={showWarehouseModal}
             transparent
             animationType="fade"
+
         >
             <View style={styles.modalOverlay}>
                 <View style={[styles.modalBox, { backgroundColor: colors.surface }]}>
@@ -434,7 +255,6 @@ export const PosScreen = () => {
             </View>
         </Modal>
     );
-
     // Layout Rendering
     const content = (
         <>
@@ -477,7 +297,36 @@ export const PosScreen = () => {
                 </ScrollView>
             )}
             {renderWarehouseModal()}
-            {renderQrPaymentModal()}
+            {/* Remove renderQrPaymentModal call */}
+            <QRPaymentModal
+                visible={showQrModal}
+                qrData={qrData}
+                pendingOrderId={pendingOrderId}
+                pendingOrderNo={pendingOrderNo}
+                pendingAmount={pendingAmount}
+                initialTimeLeftSec={timeLeftSec}
+                onClose={() => {
+                    setShowQrModal(false);
+                    setPendingOrderId(null);
+                }}
+                onSuccess={() => {
+                    setShowQrModal(false);
+                    setPendingOrderId(null);
+                    Alert.alert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
+                    fetchProductsByWarehouse();
+                }}
+                onCancel={() => {
+                    setShowQrModal(false);
+                    setPendingOrderId(null);
+                    fetchProductsByWarehouse();
+                }}
+                onChangeMethodToCash={() => {
+                    setShowQrModal(false);
+                    setPendingOrderId(null);
+                    Alert.alert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
+                    fetchProductsByWarehouse();
+                }}
+            />
         </View>
     );
 };

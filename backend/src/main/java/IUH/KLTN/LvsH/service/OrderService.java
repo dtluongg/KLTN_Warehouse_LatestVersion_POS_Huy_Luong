@@ -14,5 +14,4 @@ public interface OrderService {
 
     OrderDetailResponseDTO changePaymentMethod(Long orderId, IUH.KLTN.LvsH.enums.PaymentMethod paymentMethod);
     OrderDetailResponseDTO cancelOrder(Long orderId);
-    Object reopenQr(Long orderId);
 }

@@ -132,18 +132,6 @@ public class OrderServiceImpl implements OrderService {
             orderRepository.save(order);
             return getOrderDetailById(orderId);
         }
-    
-        @Override
-        @Transactional
-        public Object reopenQr(Long orderId) {
-            Order order = getOrderEntityById(orderId);
-            if (order.getStatus() != DocumentStatus.DRAFT) {
-                throw new RuntimeException("Chỉ mở lại QR cho đơn hàng DRAFT");
-            }
-            // Nếu đã có payosOrderCode thì trả về QR cũ, chưa có thì tạo mới
-            // Giả định PaymentService được inject vào đây (hoặc gọi qua controller)
-            throw new UnsupportedOperationException("Cần inject PaymentService để tạo lại QR hoặc trả về QR cũ. Hãy xử lý ở PaymentController hoặc inject vào đây nếu cần.");
-        }
 
     @Override
     @Transactional

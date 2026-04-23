@@ -10,6 +10,11 @@ public interface PaymentService {
     CreatePaymentLinkResponseDTO createPaymentLink(Long orderId);
 
     /**
+     * Mở lại QR (tạo mới QR nếu còn thời gian)
+     */
+    java.util.Map<String, Object> reopenPaymentLink(Long orderId);
+
+    /**
      * Xác minh webhook từ PayOS
      */
     Map<String, Object> verifyWebhook(Object body);
