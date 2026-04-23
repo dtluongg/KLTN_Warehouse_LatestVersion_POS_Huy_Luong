@@ -85,7 +85,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         // Tính thời gian còn lại (2 phút = 120 giây)
-        long elapsedSeconds = java.time.Duration.between(order.getCreatedAt(), java.time.LocalDateTime.now()).getSeconds();
+        long elapsedSeconds = java.time.Duration.between(order.getOrderTime(), java.time.LocalDateTime.now()).getSeconds();
         long timeLeftSec = 120 - elapsedSeconds;
 
         if (timeLeftSec <= 0) {
