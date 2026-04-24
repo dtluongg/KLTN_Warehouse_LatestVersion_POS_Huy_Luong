@@ -7,7 +7,11 @@ import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import vn.payos.PayOS;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
@@ -23,6 +27,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PayOS payOS;
     private final OrderRepository orderRepository;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     @Transactional
@@ -85,12 +90,29 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         // Tính thời gian còn lại (2 phút = 120 giây)
-        long elapsedSeconds = java.time.Duration.between(order.getOrderTime(), java.time.LocalDateTime.now()).getSeconds();
+        long elapsedSeconds = java.time.Duration.between(order.getOrderTime(), java.time.LocalDateTime.now())
+                .getSeconds();
         long timeLeftSec = 120 - elapsedSeconds;
 
+        // if (timeLeftSec <= 0) {
+        // order.setStatus(DocumentStatus.CANCELLED);
+        // orderRepository.save(order);
+        // throw new RuntimeException("Đã quá thời gian thanh toán (2 phút). Đơn hàng đã
+        // tự động bị huỷ.");
+        // }
         if (timeLeftSec <= 0) {
-            order.setStatus(DocumentStatus.CANCELLED);
-            orderRepository.save(order);
+            TransactionTemplate requiresNewTx = new TransactionTemplate(transactionManager);
+            requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+            requiresNewTx.execute(status -> {
+                System.out.println(">>> Inside REQUIRES_NEW transaction");
+                Order o = orderRepository.findById(orderId).orElseThrow();
+                o.setStatus(DocumentStatus.CANCELLED);
+                orderRepository.save(o);
+                System.out.println(">>> Saved CANCELLED in new transaction");
+                return null;
+            });
+
             throw new RuntimeException("Đã quá thời gian thanh toán (2 phút). Đơn hàng đã tự động bị huỷ.");
         }
 
