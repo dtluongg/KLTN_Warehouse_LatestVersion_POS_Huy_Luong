@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
     View, Text, TextInput, ScrollView, TouchableOpacity,
-    StyleSheet, Alert, ActivityIndicator, Switch,
+    StyleSheet, Alert, ActivityIndicator,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -114,7 +114,15 @@ const WarehouseFormScreen = () => {
 
                     <View style={styles.switchRow}>
                         <Text style={styles.label}>Đang hoạt động</Text>
-                        <Switch value={isActive} onValueChange={setIsActive} trackColor={{ true: theme.colors.primary }} />
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => setIsActive((prev) => !prev)}
+                            accessibilityRole="switch"
+                            accessibilityState={{ checked: isActive }}
+                            style={[styles.toggleTrack, isActive && styles.toggleTrackOn]}
+                        >
+                            <View style={[styles.toggleThumb, isActive && styles.toggleThumbOn]} />
+                        </TouchableOpacity>
                     </View>
                 </View>
             </ScrollView>
@@ -166,6 +174,27 @@ const styles = StyleSheet.create({
     },
     inputMultiline: { height: 80, textAlignVertical: "top" },
     switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+    toggleTrack: {
+        width: 44,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: theme.colors.border,
+        padding: 2,
+        justifyContent: "center",
+    },
+    toggleTrackOn: {
+        backgroundColor: theme.colors.primary,
+    },
+    toggleThumb: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: "#ffffff",
+        transform: [{ translateX: 0 }],
+    },
+    toggleThumbOn: {
+        transform: [{ translateX: 18 }],
+    },
     footer: {
         position: "absolute", bottom: 0, left: 0, right: 0,
         padding: 16, backgroundColor: theme.colors.surface,

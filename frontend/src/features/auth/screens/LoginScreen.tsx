@@ -80,7 +80,7 @@ const LoginScreen = () => {
       <View style={[styles.rightPanel, { backgroundColor: colors.background }, !isLargeScreen && { width: '100%' }]}>
         <View style={styles.formContainer}>
           <View style={!isLargeScreen && styles.textCenter}>
-            <Typography variant="heading1" style={{ marginBottom: 8 }}>Chào mừng trở lại! 👋</Typography>
+            <Typography variant="heading1" style={{ marginBottom: 8 }}>Chào mừng trở lại!</Typography>
             <Typography variant="body" color={colors.textSecondary} style={{ marginBottom: metrics.spacing.xl }}>
               Nhập thông tin đăng nhập để truy cập hệ thống quản lý.
             </Typography>
