@@ -112,10 +112,13 @@ public class OrderServiceImpl implements OrderService {
             if (order.getStatus() != DocumentStatus.DRAFT) {
                 throw new RuntimeException("Chỉ được đổi phương thức thanh toán khi đơn hàng đang ở trạng thái DRAFT");
             }
+            Staff staff = getAuthenticatedStaff();
             order.setPaymentMethod(paymentMethod);
             // Nếu đổi sang tiền mặt thì chuyển sang POSTED
             if (paymentMethod == PaymentMethod.CASH) {
                 order.setStatus(DocumentStatus.POSTED);
+                List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
+                createSaleOutMovements(order, items, staff);
             }
             orderRepository.save(order);
             return getOrderDetailById(orderId);
@@ -238,17 +241,9 @@ public class OrderServiceImpl implements OrderService {
         
         List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
 
-        for (OrderItem savedItem : savedItems) {
-            InventoryMovement movement = InventoryMovement.builder()
-                    .product(savedItem.getProduct())
-                    .warehouse(warehouse)
-                    .movementType(IUH.KLTN.LvsH.enums.InventoryMovementType.SALE_OUT)
-                    .qty(savedItem.getQty()) 
-                    .refTable("orders")
-                    .refId(generatedOrderNo)
-                    .createdBy(staff)
-                    .build();
-            movementRepository.save(movement);
+        // Chi tru kho khi don da POSTED. DRAFT se tru kho o buoc chot don.
+        if (order.getStatus() == DocumentStatus.POSTED) {
+            createSaleOutMovements(order, savedItems, staff);
         }
 
         return getOrderDetailById(order.getId());
@@ -344,6 +339,21 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Unauthenticated request");
         }
         return userDetails.getStaff();
+    }
+
+    private void createSaleOutMovements(Order order, List<OrderItem> items, Staff staff) {
+        for (OrderItem item : items) {
+            InventoryMovement movement = InventoryMovement.builder()
+                    .product(item.getProduct())
+                    .warehouse(order.getWarehouse())
+                    .movementType(IUH.KLTN.LvsH.enums.InventoryMovementType.SALE_OUT)
+                    .qty(item.getQty())
+                    .refTable("orders")
+                    .refId(order.getOrderNo())
+                    .createdBy(staff)
+                    .build();
+            movementRepository.save(movement);
+        }
     }
 
     private static class CouponCalculation {
