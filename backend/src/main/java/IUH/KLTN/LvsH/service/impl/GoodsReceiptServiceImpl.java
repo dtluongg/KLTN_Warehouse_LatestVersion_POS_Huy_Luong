@@ -12,6 +12,7 @@ import IUH.KLTN.LvsH.entity.PurchaseOrder;
 import IUH.KLTN.LvsH.entity.PurchaseOrderItem;
 import IUH.KLTN.LvsH.entity.Staff;
 import IUH.KLTN.LvsH.entity.Supplier;
+import IUH.KLTN.LvsH.entity.SupplierProduct;
 import IUH.KLTN.LvsH.entity.Warehouse;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.enums.InventoryMovementType;
@@ -23,6 +24,7 @@ import IUH.KLTN.LvsH.repository.InventoryMovementRepository;
 import IUH.KLTN.LvsH.repository.ProductRepository;
 import IUH.KLTN.LvsH.repository.PurchaseOrderItemRepository;
 import IUH.KLTN.LvsH.repository.PurchaseOrderRepository;
+import IUH.KLTN.LvsH.repository.SupplierProductRepository;
 import IUH.KLTN.LvsH.repository.SupplierRepository;
 import IUH.KLTN.LvsH.repository.WarehouseRepository;
 import IUH.KLTN.LvsH.repository.specification.GoodsReceiptSpecification;
@@ -59,6 +61,7 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
     private final WarehouseRepository warehouseRepository;
     private final ProductRepository productRepository;
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final SupplierProductRepository supplierProductRepository;
 
     @Override
     public Page<GoodsReceiptListResponseDTO> getAllGoodsReceipts(GoodsReceiptSearchCriteria criteria, Pageable pageable) {
@@ -229,6 +232,17 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
                     .build();
 
             inventoryMovementRepository.save(movement);
+
+            // Tự động cập nhật giá tham chiếu (standard_price) trong bảng giá NCC
+            if (po != null && po.getSupplier() != null) {
+                supplierProductRepository
+                        .findBySupplierIdAndProductId(po.getSupplier().getId(), product.getId())
+                        .ifPresent(sp -> {
+                            sp.setStandardPrice(incomingUnitCost);
+                            sp.setLastUpdatedAt(LocalDateTime.now());
+                            supplierProductRepository.save(sp);
+                        });
+            }
         }
 
         syncPurchaseOrderReceiptState(po);

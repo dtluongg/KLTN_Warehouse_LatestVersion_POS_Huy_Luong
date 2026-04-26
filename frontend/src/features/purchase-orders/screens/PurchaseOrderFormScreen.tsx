@@ -6,18 +6,20 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
+import { getProductsBySupplier, SupplierProductDTO } from "../../../api/supplierProductApi";
 import { theme } from "../../../utils/theme";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Supplier { id: string; name: string; phone?: string; }
 interface Warehouse { id: number; name: string; code?: string; }
-interface Product { id: number; name: string; sku: string; lastPurchaseCost?: number; vatRate?: number; }
+interface Product { id: number; name: string; sku: string; lastPurchaseCost?: number; vatRate?: number; standardPrice?: number; }
 interface LineItem {
     productId: number;
     productName: string;
     productSku: string;
     orderedQty: number;
     expectedUnitCost: number;
+    standardPrice: number; // Giá tham chiếu từ bảng giá NCC
     vatRate: number; // % nguyên, ví dụ 8 = 8%
 }
 
@@ -29,47 +31,78 @@ const PurchaseOrderFormScreen = () => {
     const isEdit = !!editId;
 
     // Form state
-    const [supplierId, setSupplierId]     = useState<string>("");
+    const [supplierId, setSupplierId] = useState<string>("");
     const [supplierName, setSupplierName] = useState<string>("");
-    const [warehouseId, setWarehouseId]   = useState<number | null>(null);
+    const [warehouseId, setWarehouseId] = useState<number | null>(null);
     const [warehouseName, setWarehouseName] = useState<string>("");
     const [expectedDate, setExpectedDate] = useState<string>("");
-    const [note, setNote]                 = useState<string>("");
+    const [note, setNote] = useState<string>("");
     const [discountAmount, setDiscountAmount] = useState<string>("0");
     const [surchargeAmount, setSurchargeAmount] = useState<string>("0");
-    const [items, setItems]               = useState<LineItem[]>([]);
-    const [status, setStatus]             = useState<string>("DRAFT");
+    const [items, setItems] = useState<LineItem[]>([]);
+    const [status, setStatus] = useState<string>("DRAFT");
+    const [warnings, setWarnings] = useState<string[]>([]);
 
     // UI state
-    const [suppliers, setSuppliers]   = useState<Supplier[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-    const [products, setProducts]     = useState<Product[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [loading, setLoading]       = useState(isEdit);
+    const [loading, setLoading] = useState(isEdit);
 
     // Picker modals
     const [showSupplierModal, setShowSupplierModal] = useState(false);
     const [showWarehouseModal, setShowWarehouseModal] = useState(false);
     const [showProductModal, setShowProductModal] = useState(false);
     const [supplierSearch, setSupplierSearch] = useState("");
-    const [productSearch, setProductSearch]   = useState("");
+    const [productSearch, setProductSearch] = useState("");
 
-    // ── Load reference data ──
+    // ── Load reference data (suppliers, warehouses) ──
     useEffect(() => {
         const load = async () => {
             try {
-                const [sRes, wRes, pRes] = await Promise.all([
+                const [sRes, wRes] = await Promise.all([
                     axiosClient.get("/suppliers?size=200"),
                     axiosClient.get("/warehouses?size=100"),
-                    axiosClient.get("/products?size=500&isActive=true"),
                 ]);
                 setSuppliers(sRes.data.content || sRes.data || []);
                 setWarehouses(wRes.data.content || wRes.data || []);
-                setProducts(pRes.data.content || pRes.data || []);
             } catch (e) { console.error("Load ref data:", e); }
         };
         load();
     }, []);
+
+    // ── Load products when supplier changes (từ bảng giá NCC) ──
+    useEffect(() => {
+        if (!supplierId) {
+            setProducts([]);
+            return;
+        }
+        const loadProducts = async () => {
+            setLoadingProducts(true);
+            try {
+                const res = await getProductsBySupplier(supplierId);
+                const spList: SupplierProductDTO[] = res.data;
+                // Map SupplierProductDTO → Product (cho modal chọn SP)
+                const mapped: Product[] = spList.map(sp => ({
+                    id: sp.productId,
+                    name: sp.productName,
+                    sku: sp.productSku,
+                    standardPrice: sp.standardPrice,
+                    lastPurchaseCost: sp.standardPrice,
+                    vatRate: 0, // sẽ được lấy lại từ product nếu cần
+                }));
+                setProducts(mapped);
+            } catch (e) {
+                console.error("Load supplier products:", e);
+                setProducts([]);
+            } finally {
+                setLoadingProducts(false);
+            }
+        };
+        loadProducts();
+    }, [supplierId]);
 
     // ── Load edit data ──
     useEffect(() => {
@@ -103,8 +136,8 @@ const PurchaseOrderFormScreen = () => {
 
     // ── Computed ──
     const grossAmount = items.reduce((s, i) => s + i.orderedQty * i.expectedUnitCost, 0);
-    const vatAmount   = items.reduce((s, i) => s + i.orderedQty * i.expectedUnitCost * (i.vatRate / 100), 0);
-    const netAmount   = grossAmount + vatAmount - Number(discountAmount || 0) + Number(surchargeAmount || 0);
+    const vatAmount = items.reduce((s, i) => s + i.orderedQty * i.expectedUnitCost * (i.vatRate / 100), 0);
+    const netAmount = grossAmount + vatAmount - Number(discountAmount || 0) + Number(surchargeAmount || 0);
 
     // ── Helpers ──
     const addProduct = (prod: Product) => {
@@ -118,7 +151,8 @@ const PurchaseOrderFormScreen = () => {
             productName: prod.name,
             productSku: prod.sku,
             orderedQty: 1,
-            expectedUnitCost: prod.lastPurchaseCost ?? 0,
+            expectedUnitCost: prod.standardPrice ?? prod.lastPurchaseCost ?? 0,
+            standardPrice: prod.standardPrice ?? 0,
             vatRate: prod.vatRate ?? 0,
         }]);
         setShowProductModal(false);
@@ -154,14 +188,27 @@ const PurchaseOrderFormScreen = () => {
 
         try {
             setSubmitting(true);
+            let resData: any;
             if (isEdit) {
-                await axiosClient.put(`/purchase-orders/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật phiếu đặt hàng.");
+                const res = await axiosClient.put(`/purchase-orders/${editId}`, payload);
+                resData = res.data;
             } else {
                 const res = await axiosClient.post("/purchase-orders", payload);
-                Alert.alert("Thành công", `Đã tạo phiếu ${res.data.poNo}.`);
+                resData = res.data;
             }
-            navigation.goBack();
+
+            // Hiển thị warnings biến động giá (nếu có)
+            if (resData.warnings && resData.warnings.length > 0) {
+                setWarnings(resData.warnings);
+                Alert.alert(
+                    "⚠️ Cảnh báo biến động giá",
+                    resData.warnings.join("\n\n") + "\n\nPhiếu đã được lưu thành công.",
+                    [{ text: "Đã hiểu", onPress: () => navigation.goBack() }]
+                );
+            } else {
+                Alert.alert("Thành công", isEdit ? "Đã cập nhật phiếu đặt hàng." : `Đã tạo phiếu ${resData.poNo}.`);
+                navigation.goBack();
+            }
         } catch (err: any) {
             Alert.alert("Lỗi", err?.response?.data?.message || "Không thể lưu phiếu.");
         } finally { setSubmitting(false); }
@@ -261,14 +308,30 @@ const PurchaseOrderFormScreen = () => {
                 {/* ── Section: Sản phẩm ── */}
                 <View style={styles.card}>
                     <View style={styles.sectionRow}>
-                        <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
+                        <Text style={styles.sectionTitle}>Sản phẩm từ bảng giá NCC</Text>
                         {canEdit && (
-                            <TouchableOpacity style={styles.addBtn} onPress={() => setShowProductModal(true)}>
+                            <TouchableOpacity
+                                style={[styles.addBtn, !supplierId && styles.addBtnDisabled]}
+                                onPress={() => {
+                                    if (!supplierId) {
+                                        Alert.alert("Thông báo", "Vui lòng chọn nhà cung cấp trước.");
+                                        return;
+                                    }
+                                    setShowProductModal(true);
+                                }}
+                            >
                                 <Feather name="plus" size={16} color={theme.colors.primaryForeground} />
                                 <Text style={styles.addBtnText}>Thêm</Text>
                             </TouchableOpacity>
                         )}
                     </View>
+
+                    {!supplierId && canEdit && (
+                        <View style={styles.infoNotice}>
+                            <Feather name="info" size={14} color="#1e40af" />
+                            <Text style={styles.infoNoticeText}>Chọn nhà cung cấp để xem danh sách sản phẩm và giá tham chiếu.</Text>
+                        </View>
+                    )}
 
                     {items.length === 0 ? (
                         <View style={styles.emptyItems}>
@@ -306,15 +369,14 @@ const PurchaseOrderFormScreen = () => {
                                         />
                                     </View>
                                     <View style={{ flex: 1.5 }}>
-                                        <Text style={styles.lineInputLabel}>Giá đặt (VND)</Text>
+                                        <Text style={styles.lineInputLabel}>Giá NCC (VND) 🔒</Text>
                                         <TextInput
-                                            style={[styles.lineInput, !canEdit && styles.inputDisabled]}
-                                            keyboardType="numeric"
-                                            value={String(item.expectedUnitCost)}
-                                            onChangeText={v => updateItem(idx, "expectedUnitCost", Number(v) || 0)}
-                                            editable={canEdit}
+                                            style={[styles.lineInput, styles.inputDisabled]}
+                                            value={Number(item.expectedUnitCost).toLocaleString("vi-VN")}
+                                            editable={false}
                                         />
                                     </View>
+
                                     <View style={{ flex: 1.5, alignItems: "flex-end", justifyContent: "flex-end" }}>
                                         <Text style={styles.lineInputLabel}>
                                             Thành tiền{item.vatRate > 0 ? ` (+${item.vatRate}%VAT)` : ""}
@@ -370,11 +432,11 @@ const PurchaseOrderFormScreen = () => {
                     )}
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Chiết khấu:</Text>
-                        <Text style={styles.summaryValue}>- {Number(discountAmount||0).toLocaleString("vi-VN")} đ</Text>
+                        <Text style={styles.summaryValue}>- {Number(discountAmount || 0).toLocaleString("vi-VN")} đ</Text>
                     </View>
                     <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Phụ phí:</Text>
-                        <Text style={styles.summaryValue}>+ {Number(surchargeAmount||0).toLocaleString("vi-VN")} đ</Text>
+                        <Text style={styles.summaryValue}>+ {Number(surchargeAmount || 0).toLocaleString("vi-VN")} đ</Text>
                     </View>
                     <View style={[styles.summaryRow, styles.summaryTotal]}>
                         <Text style={styles.summaryTotalLabel}>Tổng cộng:</Text>
@@ -422,15 +484,35 @@ const PurchaseOrderFormScreen = () => {
                         <FlatList
                             data={suppliers.filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))}
                             keyExtractor={s => s.id}
-                            renderItem={({ item }) => (
+                            renderItem={({ item: sup }) => (
                                 <TouchableOpacity style={styles.modalItem} onPress={() => {
-                                    setSupplierId(item.id);
-                                    setSupplierName(item.name);
-                                    setShowSupplierModal(false);
-                                    setSupplierSearch("");
+                                    // Nếu đổi NCC → xóa items cũ (vì SP khác NCC)
+                                    if (supplierId && supplierId !== sup.id && items.length > 0) {
+                                        Alert.alert(
+                                            "Đổi nhà cung cấp",
+                                            "Danh sách sản phẩm sẽ bị xóa khi đổi NCC. Bạn có chắc?",
+                                            [
+                                                { text: "Hủy", style: "cancel" },
+                                                {
+                                                    text: "Đồng ý", onPress: () => {
+                                                        setSupplierId(sup.id);
+                                                        setSupplierName(sup.name);
+                                                        setItems([]);
+                                                        setShowSupplierModal(false);
+                                                        setSupplierSearch("");
+                                                    }
+                                                },
+                                            ]
+                                        );
+                                    } else {
+                                        setSupplierId(sup.id);
+                                        setSupplierName(sup.name);
+                                        setShowSupplierModal(false);
+                                        setSupplierSearch("");
+                                    }
                                 }}>
-                                    <Text style={styles.modalItemName}>{item.name}</Text>
-                                    {item.phone && <Text style={styles.modalItemSub}>{item.phone}</Text>}
+                                    <Text style={styles.modalItemName}>{sup.name}</Text>
+                                    {sup.phone && <Text style={styles.modalItemSub}>{sup.phone}</Text>}
                                 </TouchableOpacity>
                             )}
                         />
@@ -466,12 +548,12 @@ const PurchaseOrderFormScreen = () => {
                 </View>
             </Modal>
 
-            {/* ── Product Picker Modal ── */}
+            {/* ── Product Picker Modal (SP từ bảng giá NCC) ── */}
             <Modal visible={showProductModal} transparent animationType="slide" onRequestClose={() => setShowProductModal(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalBox}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Thêm sản phẩm</Text>
+                            <Text style={styles.modalTitle}>Sản phẩm của NCC</Text>
                             <TouchableOpacity onPress={() => setShowProductModal(false)}>
                                 <Feather name="x" size={22} color={theme.colors.foreground} />
                             </TouchableOpacity>
@@ -483,21 +565,35 @@ const PurchaseOrderFormScreen = () => {
                             value={productSearch}
                             onChangeText={setProductSearch}
                         />
-                        <FlatList
-                            data={products.filter(p =>
-                                p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-                                p.sku.toLowerCase().includes(productSearch.toLowerCase())
-                            )}
-                            keyExtractor={p => String(p.id)}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity style={styles.modalItem} onPress={() => addProduct(item)}>
-                                    <Text style={styles.modalItemName}>{item.name}</Text>
-                                    <Text style={styles.modalItemSub}>SKU: {item.sku}
-                                        {item.lastPurchaseCost ? ` · Giá nhập gần nhất: ${Number(item.lastPurchaseCost).toLocaleString("vi-VN")} đ` : ""}
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-                        />
+                        {loadingProducts ? (
+                            <View style={{ padding: 30, alignItems: "center" }}>
+                                <ActivityIndicator size="small" color={theme.colors.primary} />
+                                <Text style={{ marginTop: 8, color: theme.colors.mutedForeground, fontSize: 13 }}>Đang tải bảng giá NCC...</Text>
+                            </View>
+                        ) : products.length === 0 ? (
+                            <View style={{ padding: 30, alignItems: "center" }}>
+                                <Feather name="inbox" size={32} color={theme.colors.muted} />
+                                <Text style={{ marginTop: 8, color: theme.colors.mutedForeground, fontSize: 13, textAlign: "center" }}>
+                                    NCC này chưa có sản phẩm nào trong bảng giá.{"\n"}Vui lòng thêm từ trang quản lý NCC.
+                                </Text>
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={products.filter(p =>
+                                    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                                    p.sku.toLowerCase().includes(productSearch.toLowerCase())
+                                )}
+                                keyExtractor={p => String(p.id)}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity style={styles.modalItem} onPress={() => addProduct(item)}>
+                                        <Text style={styles.modalItemName}>{item.name}</Text>
+                                        <Text style={styles.modalItemSub}>SKU: {item.sku}
+                                            {item.standardPrice ? ` · Giá tham chiếu: ${Number(item.standardPrice).toLocaleString("vi-VN")} đ` : ""}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -573,6 +669,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12, paddingVertical: 7,
     },
     addBtnText: { color: theme.colors.primaryForeground, fontSize: 13, fontWeight: "700" },
+    addBtnDisabled: { opacity: 0.5 },
+
+    infoNotice: {
+        flexDirection: "row", alignItems: "center", gap: 8,
+        padding: 12, backgroundColor: "#eff6ff", borderRadius: 8,
+        borderWidth: 1, borderColor: "#bfdbfe", marginBottom: 10,
+    },
+    infoNoticeText: { flex: 1, color: "#1e40af", fontSize: 12 },
+
+    refPriceText: { fontSize: 11, color: theme.colors.mutedForeground, marginTop: 2, fontStyle: "italic" },
 
     emptyItems: { alignItems: "center", paddingVertical: 28, gap: 10 },
     emptyItemsText: { color: theme.colors.mutedForeground, fontSize: 13, textAlign: "center" },

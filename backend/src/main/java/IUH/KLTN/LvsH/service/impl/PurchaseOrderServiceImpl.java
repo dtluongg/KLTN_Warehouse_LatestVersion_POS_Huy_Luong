@@ -9,6 +9,7 @@ import IUH.KLTN.LvsH.entity.PurchaseOrder;
 import IUH.KLTN.LvsH.entity.PurchaseOrderItem;
 import IUH.KLTN.LvsH.entity.Staff;
 import IUH.KLTN.LvsH.entity.Supplier;
+import IUH.KLTN.LvsH.entity.SupplierProduct;
 import IUH.KLTN.LvsH.entity.Warehouse;
 import IUH.KLTN.LvsH.enums.DocumentStatus;
 import IUH.KLTN.LvsH.enums.PurchaseOrderClosedReason;
@@ -17,6 +18,7 @@ import IUH.KLTN.LvsH.repository.GoodsReceiptItemRepository;
 import IUH.KLTN.LvsH.repository.ProductRepository;
 import IUH.KLTN.LvsH.repository.PurchaseOrderItemRepository;
 import IUH.KLTN.LvsH.repository.PurchaseOrderRepository;
+import IUH.KLTN.LvsH.repository.SupplierProductRepository;
 import IUH.KLTN.LvsH.repository.SupplierRepository;
 import IUH.KLTN.LvsH.repository.WarehouseRepository;
 import IUH.KLTN.LvsH.repository.specification.PurchaseOrderSpecification;
@@ -31,10 +33,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,10 +47,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
+    // Ngưỡng cảnh báo biến động giá: 20%
+    private static final BigDecimal PRICE_DEVIATION_THRESHOLD = new BigDecimal("20");
+
     private final PurchaseOrderRepository poRepository;
     private final PurchaseOrderItemRepository poItemRepository;
     private final GoodsReceiptItemRepository grItemRepository;
     private final SupplierRepository supplierRepository;
+    private final SupplierProductRepository supplierProductRepository;
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
 
@@ -94,6 +103,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null)
                 : null;
 
+        // Validate SP thuộc NCC + thu thập cảnh báo giá
+        List<String> warnings = validateSupplierProductsAndCollectWarnings(dto.getSupplierId(), dto.getItems());
+
         BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
 
@@ -121,7 +133,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         po.setPoNo(generatedPoNo);
 
         savePurchaseOrderItems(po, dto.getItems());
-        return toDetailResponseDTO(po);
+        PurchaseOrderDetailResponseDTO response = toDetailResponseDTO(po);
+        response.setWarnings(warnings.isEmpty() ? null : warnings);
+        return response;
     }
 
     @Override
@@ -140,6 +154,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         Warehouse warehouse = dto.getWarehouseId() != null
                 ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null)
                 : null;
+
+        // Validate SP thuộc NCC + thu thập cảnh báo giá
+        List<String> warnings = validateSupplierProductsAndCollectWarnings(dto.getSupplierId(), dto.getItems());
 
         BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
@@ -164,7 +181,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         savePurchaseOrderItems(po, dto.getItems());
 
         poRepository.save(po);
-        return toDetailResponseDTO(po);
+        PurchaseOrderDetailResponseDTO response = toDetailResponseDTO(po);
+        response.setWarnings(warnings.isEmpty() ? null : warnings);
+        return response;
     }
 
     @Override
@@ -228,11 +247,24 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         List<PurchaseOrderItem> items = poItemRepository.findByPurchaseOrderId(po.getId());
         Map<Long, Integer> postedReceivedByPoItemId = getPostedReceivedQtyByPurchaseOrderId(po.getId());
 
+        // Lấy supplierId để tra giá tham chiếu
+        UUID supplierId = po.getSupplier() != null ? po.getSupplier().getId() : null;
+
         List<PurchaseOrderDetailResponseDTO.PurchaseOrderItemResponseDTO> itemDTOs = items.stream()
                 .map(item -> {
                     int receivedQty = postedReceivedByPoItemId.getOrDefault(item.getId(), 0);
                     int orderedQty = item.getOrderedQty() == null ? 0 : item.getOrderedQty();
                     int remainingQty = Math.max(orderedQty - receivedQty, 0);
+
+                    // Tra giá tham chiếu từ bảng giá NCC
+                    BigDecimal standardPrice = null;
+                    if (supplierId != null) {
+                        standardPrice = supplierProductRepository
+                                .findBySupplierIdAndProductId(supplierId, item.getProduct().getId())
+                                .map(SupplierProduct::getStandardPrice)
+                                .orElse(null);
+                    }
+
                     return PurchaseOrderDetailResponseDTO.PurchaseOrderItemResponseDTO.builder()
                             .id(item.getId())
                             .productId(item.getProduct().getId())
@@ -242,6 +274,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                             .receivedQty(receivedQty)
                             .remainingQty(remainingQty)
                             .expectedUnitCost(item.getExpectedUnitCost())
+                            .standardPrice(standardPrice)
                             .vatRate(item.getProduct().getVatRate())
                             .lineTotal(item.getLineTotal())
                             .build();
@@ -251,7 +284,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         return PurchaseOrderDetailResponseDTO.builder()
                 .id(po.getId())
                 .poNo(po.getPoNo())
-                .supplierId(po.getSupplier() != null ? po.getSupplier().getId() : null)
+                .supplierId(supplierId)
                 .supplierName(po.getSupplier() != null ? po.getSupplier().getName() : null)
                 .warehouseId(po.getWarehouse() != null ? po.getWarehouse().getId() : null)
                 .warehouseName(po.getWarehouse() != null ? po.getWarehouse().getName() : null)
@@ -337,6 +370,51 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Purchase order items are required");
         }
+    }
+
+    /**
+     * Validate từng SP phải thuộc bảng giá NCC (chặn cứng).
+     * Nếu giá nhập lệch > PRICE_DEVIATION_THRESHOLD so với standard_price → thêm warning.
+     */
+    private List<String> validateSupplierProductsAndCollectWarnings(
+            UUID supplierId,
+            List<PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO> items) {
+
+        List<String> warnings = new ArrayList<>();
+
+        for (PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO itemDto : items) {
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại: " + itemDto.getProductId()));
+
+            // Chặn cứng: SP phải thuộc bảng giá NCC
+            SupplierProduct sp = supplierProductRepository
+                    .findBySupplierIdAndProductIdAndIsActiveTrue(supplierId, itemDto.getProductId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Sản phẩm '" + product.getName() + "' (" + product.getSku()
+                            + ") không thuộc bảng giá của nhà cung cấp này. "
+                            + "Vui lòng thêm sản phẩm vào bảng giá NCC trước."));
+
+            // Cảnh báo biến động giá
+            BigDecimal standardPrice = sp.getStandardPrice();
+            BigDecimal enteredPrice = itemDto.getExpectedUnitCost();
+
+            if (standardPrice != null && standardPrice.compareTo(BigDecimal.ZERO) > 0 && enteredPrice != null) {
+                BigDecimal deviation = enteredPrice.subtract(standardPrice)
+                        .abs()
+                        .multiply(new BigDecimal("100"))
+                        .divide(standardPrice, 2, RoundingMode.HALF_UP);
+
+                if (deviation.compareTo(PRICE_DEVIATION_THRESHOLD) > 0) {
+                    warnings.add(String.format(
+                            "Giá nhập SP '%s' (%s) là %s, lệch %.1f%% so với giá tham chiếu %s",
+                            product.getName(), product.getSku(),
+                            enteredPrice.toPlainString(), deviation,
+                            standardPrice.toPlainString()));
+                }
+            }
+        }
+
+        return warnings;
     }
 
     private static class Totals {

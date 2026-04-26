@@ -40,6 +40,9 @@ public class PurchaseOrderDetailResponseDTO {
 
     private List<PurchaseOrderItemResponseDTO> items;
 
+    // Danh sách cảnh báo biến động giá (nếu có)
+    private List<String> warnings;
+
     @Data
     @Builder
     public static class PurchaseOrderItemResponseDTO {
@@ -51,6 +54,7 @@ public class PurchaseOrderDetailResponseDTO {
         private Integer receivedQty;
         private Integer remainingQty;
         private BigDecimal expectedUnitCost;
+        private BigDecimal standardPrice; // Giá tham chiếu từ bảng giá NCC
         private BigDecimal vatRate;
         private BigDecimal lineTotal;
     }
