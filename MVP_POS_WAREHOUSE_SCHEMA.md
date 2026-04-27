@@ -113,6 +113,23 @@ Ap dung cho: orders, purchase_orders, goods_receipts, customer_returns, supplier
 - is_active
 - created_at, updated_at
 
+### supplier_products
+
+- id (BIGSERIAL, PK)
+- supplier_id (UUID, FK -> suppliers.id)
+- product_id (BIGSERIAL, FK -> products.id)
+- standard_price (NUMERIC(18,2))
+- is_active (BOOLEAN)
+- last_updated_at (TIMESTAMP)
+- created_at (TIMESTAMP)
+- unique(supplier_id, product_id)
+
+Ghi chu:
+
+- Bảng `supplier_products` lưu ánh xạ sản phẩm mà nhà cung cấp cung cấp cùng mức giá tham khảo (`standard_price`) và trạng thái `is_active`.
+- Dùng để kiểm tra ràng buộc khi tạo `purchase_orders` theo nhà cung cấp và cho frontend hiển thị giá nhà cung cấp nếu cần.
+
+
 Ghi chu:
 
 - Khong co cot on_hand trong products.
@@ -366,6 +383,7 @@ DB trigger auto-generate cho:
 - orders(order_time)
 - orders(customer_id)
 - purchase_orders(supplier_id)
+ - supplier_products(supplier_id, product_id)
 
 ## 7) API/backend workflow hien tai
 
