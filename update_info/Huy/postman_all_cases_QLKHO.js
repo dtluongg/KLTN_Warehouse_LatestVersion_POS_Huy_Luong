@@ -17,8 +17,10 @@
     }
   ],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080/api" },
+    { "key": "baseUrl", "value": "http://localhost:9999/api" },
     { "key": "token", "value": "" },
+    { "key": "username", "value": "admin" },
+    { "key": "password", "value": "123456" },
     { "key": "categoryId", "value": "" },
     { "key": "productId", "value": "" },
     { "key": "couponId", "value": "" },
@@ -50,7 +52,7 @@
             "url": "{{baseUrl}}/auth/login",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}"
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
             }
           },
           "event": [
@@ -61,7 +63,10 @@
                 "exec": [
                   "pm.test('Login success', function () { pm.response.to.have.status(200); });",
                   "const json = pm.response.json();",
-                  "pm.collectionVariables.set('token', json.token);"
+                  "pm.test('Has token', function () { pm.expect(json.token).to.be.a('string').and.not.empty; });",
+                  "pm.collectionVariables.set('token', json.token || '');",
+                  "pm.collectionVariables.set('username', json.username || pm.collectionVariables.get('username') || 'admin');",
+                  "pm.collectionVariables.set('role', json.role || '');"
                 ]
               }
             }
@@ -414,7 +419,7 @@
             "url": "{{baseUrl}}/orders",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"warehouseId\": 1,\n  \"paymentMethod\": \"CASH\",\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 1,\n      \"salePrice\": 1550000\n    }\n  ]\n}"
+              "raw": "{\n  \"warehouseId\": 1,\n  \"salesChannel\": \"POS\",\n  \"paymentMethod\": \"CASH\",\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"salePrice\": 1550000\n    }\n  ]\n}"
             }
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json = pm.response.json(); pm.collectionVariables.set('orderId', json.id || '1');"] } }]
@@ -430,7 +435,7 @@
             "url": "{{baseUrl}}/orders",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"warehouseId\": 1,\n  \"paymentMethod\": \"CASH\",\n  \"discountAmount\": 0,\n  \"couponCode\": \"KHAIMUA2026\",\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 1,\n      \"salePrice\": 1550000\n    }\n  ]\n}"
+              "raw": "{\n  \"warehouseId\": 1,\n  \"salesChannel\": \"POS\",\n  \"paymentMethod\": \"CASH\",\n  \"discountAmount\": 0,\n  \"couponCode\": \"KHAIMUA2026\",\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"salePrice\": 1550000\n    }\n  ]\n}"
             }
           }
         },
@@ -474,7 +479,7 @@
             "url": "{{baseUrl}}/purchase-orders",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"expectedDate\": \"2026-12-31\",\n  \"note\": \"PO draft test\",\n  \"createdByStaffId\": 1,\n  \"warehouseId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"orderedQty\": 2,\n      \"expectedUnitCost\": 1000000\n    }\n  ]\n}"
+              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"expectedDate\": \"2026-12-31\",\n  \"note\": \"PO draft test\",\n  \"warehouseId\": 1,\n  \"allowOverReceipt\": false,\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"orderedQty\": 2,\n      \"expectedUnitCost\": 1000000\n    }\n  ]\n}"
             }
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json = pm.response.json(); pm.collectionVariables.set('poId', json.id);"] } }]
@@ -490,7 +495,7 @@
             "url": "{{baseUrl}}/purchase-orders/{{poId}}",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"expectedDate\": \"2027-01-05\",\n  \"note\": \"PO update draft\",\n  \"createdByStaffId\": 1,\n  \"warehouseId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"orderedQty\": 3,\n      \"expectedUnitCost\": 1000000\n    }\n  ]\n}"
+              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"expectedDate\": \"2027-01-05\",\n  \"note\": \"PO update draft\",\n  \"warehouseId\": 1,\n  \"allowOverReceipt\": false,\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"orderedQty\": 3,\n      \"expectedUnitCost\": 1000000\n    }\n  ]\n}"
             }
           }
         },
@@ -526,7 +531,7 @@
             "url": "{{baseUrl}}/goods-receipts",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"poId\": 1,\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"warehouseId\": 1,\n  \"note\": \"GR draft test\",\n  \"createdByStaffId\": 1,\n  \"items\": [\n    {\n      \"poItemId\": 1,\n      \"productId\": 1,\n      \"receivedQty\": 1,\n      \"unitCost\": 1000000\n    }\n  ]\n}"
+              "raw": "{\n  \"poId\": 1,\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"warehouseId\": 1,\n  \"note\": \"GR draft test\",\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"poItemId\": 1,\n      \"productId\": 1,\n      \"receivedQty\": 1,\n      \"unitCost\": 1000000\n    }\n  ]\n}"
             }
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json = pm.response.json(); pm.collectionVariables.set('grId', json.id);"] } }]
@@ -542,7 +547,7 @@
             "url": "{{baseUrl}}/goods-receipts/{{grId}}",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"poId\": 1,\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"warehouseId\": 1,\n  \"note\": \"GR update\",\n  \"createdByStaffId\": 1,\n  \"items\": [\n    {\n      \"poItemId\": 1,\n      \"productId\": 1,\n      \"receivedQty\": 2,\n      \"unitCost\": 1000000\n    }\n  ]\n}"
+              "raw": "{\n  \"poId\": 1,\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"warehouseId\": 1,\n  \"note\": \"GR update\",\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"poItemId\": 1,\n      \"productId\": 1,\n      \"receivedQty\": 2,\n      \"unitCost\": 1000000\n    }\n  ]\n}"
             }
           }
         },
@@ -578,7 +583,7 @@
             "url": "{{baseUrl}}/customer-returns",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": \"{{customerSeedId}}\",\n  \"note\": \"CR draft\",\n  \"createdByStaffId\": 1,\n  \"warehouseId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"refundAmount\": 10000\n    }\n  ]\n}"
+              "raw": "{\n  \"customerId\": \"{{customerSeedId}}\",\n  \"note\": \"CR draft\",\n  \"warehouseId\": 1,\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"refundAmount\": 10000\n    }\n  ]\n}"
             }
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json = pm.response.json(); pm.collectionVariables.set('crId', json.id);"] } }]
@@ -594,7 +599,7 @@
             "url": "{{baseUrl}}/customer-returns/{{crId}}",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": \"{{customerSeedId}}\",\n  \"note\": \"CR update\",\n  \"createdByStaffId\": 1,\n  \"warehouseId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"refundAmount\": 12000\n    }\n  ]\n}"
+              "raw": "{\n  \"customerId\": \"{{customerSeedId}}\",\n  \"note\": \"CR update\",\n  \"warehouseId\": 1,\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"refundAmount\": 12000\n    }\n  ]\n}"
             }
           }
         },
@@ -630,7 +635,7 @@
             "url": "{{baseUrl}}/supplier-returns",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"note\": \"SR draft\",\n  \"createdByStaffId\": 1,\n  \"warehouseId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"returnAmount\": 10000,\n      \"note\": \"test\"\n    }\n  ]\n}"
+              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"note\": \"SR draft\",\n  \"warehouseId\": 1,\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"returnAmount\": 10000,\n      \"note\": \"test\"\n    }\n  ]\n}"
             }
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json = pm.response.json(); pm.collectionVariables.set('srId', json.id);"] } }]
@@ -646,7 +651,7 @@
             "url": "{{baseUrl}}/supplier-returns/{{srId}}",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"note\": \"SR update\",\n  \"createdByStaffId\": 1,\n  \"warehouseId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"returnAmount\": 12000,\n      \"note\": \"test 2\"\n    }\n  ]\n}"
+              "raw": "{\n  \"supplierId\": \"{{supplierSeedId}}\",\n  \"note\": \"SR update\",\n  \"warehouseId\": 1,\n  \"discountAmount\": 0,\n  \"surchargeAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"qty\": 1,\n      \"returnAmount\": 12000,\n      \"note\": \"test 2\"\n    }\n  ]\n}"
             }
           }
         },
@@ -682,7 +687,7 @@
             "url": "{{baseUrl}}/stock-adjustments",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"warehouseId\": 1,\n  \"reason\": \"Cycle count\",\n  \"note\": \"SA draft\",\n  \"createdByStaffId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"actualQty\": 10\n    }\n  ]\n}"
+              "raw": "{\n  \"warehouseId\": 1,\n  \"adjustDate\": \"2026-04-28\",\n  \"reason\": \"Cycle count\",\n  \"note\": \"SA draft\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"adjustQty\": 10\n    }\n  ]\n}"
             }
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["const json = pm.response.json(); pm.collectionVariables.set('saId', json.id);"] } }]
@@ -698,7 +703,7 @@
             "url": "{{baseUrl}}/stock-adjustments/{{saId}}",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"warehouseId\": 1,\n  \"reason\": \"Cycle count updated\",\n  \"note\": \"SA update\",\n  \"createdByStaffId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"actualQty\": 8\n    }\n  ]\n}"
+              "raw": "{\n  \"warehouseId\": 1,\n  \"adjustDate\": \"2026-04-28\",\n  \"reason\": \"Cycle count updated\",\n  \"note\": \"SA update\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"adjustQty\": 8\n    }\n  ]\n}"
             }
           }
         },
