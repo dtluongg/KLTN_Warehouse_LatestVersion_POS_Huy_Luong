@@ -129,14 +129,13 @@ Ghi chu:
 - Bảng `supplier_products` lưu ánh xạ sản phẩm mà nhà cung cấp cung cấp cùng mức giá tham khảo (`standard_price`) và trạng thái `is_active`.
 - Dùng để kiểm tra ràng buộc khi tạo `purchase_orders` theo nhà cung cấp và cho frontend hiển thị giá nhà cung cấp nếu cần.
 
-
 Ghi chu:
 
 - Khong co cot on_hand trong products.
 - Ton hien tai doc tu inventory_balance.
 - avg_cost duoc backend cap nhat theo Moving Average khi POSTED goods_receipt.
-- Cong thuc cap nhat avg_cost:
-  avg_cost_moi = ((so_luong_cu _ avg_cost_cu) + (so_luong_nhap _ don_gia_nhap)) / (so_luong_cu + so_luong_nhap)
+- Cong thuc cap nhat avg*cost:
+  avg_cost_moi = ((so_luong_cu * avg*cost_cu) + (so_luong_nhap * don_gia_nhap)) / (so_luong_cu + so_luong_nhap)
 - Trong backend hien tai, so_luong_cu la ton toan he thong cua san pham (tong tat ca warehouse), khong phai ton rieng 1 chi nhanh.
 - last_purchase_cost duoc backend cap nhat bang unit_cost lan nhap gan nhat khi POSTED goods_receipt.
 - API Product khong cho sua truc tiep avg_cost qua request body.
@@ -383,7 +382,7 @@ DB trigger auto-generate cho:
 - orders(order_time)
 - orders(customer_id)
 - purchase_orders(supplier_id)
- - supplier_products(supplier_id, product_id)
+- supplier_products(supplier_id, product_id)
 
 ## 7) API/backend workflow hien tai
 
