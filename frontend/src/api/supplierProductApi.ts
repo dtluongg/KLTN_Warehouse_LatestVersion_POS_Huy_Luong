@@ -8,6 +8,7 @@ export interface SupplierProductDTO {
     productId: number;
     productSku: string;
     productName: string;
+    vatRate?: number;
     standardPrice: number;
     isActive: boolean;
     lastUpdatedAt: string | null;

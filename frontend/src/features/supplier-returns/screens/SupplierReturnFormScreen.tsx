@@ -7,6 +7,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 interface Supplier { id: string; name: string; phone?: string; }
 interface Warehouse { id: number; name: string; code?: string; }
@@ -190,7 +191,7 @@ const SupplierReturnFormScreen = () => {
             })));
         } catch (e) {
             console.error("Load GR detail:", e);
-            Alert.alert("Lỗi", "Không thể tải chi tiết phiếu nhập.");
+            showAlert("Lỗi", "Không thể tải chi tiết phiếu nhập.");
         }
     };
 
@@ -260,7 +261,7 @@ const SupplierReturnFormScreen = () => {
                         );
                     } catch (_) {}
                 }
-            } catch (e) { Alert.alert("Lỗi", "Không thể tải phiếu."); }
+            } catch (e) { showAlert("Lỗi", "Không thể tải phiếu."); }
             finally { setLoading(false); }
         };
         loadEdit();
@@ -268,11 +269,11 @@ const SupplierReturnFormScreen = () => {
 
     const addProduct = (prod: Product) => {
         if (goodsReceiptId) {
-            Alert.alert("Không thể thêm", "Đã chọn phiếu nhập gốc, chỉ được trả các sản phẩm trong phiếu nhập đó.");
+            showAlert("Không thể thêm", "Đã chọn phiếu nhập gốc, chỉ được trả các sản phẩm trong phiếu nhập đó.");
             return;
         }
         if (items.find(i => i.productId === prod.id)) {
-            Alert.alert("Trùng sản phẩm", "Sản phẩm đã có."); setShowProductModal(false); return;
+            showAlert("Trùng sản phẩm", "Sản phẩm đã có."); setShowProductModal(false); return;
         }
         setItems(prev => [...prev, {
             productId: prod.id, productName: prod.name, productSku: prod.sku,
@@ -318,18 +319,18 @@ const SupplierReturnFormScreen = () => {
     const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
     const handleSubmit = async () => {
-        if (!supplierId) { Alert.alert("Thiếu thông tin", "Chọn nhà cung cấp."); return; }
-        if (!warehouseId) { Alert.alert("Thiếu thông tin", "Chọn kho."); return; }
-        if (items.length === 0) { Alert.alert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
+        if (!supplierId) { showAlert("Thiếu thông tin", "Chọn nhà cung cấp."); return; }
+        if (!warehouseId) { showAlert("Thiếu thông tin", "Chọn kho."); return; }
+        if (items.length === 0) { showAlert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
 
         if (goodsReceiptId) {
             for (const item of items) {
                 if (!item.goodsReceiptItemId) {
-                    Alert.alert("Không hợp lệ", "Khi có phiếu nhập gốc, mọi sản phẩm trả phải thuộc phiếu nhập đã chọn.");
+                    showAlert("Không hợp lệ", "Khi có phiếu nhập gốc, mọi sản phẩm trả phải thuộc phiếu nhập đã chọn.");
                     return;
                 }
                 if (item.availableQty != null && item.qty > item.availableQty) {
-                    Alert.alert("Không hợp lệ", `Số lượng trả của ${item.productName} vượt quá số lượng có thể trả (${item.availableQty}).`);
+                    showAlert("Không hợp lệ", `Số lượng trả của ${item.productName} vượt quá số lượng có thể trả (${item.availableQty}).`);
                     return;
                 }
             }
@@ -349,14 +350,14 @@ const SupplierReturnFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/supplier-returns/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật.");
+                showAlert("Thành công", "Đã cập nhật.");
             } else {
                 const res = await axiosClient.post("/supplier-returns", payload);
-                Alert.alert("Thành công", `Đã tạo phiếu ${res.data.returnNo}.`);
+                showAlert("Thành công", `Đã tạo phiếu ${res.data.returnNo}.`);
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert("Lỗi", err?.response?.data?.message || "Không thể lưu.");
+            showAlert("Lỗi", err?.response?.data?.message || "Không thể lưu.");
         } finally { setSubmitting(false); }
     };
 
@@ -400,7 +401,7 @@ const SupplierReturnFormScreen = () => {
                     <TouchableOpacity
                         style={[styles.picker, (!canEdit || !supplierId) && styles.pickerDisabled]}
                         onPress={() => {
-                            if (!supplierId) { Alert.alert("", "Vui lòng chọn nhà cung cấp trước."); return; }
+                            if (!supplierId) { showAlert("", "Vui lòng chọn nhà cung cấp trước."); return; }
                             canEdit && setShowGRModal(true);
                         }}
                         disabled={!canEdit}
@@ -691,4 +692,3 @@ const styles = StyleSheet.create({
 });
 
 export default SupplierReturnFormScreen;
-

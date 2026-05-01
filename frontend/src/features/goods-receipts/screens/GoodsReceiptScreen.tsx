@@ -15,6 +15,9 @@ import { useAuthStore } from "../../../store/authStore";
 import { useNavigation } from "@react-navigation/native";
 import { theme } from "../../../utils/theme";
 import { axiosClient } from "../../../api/axiosClient";
+import { showAlert } from "../../../utils/alerts";
+import { printDocument } from "../../../utils/printUtils";
+import { generateGoodsReceiptHTML } from "../../../utils/printTemplates";
 
 const formatDateTime = (value: string | null | undefined) => {
     if (!value) return "—";
@@ -33,7 +36,7 @@ const confirmAction = async (
     }
 
     return new Promise<boolean>((resolve) => {
-        Alert.alert(title, message, [
+        showAlert(title, message, [
             { text: "Không", style: "cancel", onPress: () => resolve(false) },
             {
                 text: confirmText,
@@ -86,9 +89,7 @@ const GoodsReceiptDetailView = ({ id }: { id: number }) => {
                             <Text style={styles.itemName}>
                                 {item.productName} ({item.productSku})
                             </Text>
-                            <Text style={styles.itemNote}>
-                                PO item: {item.poItemId || "—"}
-                            </Text>
+
                         </View>
                         <View style={styles.itemStats}>
                             <Text style={styles.itemQty}>
@@ -201,9 +202,9 @@ const GoodsReceiptListScreen = () => {
 
         try {
             await axiosClient.post(`/goods-receipts/${row.id}/complete`);
-            Alert.alert("Thành công", `Đã duyệt ${row?.grNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã duyệt ${row?.grNo || "phiếu"}.`);
         } catch (error: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 getErrorMessage(error, "Không thể duyệt phiếu GR."),
             );
@@ -222,9 +223,9 @@ const GoodsReceiptListScreen = () => {
 
         try {
             await axiosClient.post(`/goods-receipts/${row.id}/cancel`);
-            Alert.alert("Thành công", `Đã hủy ${row?.grNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã hủy ${row?.grNo || "phiếu"}.`);
         } catch (error: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 getErrorMessage(error, "Không thể hủy phiếu GR."),
             );
@@ -254,10 +255,13 @@ const GoodsReceiptListScreen = () => {
                     label: "In",
                     tone: "neutral",
                     onPress: async (row) => {
-                        Alert.alert(
-                            "In GR",
-                            `Sẵn sàng in ${row?.grNo || "phiếu"}.`,
-                        );
+                        try {
+                            const res = await axiosClient.get(`/goods-receipts/${row.id}`);
+                            const html = generateGoodsReceiptHTML(res.data);
+                            await printDocument(html);
+                        } catch (e) {
+                            showAlert("Lỗi", "Không thể lấy thông tin in.");
+                        }
                     },
                 },
                 {
@@ -834,4 +838,3 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
 });
-

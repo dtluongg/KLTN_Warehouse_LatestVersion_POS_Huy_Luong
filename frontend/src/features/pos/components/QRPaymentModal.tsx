@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Typography } from "../../../components/ui/Typography";
 import { useTheme } from "../../../hooks/useTheme";
 import { paymentApi } from "../../../api/paymentApi";
+import { showAlert } from "../../../utils/alerts";
 
 interface QRPaymentModalProps {
     visible: boolean;
@@ -105,7 +106,7 @@ export const QRPaymentModal: React.FC<QRPaymentModalProps> = ({
             if (onError) {
                 onError(e);
             } else {
-                Alert.alert("Lỗi", e?.response?.data?.message || e?.message || "Không thể hủy đơn");
+                showAlert("Lỗi", e?.response?.data?.message || e?.message || "Không thể hủy đơn");
             }
         }
     };
@@ -175,7 +176,7 @@ export const QRPaymentModal: React.FC<QRPaymentModalProps> = ({
                                     await paymentApi.changePaymentMethod(pendingOrderId, "CASH");
                                     onChangeMethodToCash(pendingOrderId);
                                 } catch (e: any) {
-                                    Alert.alert("Lỗi", "Không thể đổi phương thức: " + (e?.response?.data?.message || e?.message || e));
+                                    showAlert("Lỗi", "Không thể đổi phương thức: " + (e?.response?.data?.message || e?.message || e));
                                 }
                             }}
                         >

@@ -13,13 +13,13 @@ import java.util.UUID;
 public class PurchaseOrderDetailResponseDTO {
     private Long id;
     private String poNo;
-    
+
     private UUID supplierId;
     private String supplierName;
-    
+
     private Long warehouseId;
     private String warehouseName;
-    
+
     private LocalDate orderDate;
     private LocalDate expectedDate;
     private String status;
@@ -28,20 +28,17 @@ public class PurchaseOrderDetailResponseDTO {
     private String closedReason;
     private Boolean allowOverReceipt;
     private String note;
-    
+
     private BigDecimal totalAmount;
     private BigDecimal totalVat;
     private BigDecimal discountAmount;
     private BigDecimal surchargeAmount;
     private BigDecimal totalAmountPayable;
-    
+
     private String createdBy;
     private LocalDateTime createdAt;
 
     private List<PurchaseOrderItemResponseDTO> items;
-
-    // Danh sách cảnh báo biến động giá (nếu có)
-    private List<String> warnings;
 
     @Data
     @Builder
@@ -52,6 +49,7 @@ public class PurchaseOrderDetailResponseDTO {
         private String productName;
         private Integer orderedQty;
         private Integer receivedQty;
+        private Integer pendingQty;
         private Integer remainingQty;
         private BigDecimal expectedUnitCost;
         private BigDecimal standardPrice; // Giá tham chiếu từ bảng giá NCC

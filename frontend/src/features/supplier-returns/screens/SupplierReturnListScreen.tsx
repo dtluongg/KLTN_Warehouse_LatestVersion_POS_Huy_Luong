@@ -6,6 +6,7 @@ import { useAuthStore } from "../../../store/authStore";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { theme } from "../../../utils/theme";
 import { axiosClient } from "../../../api/axiosClient";
+import { showAlert } from "../../../utils/alerts";
 
 const SupplierReturnDetailView = ({ id }: { id: number }) => {
     const [detail, setDetail] = useState<any>(null);
@@ -85,10 +86,10 @@ const SupplierReturnListScreen = () => {
     const completeReturnRequest = async (row: any) => {
         try {
             await axiosClient.post(`/supplier-returns/${row.id}/complete`);
-            Alert.alert("Thành công", `Đã duyệt ${row?.returnNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã duyệt ${row?.returnNo || "phiếu"}.`);
             setTableVersion((prev) => prev + 1);
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Không thể duyệt",
                 err?.response?.data?.message
                     || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`,
@@ -99,10 +100,10 @@ const SupplierReturnListScreen = () => {
     const cancelReturnRequest = async (row: any) => {
         try {
             await axiosClient.post(`/supplier-returns/${row.id}/cancel`);
-            Alert.alert("Thành công", `Đã hủy ${row?.returnNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã hủy ${row?.returnNo || "phiếu"}.`);
             setTableVersion((prev) => prev + 1);
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Không thể hủy",
                 err?.response?.data?.message
                     || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`,
@@ -122,7 +123,7 @@ const SupplierReturnListScreen = () => {
             return;
         }
 
-        Alert.alert(
+        showAlert(
             "Xác nhận duyệt phiếu",
             confirmMessage,
             [
@@ -148,7 +149,7 @@ const SupplierReturnListScreen = () => {
             return;
         }
 
-        Alert.alert(
+        showAlert(
             "Xác nhận hủy phiếu",
             confirmMessage,
             [
@@ -500,4 +501,3 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.background
     }
 });
-

@@ -10,6 +10,9 @@ import { paymentApi } from "../../../api/paymentApi";
 import { Typography } from "../../../components/ui/Typography";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { QRPaymentModal } from "../../pos/components/QRPaymentModal";
+import { showAlert } from "../../../utils/alerts";
+import { printDocument } from "../../../utils/printUtils";
+import { generateOrderReceiptHTML } from "../../../utils/printTemplates";
 
 const OrderDetailView = ({ id, onShowQr, onStatusChanged }: { id: number, onShowQr?: (data: any) => void, onStatusChanged?: () => void }) => {
     const [detail, setDetail] = useState<any>(null);
@@ -163,7 +166,15 @@ const OrderListScreen = () => {
                     {
                         label: "In",
                         tone: "neutral",
-                        onPress: (row) => Alert.alert("In đơn", `Tính năng in đơn hàng đang được phát triển.`),
+                        onPress: async (row) => {
+                            try {
+                                const res = await axiosClient.get(`/orders/${row.id}`);
+                                const html = generateOrderReceiptHTML(res.data);
+                                await printDocument(html);
+                            } catch (e) {
+                                showAlert("Lỗi", "Không thể lấy thông tin in.");
+                            }
+                        },
                         showOnDesktop: true,
                         showOnMobile: true,
                     },
@@ -179,11 +190,11 @@ const OrderListScreen = () => {
                                 if (res && res.data?.qrData) {
                                     handleShowQr(res.data);
                                 } else {
-                                    Alert.alert("Lỗi", "Không thể mở lại QR");
+                                    showAlert("Lỗi", "Không thể mở lại QR");
                                 }
                             } catch (e: any) {
                                 console.log("=== reopenQr ERROR:", JSON.stringify(e?.response?.data));
-                                Alert.alert("Lỗi", "Không thể mở lại QR: " + (e?.response?.data?.message || e?.message || e));
+                                showAlert("Lỗi", "Không thể mở lại QR: " + (e?.response?.data?.message || e?.message || e));
                                 setRefreshKey(prev => prev + 1);  // ← đây là thủ phạm gây "refresh trang"
                             }
                         },
@@ -197,10 +208,10 @@ const OrderListScreen = () => {
                             const execute = async () => {
                                 try {
                                     await paymentApi.changePaymentMethod(row.id, "CASH");
-                                    Alert.alert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
+                                    showAlert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
                                     setRefreshKey(prev => prev + 1);
                                 } catch (e: any) {
-                                    Alert.alert("Lỗi", "Không thể đổi phương thức: " + (e?.message || e));
+                                    showAlert("Lỗi", "Không thể đổi phương thức: " + (e?.message || e));
                                 }
                             };
 
@@ -209,7 +220,7 @@ const OrderListScreen = () => {
                                     await execute();
                                 }
                             } else {
-                                Alert.alert("Xác nhận", message, [
+                                showAlert("Xác nhận", message, [
                                     { text: "Không", style: "cancel" },
                                     { text: "Xác nhận", onPress: execute }
                                 ]);
@@ -225,10 +236,10 @@ const OrderListScreen = () => {
                             const execute = async () => {
                                 try {
                                     await paymentApi.cancelOrder(row.id);
-                                    Alert.alert("Thành công", "Đơn hàng đã được hủy.");
+                                    showAlert("Thành công", "Đơn hàng đã được hủy.");
                                     setRefreshKey(prev => prev + 1);
                                 } catch (e: any) {
-                                    Alert.alert("Lỗi", "Không thể hủy đơn: " + (e?.message || e));
+                                    showAlert("Lỗi", "Không thể hủy đơn: " + (e?.message || e));
                                 }
                             };
 
@@ -237,7 +248,7 @@ const OrderListScreen = () => {
                                     await execute();
                                 }
                             } else {
-                                Alert.alert("Xác nhận", message, [
+                                showAlert("Xác nhận", message, [
                                     { text: "Không", style: "cancel" },
                                     { text: "Hủy đơn", style: "destructive", onPress: execute }
                                 ]);
@@ -453,13 +464,13 @@ const OrderListScreen = () => {
                 onSuccess={() => {
                     setShowQrModal(false);
                     setPendingOrderId(null);
-                    Alert.alert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
+                    showAlert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
                     setRefreshKey(prev => prev + 1);
                 }}
                 onCancel={() => {
                     setShowQrModal(false);
                     setPendingOrderId(null);
-                    Alert.alert("Hủy", `Đơn #${pendingOrderNo} đã bị huỷ.`);
+                    showAlert("Hủy", `Đơn #${pendingOrderNo} đã bị huỷ.`);
                     setRefreshKey(prev => prev + 1);
                 }}
             />

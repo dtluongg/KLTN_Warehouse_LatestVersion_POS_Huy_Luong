@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -35,6 +35,7 @@ export interface DataTableScreenProps {
     idField?: string;
     searchPlaceholder?: string;
     mobilePreviewCount?: number;
+    extraHeaderActions?: React.ReactNode | ((filters: Record<string, any>, searchKeyword: string) => React.ReactNode);
     createAction?: {
         label: string;
         onPress: () => void;
@@ -103,6 +104,7 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
     idField = "id",
     searchPlaceholder = "Tìm kiếm...",
     mobilePreviewCount = 5,
+    extraHeaderActions,
     createAction,
     rowActions = [],
     hideDefaultDetailAction = false,
@@ -130,9 +132,12 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
 
     const { isDesktop } = useResponsive();
 
-    const handleSearchSubmit = () => {
-        search(searchInput);
-    };
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            search(searchInput);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchInput]);
 
     const handleSort = (colKey: string) => {
         setSort(colKey);
@@ -367,6 +372,7 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
                                     />
                                 </View>
                             )}
+                            {typeof extraHeaderActions === 'function' ? extraHeaderActions(pageState.filters || {}, searchInput) : extraHeaderActions}
                             {createAction && (
                                 <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: 99 }]} onPress={createAction.onPress}>
                                     <Typography variant="bodyEmphasized" color={colors.buttonText}>{createAction.label}</Typography>

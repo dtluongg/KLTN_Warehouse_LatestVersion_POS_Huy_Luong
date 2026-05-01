@@ -118,6 +118,7 @@ public class SupplierProductServiceImpl implements SupplierProductService {
                 .productId(sp.getProduct().getId())
                 .productSku(sp.getProduct().getSku())
                 .productName(sp.getProduct().getName())
+                .vatRate(sp.getProduct().getVatRate())
                 .standardPrice(sp.getStandardPrice())
                 .isActive(sp.getIsActive())
                 .lastUpdatedAt(sp.getLastUpdatedAt())

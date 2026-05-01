@@ -5,6 +5,13 @@ import IUH.KLTN.LvsH.dto.product.ProductResponseDTO;
 import IUH.KLTN.LvsH.dto.product.ProductSearchCriteria;
 import IUH.KLTN.LvsH.repository.ProductRepository;
 import IUH.KLTN.LvsH.service.ProductService;
+import IUH.KLTN.LvsH.service.ProductExcelService;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,8 +28,38 @@ import java.util.List;
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
 public class ProductController {
+    @GetMapping("/export")
+    public ResponseEntity<Resource> exportProducts(IUH.KLTN.LvsH.dto.product.ProductSearchCriteria criteria) {
+        InputStreamResource file = new InputStreamResource(productExcelService.exportProductsToExcel(criteria));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=products.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
+    }
+
+    @GetMapping("/export/template")
+    public ResponseEntity<Resource> downloadTemplate() {
+        InputStreamResource file = new InputStreamResource(productExcelService.downloadTemplate());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=product_template.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
+    }
+
+    @PostMapping("/import")
+    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<Map<String, Object>> importProducts(@RequestParam("file") MultipartFile file) {
+        try {
+            Map<String, Object> result = productExcelService.importProductsFromExcel(file);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
 
     private final ProductService productService;
+    private final ProductExcelService productExcelService;
 
     @GetMapping
     public ResponseEntity<Page<ProductResponseDTO>> getAllProducts(

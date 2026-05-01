@@ -49,6 +49,7 @@ public class OrderDetailResponseDTO {
         private Long productId;
         private String productSku;
         private String productName;
+        private String productShortName;
         private Integer qty;
         private BigDecimal salePrice;
         private BigDecimal lineRevenue;

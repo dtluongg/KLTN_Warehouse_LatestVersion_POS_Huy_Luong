@@ -18,6 +18,7 @@ public class SupplierProductResponseDTO {
     private Long productId;
     private String productSku;
     private String productName;
+    private BigDecimal vatRate;
 
     private BigDecimal standardPrice;
     private Boolean isActive;

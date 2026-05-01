@@ -13,6 +13,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 const WarehouseFormScreen = () => {
     const navigation = useNavigation<any>();
@@ -37,7 +38,7 @@ const WarehouseFormScreen = () => {
                 setAddress(res.data.address || "");
                 setIsActive(res.data.isActive ?? true);
             } catch {
-                Alert.alert("Lỗi", "Không thể tải dữ liệu kho hàng.");
+                showAlert("Lỗi", "Không thể tải dữ liệu kho hàng.");
             } finally {
                 setLoading(false);
             }
@@ -47,11 +48,11 @@ const WarehouseFormScreen = () => {
 
     const handleSubmit = async () => {
         if (!code.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập mã kho.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập mã kho.");
             return;
         }
         if (!name.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập tên kho.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập tên kho.");
             return;
         }
         const payload = {
@@ -64,14 +65,14 @@ const WarehouseFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/warehouses/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật kho hàng.");
+                showAlert("Thành công", "Đã cập nhật kho hàng.");
             } else {
                 await axiosClient.post("/warehouses", payload);
-                Alert.alert("Thành công", "Đã tạo kho hàng mới.");
+                showAlert("Thành công", "Đã tạo kho hàng mới.");
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 err?.response?.data?.message || "Không thể lưu kho hàng.",
             );

@@ -74,6 +74,7 @@ public class OrderServiceImpl implements OrderService {
                 .productId(i.getProduct().getId())
                 .productSku(i.getProduct().getSku())
                 .productName(i.getProduct().getName())
+                .productShortName(i.getProduct().getShortName())
                 .qty(i.getQty())
                 .salePrice(i.getSalePrice())
                 .lineRevenue(i.getLineRevenue())

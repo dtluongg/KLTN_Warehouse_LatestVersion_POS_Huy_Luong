@@ -6,6 +6,9 @@ import { useAuthStore } from "../../../store/authStore";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { theme } from "../../../utils/theme";
 import { axiosClient } from "../../../api/axiosClient";
+import { showAlert } from "../../../utils/alerts";
+import { printDocument } from "../../../utils/printUtils";
+import { generateStockAdjustmentHTML } from "../../../utils/printTemplates";
 
 const StockAdjustmentDetailView = ({ id }: { id: number }) => {
     const [detail, setDetail] = useState<any>(null);
@@ -72,7 +75,7 @@ const StockAdjustmentListScreen = () => {
             window.alert(`${title}\n${message}`);
             return;
         }
-        Alert.alert(title, message);
+        showAlert(title, message);
     };
 
     const buildDiffPreviewMessage = (detail: any) => {
@@ -108,7 +111,7 @@ const StockAdjustmentListScreen = () => {
             await axiosClient.post(`/stock-adjustments/${row.id}/complete`, null, {
                 params: { forceCompleteWhenDrift },
             });
-            Alert.alert("Thành công", `Đã duyệt ${row?.adjustNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã duyệt ${row?.adjustNo || "phiếu"}.`);
             setTableVersion((prev) => prev + 1);
         } catch (err: any) {
             const errorMessage =
@@ -131,7 +134,7 @@ const StockAdjustmentListScreen = () => {
                 return;
             }
 
-            Alert.alert(
+            showAlert(
                 "Tồn kho đã thay đổi",
                 forceMessage,
                 [
@@ -165,7 +168,7 @@ const StockAdjustmentListScreen = () => {
             return;
         }
 
-        Alert.alert(
+        showAlert(
             "Xác nhận duyệt phiếu",
             confirmMessage,
             [
@@ -189,7 +192,7 @@ const StockAdjustmentListScreen = () => {
             }
         } else {
             const nativeConfirmed = await new Promise<boolean>((resolve) => {
-                Alert.alert("Xác nhận hủy phiếu", confirmMessage, [
+                showAlert("Xác nhận hủy phiếu", confirmMessage, [
                     { text: "Không", style: "cancel", onPress: () => resolve(false) },
                     { text: "Hủy phiếu", style: "destructive", onPress: () => resolve(true) },
                 ]);
@@ -255,8 +258,15 @@ const StockAdjustmentListScreen = () => {
                 {
                     label: "In",
                     tone: "neutral",
-                    onPress: (row) =>
-                        Alert.alert("In phiếu kiểm", `Tính năng in đang được phát triển.`),
+                    onPress: async (row) => {
+                        try {
+                            const res = await axiosClient.get(`/stock-adjustments/${row.id}`);
+                            const html = generateStockAdjustmentHTML(res.data);
+                            await printDocument(html);
+                        } catch (e) {
+                            showAlert("Lỗi", "Không thể lấy thông tin in.");
+                        }
+                    },
                 },
                 {
                     label: "Duyệt",
@@ -460,4 +470,3 @@ const styles = StyleSheet.create({
     filterPillTextActive: { color: '#fff' },
     dateInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.md, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.background }
 });
-
