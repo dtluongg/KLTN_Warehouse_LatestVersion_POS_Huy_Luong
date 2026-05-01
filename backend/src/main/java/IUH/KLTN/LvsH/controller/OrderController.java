@@ -59,6 +59,14 @@ public class OrderController {
         return ResponseEntity.ok(orderService.cancelOrder(id));
     }
 
+    @GetMapping("/preview-coupon")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
+    public ResponseEntity<CouponPreviewResponseDTO> previewCoupon(
+            @RequestParam String code,
+            @RequestParam BigDecimal grossAmount) {
+        return ResponseEntity.ok(orderService.previewCoupon(code, grossAmount));
+    }
+
     @PostMapping("/{id}/reopen-qr")
     @PreAuthorize("hasAnyRole('ADMIN', 'SALES_STAFF')")
     public ResponseEntity<?> reopenQr(@PathVariable Long id) {
