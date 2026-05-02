@@ -91,18 +91,13 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     @Transactional
     public PurchaseOrderDetailResponseDTO createPurchaseOrder(PurchaseOrderRequestDTO dto) {
-        validateItemList(dto.getItems());
+        validatePurchaseOrderData(dto);
 
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
                 .orElseThrow(() -> new RuntimeException("Supplier not found"));
+        Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
+                .orElseThrow(() -> new RuntimeException("Warehouse not found"));
         Staff staff = getAuthenticatedStaff();
-
-        Warehouse warehouse = dto.getWarehouseId() != null
-                ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null)
-                : null;
-
-        // Validate SP thuộc NCC
-        validateSupplierProducts(dto.getSupplierId(), dto.getItems());
 
         BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
@@ -135,10 +130,25 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         return response;
     }
 
+    private void validatePurchaseOrderData(PurchaseOrderRequestDTO dto) {
+        if (dto.getSupplierId() == null || !supplierRepository.existsById(dto.getSupplierId())) {
+            throw new RuntimeException("Supplier not found or invalid");
+        }
+
+        if (dto.getWarehouseId() == null || !warehouseRepository.existsById(dto.getWarehouseId())) {
+            throw new RuntimeException("Warehouse not found or invalid");
+        }
+
+        validateItemList(dto.getSupplierId(), dto.getItems());
+    }
+
     @Override
     @Transactional
     public PurchaseOrderDetailResponseDTO updateDraftPurchaseOrder(Long id, PurchaseOrderRequestDTO dto) {
-        validateItemList(dto.getItems());
+        if (dto.getSupplierId() == null || !supplierRepository.existsById(dto.getSupplierId())) {
+            throw new RuntimeException("Supplier not found or invalid");
+        }
+        validateItemList(dto.getSupplierId(), dto.getItems());
 
         PurchaseOrder po = getPurchaseOrderEntityById(id);
         if (po.getStatus() != DocumentStatus.DRAFT) {
@@ -151,9 +161,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         Warehouse warehouse = dto.getWarehouseId() != null
                 ? warehouseRepository.findById(dto.getWarehouseId()).orElse(null)
                 : null;
-
-        // Validate SP thuộc NCC
-        validateSupplierProducts(dto.getSupplierId(), dto.getItems());
 
         BigDecimal discount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal surcharge = dto.getSurchargeAmount() != null ? dto.getSurchargeAmount() : BigDecimal.ZERO;
@@ -374,30 +381,21 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         return new Totals(totalAmount, totalVat, payable);
     }
 
-    private void validateItemList(List<PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO> items) {
+    private void validateItemList(UUID supplierId, List<PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
-            throw new RuntimeException("Purchase order items are required");
+            throw new RuntimeException("Danh sách sản phẩm không được để trống");
         }
-    }
-
-    /**
-     * Validate từng SP phải thuộc bảng giá NCC (chặn cứng).
-     */
-    private void validateSupplierProducts(
-            UUID supplierId,
-            List<PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO> items) {
 
         for (PurchaseOrderRequestDTO.PurchaseOrderItemRequestDTO itemDto : items) {
-            Product product = productRepository.findById(itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại: " + itemDto.getProductId()));
+            if (!productRepository.existsById(itemDto.getProductId())) {
+                throw new RuntimeException("Sản phẩm không tồn tại: " + itemDto.getProductId());
+            }
 
             // Chặn cứng: SP phải thuộc bảng giá NCC
-            supplierProductRepository
-                    .findBySupplierIdAndProductIdAndIsActiveTrue(supplierId, itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException(
-                            "Sản phẩm '" + product.getName() + "' (" + product.getSku()
-                                    + ") không thuộc bảng giá của nhà cung cấp này. "
-                                    + "Vui lòng thêm sản phẩm vào bảng giá NCC trước."));
+            if (!supplierProductRepository.existsBySupplierIdAndProductIdAndIsActiveTrue(supplierId, itemDto.getProductId())) {
+                throw new RuntimeException("Sản phẩm (ID: " + itemDto.getProductId() + ") không thuộc bảng giá của nhà cung cấp này. "
+                        + "Vui lòng thêm sản phẩm vào bảng giá NCC trước.");
+            }
         }
     }
 
