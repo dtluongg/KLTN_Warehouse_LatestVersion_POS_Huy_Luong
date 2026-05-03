@@ -1,16 +1,30 @@
+export enum Role {
+    ADMIN = "ADMIN",
+    SALES_STAFF = "SALES_STAFF",
+    WAREHOUSE_STAFF = "WAREHOUSE_STAFF",
+}
+
 export interface Staff {
     id: number;
     staffCode: string;
     fullName: string;
     username: string;
-    role: "ADMIN" | "SALES_STAFF" | "WAREHOUSE_STAFF";
+    role: Role;
     isActive: boolean;
 }
 
 export interface AuthResponse {
-    token: string;
+    accessToken: string;
+    refreshToken: string | null;
+    tokenType: string;
     username: string;
-    role: string;
+    role: Role;
+    accessTokenExpiresInMs: number;
+    refreshTokenExpiresInMs: number;
+}
+
+export interface RefreshTokenRequest {
+    refreshToken?: string | null;
 }
 
 export interface Category {

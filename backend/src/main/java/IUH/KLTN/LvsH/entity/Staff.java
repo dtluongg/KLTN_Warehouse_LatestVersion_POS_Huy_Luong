@@ -5,6 +5,8 @@ import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import IUH.KLTN.LvsH.enums.Role;
+
 @Entity
 @Table(name = "staff")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -44,7 +46,8 @@ public class Staff {
     private String passwordHash;
 
     @Column(nullable = false)
-    private String role; // SALES_STAFF, WAREHOUSE_STAFF, ADMIN
+    @Enumerated(EnumType.STRING)
+    private Role role; // SALES_STAFF, WAREHOUSE_STAFF, ADMIN
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;

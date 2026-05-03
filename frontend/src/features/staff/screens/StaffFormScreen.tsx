@@ -14,12 +14,14 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
+import { Role } from "../../../types";
+import { getRoleLabel } from "../../../utils/roleAccess";
 import { theme } from "../../../utils/theme";
 
 const ROLES = [
-    { value: "ADMIN", label: "Quản trị viên" },
-    { value: "WAREHOUSE_STAFF", label: "Nhân viên kho" },
-    { value: "SALES_STAFF", label: "Nhân viên bán hàng" },
+    { value: Role.ADMIN, label: "Quản trị viên" },
+    { value: Role.WAREHOUSE_STAFF, label: "Nhân viên kho" },
+    { value: Role.SALES_STAFF, label: "Nhân viên bán hàng" },
 ];
 
 const StaffFormScreen = () => {
@@ -37,7 +39,7 @@ const StaffFormScreen = () => {
     const [hireDate, setHireDate] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const [role, setRole] = useState("WAREHOUSE_STAFF");
+    const [role, setRole] = useState<Role>(Role.WAREHOUSE_STAFF);
     const [isActive, setIsActive] = useState(true);
     const [loading, setLoading] = useState(isEdit);
     const [submitting, setSubmitting] = useState(false);
@@ -57,7 +59,7 @@ const StaffFormScreen = () => {
                 setAddress(res.data.address || "");
                 setHireDate(res.data.hireDate || "");
                 setUsername(res.data.username || "");
-                setRole(res.data.role || "WAREHOUSE_STAFF");
+                setRole(res.data.role || Role.WAREHOUSE_STAFF);
                 setIsActive(res.data.isActive ?? true);
             } catch {
                 Alert.alert("Lỗi", "Không thể tải dữ liệu nhân viên.");
@@ -116,8 +118,7 @@ const StaffFormScreen = () => {
         }
     };
 
-    const selectedRoleLabel =
-        ROLES.find((r) => r.value === role)?.label || role;
+    const selectedRoleLabel = getRoleLabel(role);
 
     if (loading) {
         return (

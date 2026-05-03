@@ -1,8 +1,11 @@
 package IUH.KLTN.LvsH.dto.staff;
 
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import java.time.LocalDate;
+
+import IUH.KLTN.LvsH.enums.Role;
 
 @Data
 public class StaffRequestDTO {
@@ -23,8 +26,8 @@ public class StaffRequestDTO {
     
     private String password;
     
-    @NotBlank(message = "Vui lòng chọn chức vụ")
-    private String role;
+    @NotNull(message = "Vui lòng chọn chức vụ")
+    private Role role;
     
     private Boolean isActive;
 }

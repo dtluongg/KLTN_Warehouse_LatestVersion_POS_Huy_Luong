@@ -191,7 +191,7 @@ public class SupplierReturnServiceImpl implements SupplierReturnService {
         }
 
         Staff currentStaff = getAuthenticatedStaff();
-        boolean isAdmin = currentStaff.getRole() != null && currentStaff.getRole().equalsIgnoreCase("ADMIN");
+        boolean isAdmin = currentStaff.getRole() != null && currentStaff.getRole() == IUH.KLTN.LvsH.enums.Role.ADMIN;
         boolean isOwner = sr.getCreatedBy() != null && sr.getCreatedBy().getId() != null && sr.getCreatedBy().getId().equals(currentStaff.getId());
 
         if (!isAdmin && !isOwner) {

@@ -202,7 +202,7 @@ public class StockAdjustmentServiceImpl implements StockAdjustmentService {
     @Transactional
     public StockAdjustmentDetailResponseDTO completeAdjustment(Long id, boolean forceCompleteWhenDrift) {
         Staff actor = getAuthenticatedStaff();
-        if (!"ADMIN".equals(actor.getRole())) {
+        if (actor.getRole() != IUH.KLTN.LvsH.enums.Role.ADMIN) {
             throw new RuntimeException("Only ADMIN can complete stock adjustment");
         }
 

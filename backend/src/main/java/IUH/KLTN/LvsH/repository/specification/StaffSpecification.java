@@ -23,7 +23,7 @@ public class StaffSpecification {
                 );
                 predicates.add(defaultMatch);
             }
-            if (criteria.getRole() != null && !criteria.getRole().isBlank()) {
+            if (criteria.getRole() != null) {
                 predicates.add(cb.equal(root.get("role"), criteria.getRole()));
             }
             if (criteria.getIsActive() != null) {

@@ -8,7 +8,7 @@ import { DrawerContentScrollView } from "@react-navigation/drawer";
 import { useAuthStore } from "../store/authStore";
 import { useTheme } from "../hooks/useTheme";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { isRouteAllowedByRole } from "../utils/roleAccess";
+import { getRoleLabel, isRouteAllowedByRole } from "../utils/roleAccess";
 import { Typography } from "./ui/Typography";
 
 type MenuItem = {
@@ -121,11 +121,7 @@ export const CustomDrawerContent = (props: any) => {
                         </Typography>
                         <View style={[styles.roleBadge, { backgroundColor: 'rgba(0,113,227,0.1)', borderColor: colors.primary }]}>
                             <Typography variant="micro" color={colors.primary}>
-                                {role === "ADMIN"
-                                    ? "Quản trị viên"
-                                    : role === "SALES_STAFF"
-                                      ? "Bán hàng"
-                                      : "Kho"}
+                                {getRoleLabel(role)}
                             </Typography>
                         </View>
                     </View>

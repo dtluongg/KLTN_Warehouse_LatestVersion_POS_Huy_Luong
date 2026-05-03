@@ -16,25 +16,44 @@ public class JwtTokenProvider {
     @Value("${app.security.jwt.secret-key}")
     private String jwtSecret;
 
-    @Value("${app.security.jwt.expiration}")
-    private int jwtExpirationInMs;
+    @Value("${app.security.jwt.access-token-expiration-ms}")
+    private long accessTokenExpirationInMs;
+
+    public long getAccessTokenExpirationInMs() {
+        return accessTokenExpirationInMs;
+    }
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(Authentication authentication) {
+    public String generateAccessToken(Authentication authentication) {
         CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
 
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+        Date expiryDate = new Date(now.getTime() + accessTokenExpirationInMs);
 
         return Jwts.builder()
                 .subject(userPrincipal.getUsername())
-                .claim("role", userPrincipal.getStaff().getRole())
+                .claim("role", userPrincipal.getStaff().getRole().name())
                 .claim("staff_id", userPrincipal.getStaff().getId())
-                .issuedAt(new Date())
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    // Overload: generate access token directly from CustomUserDetails (used during refresh)
+    public String generateAccessToken(CustomUserDetails userPrincipal) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + accessTokenExpirationInMs);
+
+        return Jwts.builder()
+                .subject(userPrincipal.getUsername())
+                .claim("role", userPrincipal.getStaff().getRole().name())
+                .claim("staff_id", userPrincipal.getStaff().getId())
+                .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
                 .compact();

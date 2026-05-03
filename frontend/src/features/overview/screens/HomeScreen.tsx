@@ -9,6 +9,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../../store/authStore";
+import { getRoleLabel } from "../../../utils/roleAccess";
 import { useTheme } from "../../../hooks/useTheme";
 import { Typography } from "../../../components/ui/Typography";
 import { Card } from "../../../components/ui/Card";
@@ -22,12 +23,7 @@ const HomeScreen = () => {
 
     const isLargeScreen = width > 768; // Desktop / Tablet breakpoint
 
-    const roleLabel =
-        role === "ADMIN"
-            ? "Quản trị viên"
-            : role === "SALES_STAFF"
-              ? "Nhân viên bán hàng"
-              : "Nhân viên kho";
+    const roleLabel = getRoleLabel(role);
 
     const quickActions = [
         { label: "Bán hàng POS", route: "Pos", icon: "shopping-bag" as const },

@@ -17,7 +17,7 @@ public class StaffResponseDTO {
     private String address;
     private LocalDate hireDate;
     private String username;
-    private String role;
+    private IUH.KLTN.LvsH.enums.Role role;
     private Boolean isActive;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;

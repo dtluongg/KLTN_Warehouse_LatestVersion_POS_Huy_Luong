@@ -43,13 +43,13 @@ public class SupplierController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN')")
     public ResponseEntity<SupplierResponseDTO> createSupplier(@Valid @RequestBody SupplierRequestDTO request) {
         return ResponseEntity.ok(supplierService.createSupplier(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN')")
     public ResponseEntity<SupplierResponseDTO> updateSupplier(@PathVariable UUID id, @Valid @RequestBody SupplierRequestDTO request) {
         return ResponseEntity.ok(supplierService.updateSupplier(id, request));
     }

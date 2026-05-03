@@ -186,7 +186,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         }
 
         Staff currentStaff = getAuthenticatedStaff();
-        boolean isAdmin = currentStaff.getRole() != null && currentStaff.getRole().equalsIgnoreCase("ADMIN");
+        boolean isAdmin = currentStaff.getRole() != null && currentStaff.getRole() == IUH.KLTN.LvsH.enums.Role.ADMIN;
         boolean isOwner = cr.getCreatedBy() != null && cr.getCreatedBy().getId() != null && cr.getCreatedBy().getId().equals(currentStaff.getId());
 
         if (!isAdmin && !isOwner) {

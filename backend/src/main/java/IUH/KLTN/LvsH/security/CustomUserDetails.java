@@ -23,7 +23,7 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         // Gáº¯n ROLE_ vÃ o trÆ°á»›c Ä‘á»ƒ Spring Security nháº­n diá»‡n Ä‘Æ°á»£c dÃ¹ng hasRole
-        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + staff.getRole()));
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + staff.getRole().name()));
     }
 
     @Override

@@ -6,12 +6,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.lang.NonNull;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.Date;
@@ -46,6 +48,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<?> handleConstraintViolation(ConstraintViolationException ex, WebRequest request) {
         Map<String, Object> body = createBody(HttpStatus.BAD_REQUEST, "Validation Failed", ex.getMessage(), request);
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<?> handleAuthenticationException(AuthenticationException ex, WebRequest request) {
+        Map<String, Object> body = createBody(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage(), request);
+        return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<?> handleResponseStatusException(ResponseStatusException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        HttpStatus resolvedStatus = status == null ? HttpStatus.BAD_REQUEST : status;
+        String message = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+        Map<String, Object> body = createBody(resolvedStatus, resolvedStatus.getReasonPhrase(), message, request);
+        return new ResponseEntity<>(body, resolvedStatus);
     }
 
     @ExceptionHandler(RuntimeException.class)

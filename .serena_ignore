@@ -1,0 +1,7 @@
+# Chặn các file rác tiêu tốn token
+node_modules/
+target/
+.next/
+dist/
+.git/
+*.log
