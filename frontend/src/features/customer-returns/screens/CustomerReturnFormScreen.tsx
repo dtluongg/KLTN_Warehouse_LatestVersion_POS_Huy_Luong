@@ -98,8 +98,8 @@ const CustomerReturnFormScreen = () => {
         const pendingRefundByOrderItemId = new Map<number, number>();
 
         const [postedRes, draftRes] = await Promise.all([
-            axiosClient.get("/customer-returns?status=POSTED&page=0&size=500&sortBy=id&direction=desc"),
-            axiosClient.get("/customer-returns?status=DRAFT&page=0&size=500&sortBy=id&direction=desc"),
+            axiosClient.get(`/customer-returns?status=POSTED&orderId=${selectedOrderId}&page=0&size=500&sortBy=id&direction=desc`),
+            axiosClient.get(`/customer-returns?status=DRAFT&orderId=${selectedOrderId}&page=0&size=500&sortBy=id&direction=desc`),
         ]);
         const postedRows: any[] = postedRes.data?.content || postedRes.data || [];
         const draftRows: any[] = draftRes.data?.content || draftRes.data || [];

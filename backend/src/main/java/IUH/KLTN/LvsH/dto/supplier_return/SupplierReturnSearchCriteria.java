@@ -6,6 +6,7 @@ import java.time.LocalDate;
 @Data
 public class SupplierReturnSearchCriteria {
     private String keyword; // returnNo, supplierName
+    private Long goodsReceiptId;
     private Long warehouseId;
     private String status;
     private LocalDate fromDate;

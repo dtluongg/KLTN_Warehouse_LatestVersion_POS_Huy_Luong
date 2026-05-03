@@ -21,6 +21,9 @@ public class SupplierReturnSpecification {
                 );
                 predicates.add(defaultMatch);
             }
+            if (criteria.getGoodsReceiptId() != null) {
+                predicates.add(cb.equal(root.join("goodsReceipt").get("id"), criteria.getGoodsReceiptId()));
+            }
             if (criteria.getWarehouseId() != null) {
                 predicates.add(cb.equal(root.join("warehouse").get("id"), criteria.getWarehouseId()));
             }

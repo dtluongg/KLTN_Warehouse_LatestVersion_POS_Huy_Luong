@@ -21,6 +21,9 @@ public class CustomerReturnSpecification {
                 );
                 predicates.add(defaultMatch);
             }
+            if (criteria.getOrderId() != null) {
+                predicates.add(cb.equal(root.join("order").get("id"), criteria.getOrderId()));
+            }
             if (criteria.getWarehouseId() != null) {
                 predicates.add(cb.equal(root.join("warehouse").get("id"), criteria.getWarehouseId()));
             }

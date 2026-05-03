@@ -80,8 +80,8 @@ const SupplierReturnFormScreen = () => {
         const pendingByGrItemId = new Map<number, number>();
 
         const [postedRes, draftRes] = await Promise.all([
-            axiosClient.get("/supplier-returns?status=POSTED&page=0&size=500&sortBy=id&direction=desc"),
-            axiosClient.get("/supplier-returns?status=DRAFT&page=0&size=500&sortBy=id&direction=desc"),
+            axiosClient.get(`/supplier-returns?status=POSTED&goodsReceiptId=${selectedGrId}&page=0&size=500&sortBy=id&direction=desc`),
+            axiosClient.get(`/supplier-returns?status=DRAFT&goodsReceiptId=${selectedGrId}&page=0&size=500&sortBy=id&direction=desc`),
         ]);
         const postedRows: any[] = postedRes.data?.content || postedRes.data || [];
         const draftRows: any[] = draftRes.data?.content || draftRes.data || [];
