@@ -1,0 +1,3 @@
+Cho Serena đọc file /memories/repo/jwt-security-audit.md để nắm tình hình bảo mật. Không cần quét lại toàn bộ codebase. Hãy cho tôi biết rõ về cơ chế thời gian của refreshToken và accessToken hiện tại. Cho tôi biết rõ thời gian của mỗi loại.
+
+/memories/repo/supplier-management-updates.md

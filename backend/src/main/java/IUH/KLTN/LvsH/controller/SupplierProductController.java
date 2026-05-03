@@ -33,23 +33,23 @@ public class SupplierProductController {
         return ResponseEntity.ok(supplierProductService.getSuppliersByProduct(productId));
     }
 
-    // Thêm SP vào bảng giá NCC
+    // Thêm SP vào bảng giá NCC (chỉ ADMIN)
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SupplierProductResponseDTO> create(@Valid @RequestBody SupplierProductRequestDTO request) {
         return ResponseEntity.ok(supplierProductService.create(request));
     }
 
-    // Cập nhật giá / trạng thái
+    // Cập nhật giá / trạng thái (chỉ ADMIN)
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SupplierProductResponseDTO> update(
             @PathVariable Long id,
             @Valid @RequestBody SupplierProductRequestDTO request) {
         return ResponseEntity.ok(supplierProductService.update(id, request));
     }
 
-    // Xóa SP khỏi bảng giá NCC
+    // Xóa SP khỏi bảng giá NCC (chỉ ADMIN)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

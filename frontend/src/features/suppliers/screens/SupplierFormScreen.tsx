@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     FlatList,
     Modal,
+    Platform,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -22,12 +23,16 @@ import {
     SupplierProductDTO,
 } from "../../../api/supplierProductApi";
 import { theme } from "../../../utils/theme";
+import { useAuthStore } from "../../../store/authStore";
+import { Role } from "../../../types";
 
 const SupplierFormScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const editId: string | undefined = route.params?.id; // UUID string
     const isEdit = !!editId;
+    const userRole = useAuthStore(state => state.role);
+    const isAdmin = userRole === Role.ADMIN;
 
     // supplierCode là readonly — trigger SQL tự sinh NCC-XXXXX khi create
     const [supplierCode, setSupplierCode] = useState("");
@@ -48,7 +53,12 @@ const SupplierFormScreen = () => {
     const [addingPrice, setAddingPrice] = useState("");
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [addingProduct, setAddingProduct] = useState(false);
-
+    const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
+    // Edit supplier product
+    const [showEditProductModal, setShowEditProductModal] = useState(false);
+    const [editingProductId, setEditingProductId] = useState<number | null>(null);
+    const [editingPrice, setEditingPrice] = useState("");
+    const [updatingProduct, setUpdatingProduct] = useState(false);
     useEffect(() => {
         if (!isEdit) return;
         const load = async () => {
@@ -118,24 +128,61 @@ const SupplierFormScreen = () => {
         } finally { setAddingProduct(false); }
     };
 
-    const handleRemoveProduct = (sp: SupplierProductDTO) => {
-        Alert.alert(
-            "Xóa sản phẩm",
-            `Xóa "${sp.productName}" khỏi bảng giá NCC?`,
-            [
-                { text: "Hủy", style: "cancel" },
-                {
-                    text: "Xóa", style: "destructive", onPress: async () => {
-                        try {
-                            await deleteSupplierProduct(sp.id);
-                            await loadSupplierProducts();
-                        } catch (err: any) {
-                            Alert.alert("Lỗi", err?.response?.data?.message || "Không thể xóa.");
-                        }
-                    }
-                },
-            ]
-        );
+    const handleRemoveProduct = async (sp: SupplierProductDTO) => {
+        const confirmed = Platform.OS === "web"
+            ? window.confirm(`Xóa "${sp.productName}" khỏi bảng giá NCC?`)
+            : true;
+
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingProductId(sp.id);
+        try {
+            await deleteSupplierProduct(sp.id);
+            await loadSupplierProducts();
+        } catch (err: any) {
+            // Provide more detailed error feedback in UI / console
+            console.error('Delete supplier-product failed', err?.response || err);
+            const serverMsg = err?.response?.data?.message;
+            const status = err?.response?.status;
+            Alert.alert(
+                "Lỗi",
+                serverMsg || (status ? `HTTP ${status}` : "Không thể xóa."),
+            );
+        } finally {
+            setDeletingProductId(null);
+        }
+    };
+
+    const handleEditProduct = (sp: SupplierProductDTO) => {
+        setEditingProductId(sp.id);
+        setEditingPrice(String(sp.standardPrice));
+        setShowEditProductModal(true);
+    };
+
+    const handleUpdateProduct = async () => {
+        if (!editingProductId || !editingPrice || Number(editingPrice) < 0) {
+            Alert.alert("Thiếu thông tin", "Vui lòng nhập giá hợp lệ.");
+            return;
+        }
+        try {
+            setUpdatingProduct(true);
+            await updateSupplierProduct(editingProductId, {
+                supplierId: editId!,
+                productId: 0, // Backend không sử dụng khi update
+                standardPrice: Number(editingPrice),
+            });
+            setShowEditProductModal(false);
+            setEditingProductId(null);
+            setEditingPrice("");
+            await loadSupplierProducts();
+            Alert.alert("Thành công", "Đã cập nhật giá sản phẩm.");
+        } catch (err: any) {
+            Alert.alert("Lỗi", err?.response?.data?.message || "Không thể cập nhật giá.");
+        } finally {
+            setUpdatingProduct(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -144,7 +191,9 @@ const SupplierFormScreen = () => {
             return;
         }
         const payload = {
-            supplierCode: null, // trigger SQL tự sinh NCC-XXXXX
+            // Khi tạo: supplierCode = null (backend tự sinh NCC-XXXXX)
+            // Khi sửa: không gửi supplierCode (giữ giá trị hiện tại)
+            ...(isEdit ? {} : { supplierCode: null }),
             name: name.trim(),
             phone: phone.trim() || null,
             taxCode: taxCode.trim() || null,
@@ -290,8 +339,8 @@ const SupplierFormScreen = () => {
                     </View>
                 </View>
 
-                {/* Bảng giá sản phẩm NCC (chỉ hiển khi edit) */}
-                {isEdit && (
+                {/* Bảng giá sản phẩm NCC (chỉ hiển khi edit & ADMIN) */}
+                {isEdit && isAdmin && (
                     <View style={styles.card}>
                         <View style={styles.spHeader}>
                             <Text style={styles.sectionTitle}>Sản phẩm cung cấp</Text>
@@ -329,14 +378,34 @@ const SupplierFormScreen = () => {
                                         )}
                                     </View>
                                     <TouchableOpacity
+                                        style={styles.spEditBtn}
+                                        onPress={() => handleEditProduct(sp)}
+                                    >
+                                        <Feather name="edit-2" size={16} color={theme.colors.primary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
                                         style={styles.spRemoveBtn}
                                         onPress={() => handleRemoveProduct(sp)}
+                                        disabled={deletingProductId === sp.id}
                                     >
-                                        <Feather name="trash-2" size={16} color={theme.colors.error} />
+                                        {deletingProductId === sp.id
+                                            ? <ActivityIndicator size="small" color={theme.colors.error} />
+                                            : <Feather name="trash-2" size={16} color={theme.colors.error} />
+                                        }
                                     </TouchableOpacity>
                                 </View>
                             ))
                         )}
+                    </View>
+                )}
+
+                {/* Thông báo cho non-admin users */}
+                {isEdit && !isAdmin && (
+                    <View style={styles.infoCard}>
+                        <Feather name="info" size={16} color={theme.colors.primary} />
+                        <Text style={styles.infoText}>
+                            Chỉ quản trị viên có quyền quản lý sản phẩm của nhà cung cấp.
+                        </Text>
                     </View>
                 )}
             </ScrollView>
@@ -447,6 +516,61 @@ const SupplierFormScreen = () => {
                                 </View>
                             </View>
                         )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal sửa giá sản phẩm NCC */}
+            <Modal visible={showEditProductModal} transparent animationType="slide" onRequestClose={() => setShowEditProductModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Cập nhật giá sản phẩm</Text>
+                            <TouchableOpacity onPress={() => { setShowEditProductModal(false); setEditingProductId(null); setEditingPrice(""); }}>
+                                <Feather name="x" size={22} color={theme.colors.foreground} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ padding: 16 }}>
+                            {editingProductId && (
+                                <>
+                                    <Text style={styles.label}>Sản phẩm:</Text>
+                                    <Text style={[styles.spName, { marginBottom: 16 }]}>
+                                        {supplierProducts.find(sp => sp.id === editingProductId)?.productName ?? ""}
+                                    </Text>
+
+                                    <Text style={styles.label}>Giá mua mặc định (VND) <Text style={styles.required}>*</Text></Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        value={editingPrice}
+                                        onChangeText={setEditingPrice}
+                                        placeholder="Nhập giá..."
+                                        placeholderTextColor={theme.colors.mutedForeground}
+                                    />
+
+                                    <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                                        <TouchableOpacity
+                                            style={[styles.submitBtn, { flex: 1, backgroundColor: theme.colors.muted }]}
+                                            onPress={() => { setShowEditProductModal(false); setEditingProductId(null); setEditingPrice(""); }}
+                                        >
+                                            <Text style={[styles.submitBtnText, { color: theme.colors.foreground }]}>Hủy</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.submitBtn, { flex: 1 }, updatingProduct && styles.submitBtnDisabled]}
+                                            onPress={handleUpdateProduct}
+                                            disabled={updatingProduct}
+                                        >
+                                            {updatingProduct
+                                                ? <ActivityIndicator color="#fff" size="small" />
+                                                : <Feather name="check" size={16} color="#fff" />
+                                            }
+                                            <Text style={styles.submitBtnText}>{updatingProduct ? "Đang lưu..." : "Cập nhật"}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )}
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -595,6 +719,7 @@ const styles = StyleSheet.create({
     spSku: { fontSize: 12, color: theme.colors.mutedForeground, marginTop: 2 },
     spPrice: { fontSize: 14, fontWeight: "700", color: theme.colors.primary },
     spDate: { fontSize: 11, color: theme.colors.mutedForeground, marginTop: 2 },
+    spEditBtn: { padding: 6, marginRight: 4 },
     spRemoveBtn: { padding: 6 },
 
     // Modal styles
@@ -615,6 +740,25 @@ const styles = StyleSheet.create({
     modalItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
     modalItemName: { fontSize: 14, fontWeight: "600", color: theme.colors.foreground },
     modalItemSub: { fontSize: 12, color: theme.colors.mutedForeground, marginTop: 2 },
+
+    // Info card styles
+    infoCard: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 10,
+        backgroundColor: theme.colors.surface,
+        margin: 16,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+    },
+    infoText: {
+        flex: 1,
+        fontSize: 13,
+        color: theme.colors.primary,
+        fontWeight: "500",
+    },
 });
 
 export default SupplierFormScreen;

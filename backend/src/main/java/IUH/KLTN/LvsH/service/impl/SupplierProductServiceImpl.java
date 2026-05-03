@@ -107,7 +107,12 @@ public class SupplierProductServiceImpl implements SupplierProductService {
     public void delete(Long id) {
         SupplierProduct sp = supplierProductRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bản ghi bảng giá NCC không tồn tại"));
-        supplierProductRepository.delete(sp);
+                // Soft delete: keep history and allow re-activation on create.
+                // getProductsBySupplier()/getSuppliersByProduct() only return active records,
+                // so marking inactive makes the record disappear from the UI immediately.
+                sp.setIsActive(false);
+                sp.setLastUpdatedAt(LocalDateTime.now());
+                supplierProductRepository.save(sp);
     }
 
     private SupplierProductResponseDTO toResponseDTO(SupplierProduct sp) {

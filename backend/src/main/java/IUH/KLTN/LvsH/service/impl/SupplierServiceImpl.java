@@ -52,7 +52,11 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     public SupplierResponseDTO updateSupplier(UUID id, SupplierRequestDTO request) {
         Supplier supplier = getSupplierById(id);
-        supplier.setSupplierCode(request.getSupplierCode());
+        // Only update supplierCode when client explicitly provides a value.
+        // Prevent accidental overwrite to null when the frontend omits supplierCode on edits.
+        if (request.getSupplierCode() != null) {
+            supplier.setSupplierCode(request.getSupplierCode());
+        }
         supplier.setName(request.getName());
         supplier.setPhone(request.getPhone());
         supplier.setTaxCode(request.getTaxCode());
