@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="PO Creation UML Sequence (Minimal Create Response)" id="po-seq-uml-v2">
+    <mxGraphModel dx="1750" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1800">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="10" value="Warehouse Staff" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="60" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" value="PurchaseOrderScreen&lt;br&gt;(UI)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="120" y="20" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" value="PurchaseOrderController" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="330" y="20" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" value="PurchaseOrderServiceImpl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="540" y="20" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" value="SupplierRepository" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="770" y="20" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="15" value="WarehouseRepository" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="960" y="20" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="16" value="ProductRepository" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="20" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="17" value="SupplierProductRepository" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="20" width="190" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="18" value="PurchaseOrderRepository" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1550" y="20" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="19" value="PurchaseOrderItemRepository" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1750" y="20" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="20" value="PurchaseOrder&lt;br&gt;(Entity)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1970" y="20" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" value="CreatePOResponse&lt;br&gt;{id, poNo}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="2150" y="20" width="220" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="100" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="10">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="50" y="150" as="sourcePoint"/>
+            <mxPoint x="50" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="101" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="11">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="210" y="70" as="sourcePoint"/>
+            <mxPoint x="210" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="102" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="12">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="420" y="70" as="sourcePoint"/>
+            <mxPoint x="420" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="103" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="13">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="70" as="sourcePoint"/>
+            <mxPoint x="640" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="104" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="14">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="855" y="70" as="sourcePoint"/>
+            <mxPoint x="855" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="105" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="15">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1045" y="70" as="sourcePoint"/>
+            <mxPoint x="1045" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="106" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="16">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1235" y="70" as="sourcePoint"/>
+            <mxPoint x="1235" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="107" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="17">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1435" y="70" as="sourcePoint"/>
+            <mxPoint x="1435" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="108" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="18">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1640" y="70" as="sourcePoint"/>
+            <mxPoint x="1640" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="109" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="19">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1850" y="70" as="sourcePoint"/>
+            <mxPoint x="1850" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="110" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="20">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="2050" y="70" as="sourcePoint"/>
+            <mxPoint x="2050" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="111" value="" style="endArrow=none;dashed=1;strokeColor=#999999;html=1;" edge="1" parent="1" source="21">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="2260" y="70" as="sourcePoint"/>
+            <mxPoint x="2260" y="1250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="200" value="" style="fillColor=#666666;strokeColor=#333333;" vertex="1" parent="1"><mxGeometry x="204" y="140" width="12" height="980" as="geometry"/></mxCell>
+        <mxCell id="201" value="" style="fillColor=#6c8ebf;strokeColor=#333333;" vertex="1" parent="1"><mxGeometry x="414" y="180" width="12" height="900" as="geometry"/></mxCell>
+        <mxCell id="202" value="" style="fillColor=#82b366;strokeColor=#333333;" vertex="1" parent="1"><mxGeometry x="634" y="220" width="12" height="800" as="geometry"/></mxCell>
+
+        <mxCell id="210" value="loop [for each item in dto.getItems()]" style="rounded=0;dashed=1;whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=none;align=left;verticalAlign=top;spacing=4;" vertex="1" parent="1">
+          <mxGeometry x="600" y="380" width="1360" height="280" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="211" value="alt [success | validation error]" style="rounded=0;dashed=1;whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=none;align=left;verticalAlign=top;spacing=4;" vertex="1" parent="1">
+          <mxGeometry x="560" y="880" width="1760" height="260" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="300" value="1. Nhap thong tin PO va items" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="10" target="11"><mxGeometry relative="1" as="geometry"><mxPoint x="50" y="180" as="sourcePoint"/><mxPoint x="210" y="180" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="301" value="2. POST /api/purchase-orders" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="11" target="12"><mxGeometry relative="1" as="geometry"><mxPoint x="210" y="240" as="sourcePoint"/><mxPoint x="420" y="240" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="302" value="3. createPurchaseOrder(request)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="12" target="13"><mxGeometry relative="1" as="geometry"><mxPoint x="420" y="300" as="sourcePoint"/><mxPoint x="640" y="300" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="303" value="4. supplierRepository.findById(dto.getSupplierId())" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="14"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="360" as="sourcePoint"/><mxPoint x="855" y="360" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="304" value="5. warehouseRepository.findById(dto.getWarehouseId()) [optional]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="15"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="420" as="sourcePoint"/><mxPoint x="1045" y="420" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="305" value="6. productRepository.findById(itemDto.getProductId())" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="16"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="480" as="sourcePoint"/><mxPoint x="1235" y="480" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="306" value="7. supplierProductRepository.findBySupplierIdAndProductIdAndIsActiveTrue(...)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="17"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="540" as="sourcePoint"/><mxPoint x="1435" y="540" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="307" value="8. Build PurchaseOrder entity (status=DRAFT, receiptProgress=NOT_RECEIVED)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="20"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="600" as="sourcePoint"/><mxPoint x="2050" y="600" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="308" value="9. poRepository.saveAndFlush(po)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="18"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="660" as="sourcePoint"/><mxPoint x="1640" y="660" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="309" value="10. poRepository.findPoNoById(po.getId())" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="18"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="720" as="sourcePoint"/><mxPoint x="1640" y="720" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="310" value="11. poItemRepository.save(item) [loop items]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="19"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="780" as="sourcePoint"/><mxPoint x="1850" y="780" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="311" value="12. Build create response {id, poNo}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="13" target="21"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="840" as="sourcePoint"/><mxPoint x="2260" y="840" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="312" value="13. {id, poNo}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;endArrow=open;html=1;" edge="1" parent="1" source="13" target="12"><mxGeometry relative="1" as="geometry"><mxPoint x="640" y="900" as="sourcePoint"/><mxPoint x="420" y="900" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="313" value="14. 201 Created + {id, poNo}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;endArrow=open;html=1;" edge="1" parent="1" source="12" target="11"><mxGeometry relative="1" as="geometry"><mxPoint x="420" y="960" as="sourcePoint"/><mxPoint x="210" y="960" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="314" value="15. [Optional] GET /api/purchase-orders/{id}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;html=1;" edge="1" parent="1" source="11" target="12"><mxGeometry relative="1" as="geometry"><mxPoint x="210" y="1020" as="sourcePoint"/><mxPoint x="420" y="1020" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="315" value="16. [Optional] 200 OK + PurchaseOrderDetailResponseDTO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;endArrow=open;html=1;" edge="1" parent="1" source="12" target="11"><mxGeometry relative="1" as="geometry"><mxPoint x="420" y="1080" as="sourcePoint"/><mxPoint x="210" y="1080" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="316" value="17. Hien thi ket qua tao PO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;endArrow=open;html=1;" edge="1" parent="1" source="11" target="10"><mxGeometry relative="1" as="geometry"><mxPoint x="210" y="1140" as="sourcePoint"/><mxPoint x="50" y="1140" as="targetPoint"/></mxGeometry></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

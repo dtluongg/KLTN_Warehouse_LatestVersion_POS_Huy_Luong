@@ -6,6 +6,9 @@ import { useAuthStore } from "../../../store/authStore";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { theme } from "../../../utils/theme";
 import { axiosClient } from "../../../api/axiosClient";
+import { showAlert } from "../../../utils/alerts";
+import { printDocument } from "../../../utils/printUtils";
+import { generateCustomerReturnHTML } from "../../../utils/printTemplates";
 
 const CustomerReturnDetailView = ({ id }: { id: number }) => {
     const [detail, setDetail] = useState<any>(null);
@@ -81,10 +84,10 @@ const CustomerReturnListScreen = () => {
     const completeReturnRequest = async (row: any) => {
         try {
             await axiosClient.post(`/customer-returns/${row.id}/complete`);
-            Alert.alert("Thành công", `Đã duyệt ${row?.returnNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã duyệt ${row?.returnNo || "phiếu"}.`);
             setTableVersion((prev) => prev + 1);
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Không thể duyệt",
                 err?.response?.data?.message
                     || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`,
@@ -95,10 +98,10 @@ const CustomerReturnListScreen = () => {
     const cancelReturnRequest = async (row: any) => {
         try {
             await axiosClient.post(`/customer-returns/${row.id}/cancel`);
-            Alert.alert("Thành công", `Đã hủy ${row?.returnNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã hủy ${row?.returnNo || "phiếu"}.`);
             setTableVersion((prev) => prev + 1);
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Không thể hủy",
                 err?.response?.data?.message
                     || `HTTP ${err?.response?.status || "?"}: ${err?.message || "Vui lòng thử lại."}`,
@@ -118,7 +121,7 @@ const CustomerReturnListScreen = () => {
             return;
         }
 
-        Alert.alert(
+        showAlert(
             "Xác nhận duyệt phiếu",
             confirmMessage,
             [
@@ -144,7 +147,7 @@ const CustomerReturnListScreen = () => {
             return;
         }
 
-        Alert.alert(
+        showAlert(
             "Xác nhận hủy phiếu",
             confirmMessage,
             [
@@ -210,11 +213,15 @@ const CustomerReturnListScreen = () => {
                 {
                     label: "In",
                     tone: "neutral",
-                    onPress: (row) =>
-                        Alert.alert(
-                            "In phiếu trả KH",
-                            `Sẵn sàng in ${row?.returnNo || "phiếu"}.`,
-                        ),
+                    onPress: async (row) => {
+                        try {
+                            const res = await axiosClient.get(`/customer-returns/${row.id}`);
+                            const html = generateCustomerReturnHTML(res.data);
+                            await printDocument(html);
+                        } catch (e) {
+                            showAlert("Lỗi", "Không thể lấy thông tin in.");
+                        }
+                    },
                 },
                 {
                     label: "Duyệt",
@@ -506,4 +513,3 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: theme.colors.foreground, backgroundColor: theme.colors.background
     }
 });
-

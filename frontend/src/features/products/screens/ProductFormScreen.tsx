@@ -18,6 +18,7 @@ import * as ImagePicker from "expo-image-picker";
 import { axiosClient } from "../../../api/axiosClient";
 import { uploadProductImageToSupabase } from "../../../api/supabaseStorage";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 interface Category {
     id: number;
@@ -89,7 +90,7 @@ const ProductFormScreen = () => {
                     setIsActive(res.data.isActive ?? true);
                 }
             } catch (e) {
-                Alert.alert("Lỗi", "Không thể tải dữ liệu.");
+                showAlert("Lỗi", "Không thể tải dữ liệu.");
             } finally {
                 setLoading(false);
             }
@@ -102,7 +103,7 @@ const ProductFormScreen = () => {
             const permission =
                 await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!permission.granted) {
-                Alert.alert(
+                showAlert(
                     "Thiếu quyền",
                     "Vui lòng cấp quyền truy cập thư viện ảnh để chọn ảnh sản phẩm.",
                 );
@@ -132,10 +133,10 @@ const ProductFormScreen = () => {
             });
 
             setImageUrl(publicUrl);
-            Alert.alert("Thành công", "Đã upload ảnh sản phẩm lên Supabase.");
+            showAlert("Thành công", "Đã upload ảnh sản phẩm lên Supabase.");
         } catch (err: any) {
             setLocalImageUri(null);
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 err?.message || "Không thể upload ảnh sản phẩm.",
             );
@@ -151,19 +152,19 @@ const ProductFormScreen = () => {
 
     const handleSubmit = async () => {
         if (!sku.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập mã SKU.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập mã SKU.");
             return;
         }
         if (!name.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập tên sản phẩm.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập tên sản phẩm.");
             return;
         }
         if (!categoryId) {
-            Alert.alert("Thiếu thông tin", "Vui lòng chọn danh mục.");
+            showAlert("Thiếu thông tin", "Vui lòng chọn danh mục.");
             return;
         }
         if (!salePrice || Number(salePrice) < 0) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập giá bán hợp lệ.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập giá bán hợp lệ.");
             return;
         }
 
@@ -182,14 +183,14 @@ const ProductFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/products/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật sản phẩm.");
+                showAlert("Thành công", "Đã cập nhật sản phẩm.");
             } else {
                 await axiosClient.post("/products", payload);
-                Alert.alert("Thành công", "Đã tạo sản phẩm mới.");
+                showAlert("Thành công", "Đã tạo sản phẩm mới.");
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 err?.response?.data?.message || "Không thể lưu sản phẩm.",
             );

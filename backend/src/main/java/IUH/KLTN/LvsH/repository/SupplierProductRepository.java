@@ -23,12 +23,9 @@ public interface SupplierProductRepository extends JpaRepository<SupplierProduct
     // Lấy danh sách NCC cung cấp 1 SP (tất cả trạng thái)
     List<SupplierProduct> findByProductId(Long productId);
 
-    // Tìm bản ghi theo NCC + SP (active)
-    Optional<SupplierProduct> findBySupplierIdAndProductIdAndIsActiveTrue(UUID supplierId, Long productId);
-
     // Tìm bản ghi theo NCC + SP (bất kỳ trạng thái)
     Optional<SupplierProduct> findBySupplierIdAndProductId(UUID supplierId, Long productId);
 
-    // Kiểm tra SP có thuộc NCC không
+    // Kiểm tra SP có thuộc NCC không + SP (active)
     boolean existsBySupplierIdAndProductIdAndIsActiveTrue(UUID supplierId, Long productId);
 }

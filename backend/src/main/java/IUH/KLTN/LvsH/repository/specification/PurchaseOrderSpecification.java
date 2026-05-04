@@ -34,6 +34,15 @@ public class PurchaseOrderSpecification {
                 predicates.add(cb.lessThanOrEqualTo(root.get("orderDate"), criteria.getToDate()));
             }
 
+            
+            if (criteria.getIsClosed() != null) {
+                if (criteria.getIsClosed()) {
+                    predicates.add(cb.isNotNull(root.get("closedAt")));
+                } else {
+                    predicates.add(cb.isNull(root.get("closedAt")));
+                }
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }

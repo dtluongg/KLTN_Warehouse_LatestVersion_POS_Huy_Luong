@@ -7,6 +7,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { Typography } from '../../../components/ui/Typography';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
+import { showAlert } from "../../../utils/alerts";
 
 const bgUrl = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=2832&auto=format&fit=crop';
 
@@ -23,7 +24,7 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      showAlert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
       return;
     }
     
@@ -32,7 +33,7 @@ const LoginScreen = () => {
       const res = await authApi.login({ username, password });
       await login(res);
     } catch (error: any) {
-      Alert.alert('Đăng nhập thất bại', error.response?.data?.message || 'Sai tên đăng nhập hoặc mật khẩu');
+      showAlert('Đăng nhập thất bại', error.response?.data?.message || 'Sai tên đăng nhập hoặc mật khẩu');
     } finally {
       setLoading(false);
     }

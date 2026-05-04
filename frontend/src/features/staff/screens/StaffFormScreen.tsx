@@ -17,6 +17,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Role } from "../../../types";
 import { getRoleLabel } from "../../../utils/roleAccess";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 const ROLES = [
     { value: Role.ADMIN, label: "Quản trị viên" },
@@ -62,7 +63,7 @@ const StaffFormScreen = () => {
                 setRole(res.data.role || Role.WAREHOUSE_STAFF);
                 setIsActive(res.data.isActive ?? true);
             } catch {
-                Alert.alert("Lỗi", "Không thể tải dữ liệu nhân viên.");
+                showAlert("Lỗi", "Không thể tải dữ liệu nhân viên.");
             } finally {
                 setLoading(false);
             }
@@ -72,15 +73,15 @@ const StaffFormScreen = () => {
 
     const handleSubmit = async () => {
         if (!fullName.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập họ tên nhân viên.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập họ tên nhân viên.");
             return;
         }
         if (!username.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập tên đăng nhập.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập tên đăng nhập.");
             return;
         }
         if (!role) {
-            Alert.alert("Thiếu thông tin", "Vui lòng chọn chức vụ.");
+            showAlert("Thiếu thông tin", "Vui lòng chọn chức vụ.");
             return;
         }
 
@@ -102,14 +103,14 @@ const StaffFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/staffs/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật nhân viên.");
+                showAlert("Thành công", "Đã cập nhật nhân viên.");
             } else {
                 await axiosClient.post("/staffs", payload);
-                Alert.alert("Thành công", "Đã tạo tài khoản nhân viên.");
+                showAlert("Thành công", "Đã tạo tài khoản nhân viên.");
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 err?.response?.data?.message || "Không thể lưu nhân viên.",
             );

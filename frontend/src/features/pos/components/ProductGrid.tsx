@@ -107,7 +107,7 @@ export const ProductGrid = ({
                         numColumns={isLargeScreen ? 4 : 2}
                         key={isLargeScreen ? "cols-4" : "cols-2"}
                         scrollEnabled={false} // Disable auto flatlist scroll because container scrolls
-                        columnWrapperStyle={styles.row}
+                        columnWrapperStyle={{ gap: 16, marginBottom: 16, justifyContent: 'flex-start' }}
                         showsVerticalScrollIndicator={false}
                         ListEmptyComponent={
                             <Typography style={{ textAlign: "center", marginTop: 40 }} color={colors.textDisabled}>
@@ -120,7 +120,7 @@ export const ProductGrid = ({
                                     styles.productCard,
                                     { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: metrics.borderRadius.large },
                                     item.onHand <= 0 && { opacity: 0.5 },
-                                    !isLargeScreen && { maxWidth: "48%" },
+                                    { maxWidth: isLargeScreen ? "23.5%" : "47.5%" },
                                 ]}
                                 activeOpacity={0.7}
                                 onPress={() => handleAddToCart(item)}
@@ -163,7 +163,6 @@ const styles = StyleSheet.create({
     searchInput: { flex: 1, marginLeft: 8, height: "100%" },
     categoryChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
     loadingCenter: { flex: 1, justifyContent: "center", alignItems: "center" },
-    row: { justifyContent: "space-between", marginBottom: 16 },
     productCard: { flex: 1, borderWidth: 1, overflow: "hidden", elevation: 1 },
     productImagePlaceholder: { height: 140, justifyContent: "center", alignItems: "center", width: "100%" },
     productInfo: { padding: 12 },

@@ -10,4 +10,5 @@ public class PurchaseOrderSearchCriteria {
     private String status;
     private LocalDate fromDate;
     private LocalDate toDate;
+    private Boolean isClosed;
 }

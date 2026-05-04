@@ -21,6 +21,7 @@ import { paymentApi, type CreateQrData } from "../../../api/paymentApi";
 import { ProductGrid } from "../components/ProductGrid";
 import { CartSummary } from "../components/CartSummary";
 import { QRPaymentModal } from "../components/QRPaymentModal";
+import { showAlert } from "../../../utils/alerts";
 
 export const PosScreen = () => {
     const { colors, metrics } = useTheme();
@@ -89,7 +90,7 @@ export const PosScreen = () => {
             setProducts(res.data);
         } catch (error) {
             console.log("Lỗi fetch sản phẩm:", error);
-            Alert.alert("Lỗi", "Không thể lấy danh sách sản phẩm từ máy chủ.");
+            showAlert("Lỗi", "Không thể lấy danh sách sản phẩm từ máy chủ.");
         } finally {
             setLoading(false);
         }
@@ -106,7 +107,7 @@ export const PosScreen = () => {
 
     const handleAddToCart = (product: any) => {
         if (product.onHand <= 0) {
-            Alert.alert("Hết hàng", "Sản phẩm này đã hết trong kho!");
+            showAlert("Hết hàng", "Sản phẩm này đã hết trong kho!");
             return;
         }
         addToCart(product);
@@ -116,11 +117,11 @@ export const PosScreen = () => {
         setCheckoutError("");
 
         if (cart.length === 0) {
-            Alert.alert("Lỗi", "Giỏ hàng đang trống!");
+            showAlert("Lỗi", "Giỏ hàng đang trống!");
             return;
         }
         if (!warehouseId) {
-            Alert.alert("Chưa chọn kho", "Vui lòng chọn kho xuất hàng trước khi thanh toán!");
+            showAlert("Chưa chọn kho", "Vui lòng chọn kho xuất hàng trước khi thanh toán!");
             setShowWarehouseModal(true);
             return;
         }
@@ -167,7 +168,7 @@ export const PosScreen = () => {
                 setTimeLeftSec(120);
                 setShowQrModal(true);
 
-                Alert.alert(
+                showAlert(
                     "Đã tạo QR",
                     `Đơn hàng #${orderNo}\nKhách cần trả: ${netAmount.toLocaleString("vi-VN")} đ`,
                 );
@@ -175,7 +176,7 @@ export const PosScreen = () => {
                 return;
             }
 
-            Alert.alert("Thành công", `Đã tạo Đơn hàng #${orderNo}`);
+            showAlert("Thành công", `Đã tạo Đơn hàng #${orderNo}`);
             clearCart();
             fetchProductsByWarehouse();
         } catch (error: any) {
@@ -186,7 +187,7 @@ export const PosScreen = () => {
                 error?.message ||
                 "Đã xảy ra lỗi";
             setCheckoutError(errMessage);
-            Alert.alert("Lỗi", errMessage);
+            showAlert("Lỗi", errMessage);
         } finally {
             setLoading(false);
         }
@@ -222,6 +223,9 @@ export const PosScreen = () => {
                                         warehouseId === w.id && { borderColor: colors.primary, backgroundColor: 'rgba(0,113,227,0.05)' }
                                     ]}
                                     onPress={() => {
+                                        if (warehouseId !== w.id) {
+                                            clearCart();
+                                        }
                                         setWarehouseId(w.id);
                                         setWarehouseName(w.name);
                                         setShowWarehouseModal(false);
@@ -312,7 +316,7 @@ export const PosScreen = () => {
                 onSuccess={() => {
                     setShowQrModal(false);
                     setPendingOrderId(null);
-                    Alert.alert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
+                    showAlert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
                     fetchProductsByWarehouse();
                 }}
                 onCancel={() => {
@@ -323,7 +327,7 @@ export const PosScreen = () => {
                 onChangeMethodToCash={() => {
                     setShowQrModal(false);
                     setPendingOrderId(null);
-                    Alert.alert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
+                    showAlert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
                     fetchProductsByWarehouse();
                 }}
             />

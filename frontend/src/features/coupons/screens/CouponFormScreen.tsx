@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 const DISCOUNT_TYPES = [
     { value: "PERCENT", label: "Phần trăm (%)" },
@@ -59,7 +60,7 @@ const CouponFormScreen = () => {
                 setUsageLimit(String(res.data.usageLimit ?? ""));
                 setIsActive(res.data.isActive ?? true);
             } catch {
-                Alert.alert("Lỗi", "Không thể tải dữ liệu coupon.");
+                showAlert("Lỗi", "Không thể tải dữ liệu coupon.");
             } finally {
                 setLoading(false);
             }
@@ -69,11 +70,11 @@ const CouponFormScreen = () => {
 
     const handleSubmit = async () => {
         if (!code.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập mã coupon.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập mã coupon.");
             return;
         }
         if (!discountValue) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập giá trị giảm.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập giá trị giảm.");
             return;
         }
         const payload = {
@@ -93,14 +94,14 @@ const CouponFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/coupons/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật mã giảm giá.");
+                showAlert("Thành công", "Đã cập nhật mã giảm giá.");
             } else {
                 await axiosClient.post("/coupons", payload);
-                Alert.alert("Thành công", "Đã tạo mã giảm giá mới.");
+                showAlert("Thành công", "Đã tạo mã giảm giá mới.");
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 err?.response?.data?.message || "Không thể lưu coupon.",
             );

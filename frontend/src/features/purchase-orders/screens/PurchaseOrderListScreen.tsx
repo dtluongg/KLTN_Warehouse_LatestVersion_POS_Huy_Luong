@@ -15,6 +15,9 @@ import { useAuthStore } from "../../../store/authStore";
 import { useNavigation } from "@react-navigation/native";
 import { theme } from "../../../utils/theme";
 import { axiosClient } from "../../../api/axiosClient";
+import { showAlert } from "../../../utils/alerts";
+import { printDocument } from "../../../utils/printUtils";
+import { generatePurchaseOrderHTML } from "../../../utils/printTemplates";
 
 const formatDateTime = (value: string | null | undefined) => {
     if (!value) return "—";
@@ -33,7 +36,7 @@ const confirmAction = async (
     }
 
     return new Promise<boolean>((resolve) => {
-        Alert.alert(title, message, [
+        showAlert(title, message, [
             { text: "Không", style: "cancel", onPress: () => resolve(false) },
             {
                 text: confirmText,
@@ -218,9 +221,9 @@ const PurchaseOrderListScreen = () => {
             await axiosClient.put(
                 `/purchase-orders/${row.id}/status?status=POSTED`,
             );
-            Alert.alert("Thành công", `Đã duyệt ${row?.poNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã duyệt ${row?.poNo || "phiếu"}.`);
         } catch (error: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 getErrorMessage(error, "Không thể duyệt phiếu PO."),
             );
@@ -241,9 +244,9 @@ const PurchaseOrderListScreen = () => {
             await axiosClient.put(
                 `/purchase-orders/${row.id}/status?status=CANCELLED`,
             );
-            Alert.alert("Thành công", `Đã hủy ${row?.poNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã hủy ${row?.poNo || "phiếu"}.`);
         } catch (error: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 getErrorMessage(error, "Không thể hủy phiếu PO."),
             );
@@ -256,9 +259,9 @@ const PurchaseOrderListScreen = () => {
             await axiosClient.post(
                 `/purchase-orders/${row.id}/close?reason=${reason}`,
             );
-            Alert.alert("Thành công", `Đã đóng ${row?.poNo || "phiếu"}.`);
+            showAlert("Thành công", `Đã đóng ${row?.poNo || "phiếu"}.`);
         } catch (error: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 getErrorMessage(error, "Không thể đóng phiếu PO."),
             );
@@ -305,7 +308,7 @@ const PurchaseOrderListScreen = () => {
                 return;
             }
 
-            Alert.alert("Đóng PO", `Chọn lý do đóng ${row?.poNo || "phiếu"}:`, [
+            showAlert("Đóng PO", `Chọn lý do đóng ${row?.poNo || "phiếu"}:`, [
                 {
                     text: "Ngưng giao hàng",
                     onPress: () => resolve("SUPPLIER_UNABLE_TO_DELIVER"),
@@ -354,10 +357,13 @@ const PurchaseOrderListScreen = () => {
                     label: "In",
                     tone: "neutral",
                     onPress: async (row) => {
-                        Alert.alert(
-                            "In PO",
-                            `Sẵn sàng in ${row?.poNo || "phiếu"}.`,
-                        );
+                        try {
+                            const res = await axiosClient.get(`/purchase-orders/${row.id}`);
+                            const html = generatePurchaseOrderHTML(res.data);
+                            await printDocument(html);
+                        } catch (e) {
+                            showAlert("Lỗi", "Không thể lấy thông tin in.");
+                        }
                     },
                 },
                 {
@@ -880,4 +886,3 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
 });
-

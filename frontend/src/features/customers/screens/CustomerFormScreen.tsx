@@ -13,6 +13,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 const CustomerFormScreen = () => {
     const navigation = useNavigation<any>();
@@ -43,7 +44,7 @@ const CustomerFormScreen = () => {
                 setAddress(res.data.address || "");
                 setIsActive(res.data.isActive ?? true);
             } catch {
-                Alert.alert("Lỗi", "Không thể tải dữ liệu khách hàng.");
+                showAlert("Lỗi", "Không thể tải dữ liệu khách hàng.");
             } finally {
                 setLoading(false);
             }
@@ -53,7 +54,7 @@ const CustomerFormScreen = () => {
 
     const handleSubmit = async () => {
         if (!name.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập tên khách hàng.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập tên khách hàng.");
             return;
         }
         const payload = {
@@ -69,14 +70,14 @@ const CustomerFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/customers/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật khách hàng.");
+                showAlert("Thành công", "Đã cập nhật khách hàng.");
             } else {
                 await axiosClient.post("/customers", payload);
-                Alert.alert("Thành công", "Đã tạo khách hàng mới.");
+                showAlert("Thành công", "Đã tạo khách hàng mới.");
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 err?.response?.data?.message || "Không thể lưu khách hàng.",
             );

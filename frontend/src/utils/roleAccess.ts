@@ -27,7 +27,6 @@ const WAREHOUSE_ALLOWED_ROUTES = new Set<string>([
     "PurchaseOrderForm",
     "GoodsReceipt",
     "GoodsReceiptForm",
-    "Suppliers",
     "SupplierReturns",
     "SupplierReturnForm",
     "InventoryStock",

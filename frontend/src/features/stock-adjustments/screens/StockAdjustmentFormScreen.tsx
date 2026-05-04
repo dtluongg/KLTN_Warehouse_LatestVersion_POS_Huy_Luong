@@ -7,6 +7,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 interface Warehouse { id: number; name: string; code?: string; }
 interface Category { id: number; name: string; }
@@ -60,11 +61,11 @@ const StockAdjustmentFormScreen = () => {
         }
 
         if (onOk) {
-            Alert.alert(title, message, [{ text: "OK", onPress: onOk }]);
+            showAlert(title, message, [{ text: "OK", onPress: onOk }]);
             return;
         }
 
-        Alert.alert(title, message);
+        showAlert(title, message);
     };
 
     useEffect(() => {
@@ -150,7 +151,7 @@ const StockAdjustmentFormScreen = () => {
                     adjustQtyInput: String(item.adjustQty ?? 0),
                     adjustQty: item.adjustQty,
                 })));
-            } catch (e) { Alert.alert("Lỗi", "Không thể tải phiếu."); }
+            } catch (e) { showAlert("Lỗi", "Không thể tải phiếu."); }
             finally { setLoading(false); }
         };
         loadEdit();
@@ -158,11 +159,11 @@ const StockAdjustmentFormScreen = () => {
 
     const addProduct = (prod: Product) => {
         if (!categoryId) {
-            Alert.alert("Thiếu thông tin", "Vui lòng chọn danh mục trước khi thêm sản phẩm.");
+            showAlert("Thiếu thông tin", "Vui lòng chọn danh mục trước khi thêm sản phẩm.");
             return;
         }
         if (items.find(i => i.productId === prod.id)) {
-            Alert.alert("Trùng sản phẩm", "Sản phẩm đã có."); setShowProductModal(false); return;
+            showAlert("Trùng sản phẩm", "Sản phẩm đã có."); setShowProductModal(false); return;
         }
         setItems(prev => [...prev, {
             productId: prod.id,
@@ -196,11 +197,11 @@ const StockAdjustmentFormScreen = () => {
     const removeItem = (idx: number) => { setItems(prev => prev.filter((_, i) => i !== idx)); };
 
     const handleSubmit = async () => {
-        if (!warehouseId) { Alert.alert("Thiếu thông tin", "Chọn kho hàng."); return; }
-        if (!categoryId) { Alert.alert("Thiếu thông tin", "Chọn danh mục sản phẩm."); return; }
-        if (items.length === 0) { Alert.alert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
+        if (!warehouseId) { showAlert("Thiếu thông tin", "Chọn kho hàng."); return; }
+        if (!categoryId) { showAlert("Thiếu thông tin", "Chọn danh mục sản phẩm."); return; }
+        if (items.length === 0) { showAlert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
         const hasZero = items.some(it => it.adjustQty === 0);
-        if (hasZero) { Alert.alert("Thiếu thông tin", "Không thể lưu dòng có chênh lệch = 0. Vui lòng nhập số dương hoặc âm."); return; }
+        if (hasZero) { showAlert("Thiếu thông tin", "Không thể lưu dòng có chênh lệch = 0. Vui lòng nhập số dương hoặc âm."); return; }
         doSubmit();
     };
 
@@ -298,7 +299,7 @@ const StockAdjustmentFormScreen = () => {
                                 style={styles.addBtn}
                                 onPress={() => {
                                     if (!categoryId) {
-                                        Alert.alert("Thiếu thông tin", "Vui lòng chọn danh mục trước khi thêm sản phẩm.");
+                                        showAlert("Thiếu thông tin", "Vui lòng chọn danh mục trước khi thêm sản phẩm.");
                                         return;
                                     }
                                     setShowProductModal(true);
@@ -463,4 +464,3 @@ const styles = StyleSheet.create({
 });
 
 export default StockAdjustmentFormScreen;
-

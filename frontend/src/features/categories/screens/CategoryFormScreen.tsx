@@ -13,6 +13,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 const CategoryFormScreen = () => {
     const navigation = useNavigation<any>();
@@ -52,7 +53,7 @@ const CategoryFormScreen = () => {
                 setSlug(res.data.slug || "");
                 setIsActive(res.data.isActive ?? true);
             } catch {
-                Alert.alert("Lỗi", "Không thể tải dữ liệu danh mục.");
+                showAlert("Lỗi", "Không thể tải dữ liệu danh mục.");
             } finally {
                 setLoading(false);
             }
@@ -62,11 +63,11 @@ const CategoryFormScreen = () => {
 
     const handleSubmit = async () => {
         if (!name.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập tên danh mục.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập tên danh mục.");
             return;
         }
         if (!slug.trim()) {
-            Alert.alert("Thiếu thông tin", "Vui lòng nhập slug.");
+            showAlert("Thiếu thông tin", "Vui lòng nhập slug.");
             return;
         }
         const payload = { name: name.trim(), slug: slug.trim(), isActive };
@@ -74,14 +75,14 @@ const CategoryFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/categories/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật danh mục.");
+                showAlert("Thành công", "Đã cập nhật danh mục.");
             } else {
                 await axiosClient.post("/categories", payload);
-                Alert.alert("Thành công", "Đã tạo danh mục mới.");
+                showAlert("Thành công", "Đã tạo danh mục mới.");
             }
             navigation.goBack();
         } catch (err: any) {
-            Alert.alert(
+            showAlert(
                 "Lỗi",
                 err?.response?.data?.message || "Không thể lưu danh mục.",
             );

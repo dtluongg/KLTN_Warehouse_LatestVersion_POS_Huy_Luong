@@ -7,6 +7,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { axiosClient } from "../../../api/axiosClient";
 import { theme } from "../../../utils/theme";
+import { showAlert } from "../../../utils/alerts";
 
 interface Customer { id: string; name: string; phone?: string; }
 interface Warehouse { id: number; name: string; code?: string; }
@@ -238,7 +239,7 @@ const CustomerReturnFormScreen = () => {
             }));
         } catch (e) {
             console.error("Load order detail:", e);
-            Alert.alert("Lỗi", "Không thể tải chi tiết đơn hàng.");
+            showAlert("Lỗi", "Không thể tải chi tiết đơn hàng.");
         }
     };
 
@@ -320,7 +321,7 @@ const CustomerReturnFormScreen = () => {
                         );
                     } catch (_) {}
                 }
-            } catch (e) { Alert.alert("Lỗi", "Không thể tải phiếu."); }
+            } catch (e) { showAlert("Lỗi", "Không thể tải phiếu."); }
             finally { setLoading(false); }
         };
         loadEdit();
@@ -328,11 +329,11 @@ const CustomerReturnFormScreen = () => {
 
     const addProduct = (prod: Product) => {
         if (orderId) {
-            Alert.alert("Không thể thêm", "Đã chọn đơn hàng gốc, chỉ được trả các sản phẩm trong đơn này.");
+            showAlert("Không thể thêm", "Đã chọn đơn hàng gốc, chỉ được trả các sản phẩm trong đơn này.");
             return;
         }
         if (items.find(i => i.productId === prod.id)) {
-            Alert.alert("Trùng sản phẩm", "Sản phẩm đã có.");
+            showAlert("Trùng sản phẩm", "Sản phẩm đã có.");
             setShowProductModal(false); return;
         }
         setItems(prev => [...prev, {
@@ -383,25 +384,25 @@ const CustomerReturnFormScreen = () => {
     const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
     const handleSubmit = async () => {
-        if (!customerId) { Alert.alert("Thiếu thông tin", "Chọn khách hàng."); return; }
-        if (!warehouseId) { Alert.alert("Thiếu thông tin", "Chọn kho nhận hàng trả."); return; }
-        if (items.length === 0) { Alert.alert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
+        if (!customerId) { showAlert("Thiếu thông tin", "Chọn khách hàng."); return; }
+        if (!warehouseId) { showAlert("Thiếu thông tin", "Chọn kho nhận hàng trả."); return; }
+        if (items.length === 0) { showAlert("Thiếu sản phẩm", "Thêm ít nhất 1 sản phẩm."); return; }
 
         if (orderId) {
             const returnableItems = submitItems;
 
             if (returnableItems.length === 0) {
-                Alert.alert("Không thể tạo phiếu", "Tất cả sản phẩm trong đơn hàng này đã đạt tối đa yêu cầu trả.");
+                showAlert("Không thể tạo phiếu", "Tất cả sản phẩm trong đơn hàng này đã đạt tối đa yêu cầu trả.");
                 return;
             }
 
             for (const item of returnableItems) {
                 if (!item.orderItemId) {
-                    Alert.alert("Không hợp lệ", "Khi có đơn hàng gốc, mọi sản phẩm trả phải thuộc đơn hàng đã chọn.");
+                    showAlert("Không hợp lệ", "Khi có đơn hàng gốc, mọi sản phẩm trả phải thuộc đơn hàng đã chọn.");
                     return;
                 }
                 if (item.availableQty != null && item.qty > item.availableQty) {
-                    Alert.alert("Không hợp lệ", `Số lượng trả của ${item.productName} vượt quá số lượng có thể trả (${item.availableQty}).`);
+                    showAlert("Không hợp lệ", `Số lượng trả của ${item.productName} vượt quá số lượng có thể trả (${item.availableQty}).`);
                     return;
                 }
             }
@@ -427,10 +428,10 @@ const CustomerReturnFormScreen = () => {
             setSubmitting(true);
             if (isEdit) {
                 await axiosClient.put(`/customer-returns/${editId}`, payload);
-                Alert.alert("Thành công", "Đã cập nhật phiếu.");
+                showAlert("Thành công", "Đã cập nhật phiếu.");
             } else {
                 const res = await axiosClient.post("/customer-returns", payload);
-                Alert.alert("Thành công", `Đã tạo phiếu ${res.data.returnNo}.`);
+                showAlert("Thành công", `Đã tạo phiếu ${res.data.returnNo}.`);
             }
             navigation.goBack();
         } catch (err: any) {
@@ -440,7 +441,7 @@ const CustomerReturnFormScreen = () => {
             const detailMessage = typeof responseData === "string"
                 ? responseData
                 : responseData?.message || responseData?.error || responseData?.fieldErrors?.items || "Không thể lưu phiếu.";
-            Alert.alert("Lỗi", [statusText, detailMessage, rawDetail].filter(Boolean).join("\n"));
+            showAlert("Lỗi", [statusText, detailMessage, rawDetail].filter(Boolean).join("\n"));
         } finally { setSubmitting(false); }
     };
 
@@ -486,7 +487,7 @@ const CustomerReturnFormScreen = () => {
                     <TouchableOpacity
                         style={[styles.picker, (!canEdit || !customerId) && styles.pickerDisabled]}
                         onPress={() => {
-                            if (!customerId) { Alert.alert("", "Vui lòng chọn khách hàng trước."); return; }
+                            if (!customerId) { showAlert("", "Vui lòng chọn khách hàng trước."); return; }
                             canEdit && setShowOrderModal(true);
                         }}
                         disabled={!canEdit}
@@ -780,4 +781,3 @@ const styles = StyleSheet.create({
 });
 
 export default CustomerReturnFormScreen;
-
