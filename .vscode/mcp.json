@@ -1,8 +1,13 @@
-{
-  "mcpServers": {
-    "serena": {
-      "command": "serena",
-      "args": ["lsp"]
-    }
+{	"servers": {
+		"serena": {
+			"type": "stdio",
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "serena start-mcp-server --context ide"
+      ]
+		}
+	},
+	"inputs": []
+
   }
-}

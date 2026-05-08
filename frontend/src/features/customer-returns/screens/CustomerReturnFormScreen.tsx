@@ -205,6 +205,9 @@ const CustomerReturnFormScreen = () => {
                 setWarehouseName(detail.warehouseName || "");
             }
             // Auto-fill items từ order items
+            // Kiểm tra order item đã được trả bao nhiêu, đang chờ duyệt bao nhiêu để tính số lượng còn có thể trả được, tránh trường hợp tạo nhiều phiếu cùng trả một sản phẩm vượt quá số lượng đã mua.
+            // Kiểm tra số lượng đã trả và đang chờ duyệt để tính số lượng còn có thể trả được, tránh trường hợp tạo nhiều phiếu cùng trả một sản phẩm vượt quá số lượng đã mua.
+            // Tránh trường hợp trả vượt quá số lượng có thể trả khi đã có một phiếu trả hàng khác đang chờ duyệt nhưng chưa được duyệt, hoặc đã được duyệt nhưng chưa cập nhật số lượng trả vào đơn hàng (trường hợp hệ thống xử lý phiếu trả hàng bất đồng bộ).
             const orderItems = detail.items || [];
             setItems(orderItems.map((oi: any) => {
                 const purchasedQty = Number(oi.qty || 0);
