@@ -1,10 +1,9 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import { AuthResponse, RefreshTokenRequest } from '../types';
+import { getApiBaseUrl } from './apiConfig';
 
-const BASE_URL = Platform.OS === 'web'
-  ? 'http://localhost:9999/api'
-  : 'http://10.0.2.2:9999/api';
+const BASE_URL = getApiBaseUrl();
 
 const authHttpClient = axios.create({
   baseURL: BASE_URL,

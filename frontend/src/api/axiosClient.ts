@@ -4,11 +4,9 @@ import { Platform } from 'react-native';
 import { authApi } from './authApi';
 import { useAuthStore } from '../store/authStore';
 import { AuthResponse } from '../types';
+import { getApiBaseUrl } from './apiConfig';
 
-// Chú ý: Web thì gọi localhost. Android Emulator thì gọi 10.0.2.2
-const BASE_URL = Platform.OS === 'web' 
-  ? 'http://localhost:9999/api' 
-  : 'http://10.0.2.2:9999/api'; 
+const BASE_URL = getApiBaseUrl();
 
 export const axiosClient = axios.create({
   baseURL: BASE_URL,

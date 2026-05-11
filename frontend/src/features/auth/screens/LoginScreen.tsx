@@ -170,11 +170,11 @@ const LoginScreen = () => {
               </View>
               <View style={[styles.demoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Typography variant="micro" color={colors.textSecondary}>Nhân viên bán hàng</Typography>
-                <Typography variant="micro" color={colors.textPrimary}>nvbh / 123456</Typography>
+                <Typography variant="micro" color={colors.textPrimary}>nvbh01 / 123456</Typography>
               </View>
               <View style={[styles.demoRow, { backgroundColor: colors.background, borderColor: colors.border, marginBottom: 0 }]}>
                 <Typography variant="micro" color={colors.textSecondary}>Nhân viên kho</Typography>
-                <Typography variant="micro" color={colors.textPrimary}>nvk / 123456</Typography>
+                <Typography variant="micro" color={colors.textPrimary}>nvql01 / 123456</Typography>
               </View>
             </Card>
           </View>
