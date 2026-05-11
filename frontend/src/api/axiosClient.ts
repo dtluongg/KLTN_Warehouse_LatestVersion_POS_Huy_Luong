@@ -42,7 +42,7 @@ axiosClient.interceptors.request.use(
   }
 );
 
-// Interceptor: Xử lý response lỗi (ví dụ 401 Unauthorized => Đăng xuất mượt mà)
+// Interceptor: Xử lý response lỗi auth (401/403 => thử refresh một lần)
 axiosClient.interceptors.response.use(
   (response) => {
     return response;
@@ -52,7 +52,7 @@ axiosClient.interceptors.response.use(
     const status = error.response?.status;
     const requestUrl = originalRequest?.url;
 
-    if (status !== 401 || !originalRequest || shouldSkipRefresh(requestUrl) || originalRequest._retry) {
+    if ((status !== 401 && status !== 403) || !originalRequest || shouldSkipRefresh(requestUrl) || originalRequest._retry) {
       return Promise.reject(error);
     }
 

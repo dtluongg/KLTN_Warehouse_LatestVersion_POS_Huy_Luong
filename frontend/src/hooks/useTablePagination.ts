@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { axiosClient } from '../api/axiosClient';
 
 export interface PaginationState {
@@ -81,6 +82,19 @@ export function useTablePagination<T>(apiUrl: string, defaultSort = 'id') {
                 setData([]);
             }
         } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const status = error.response?.status;
+                if (status === 401) {
+                    console.warn(`Auth expired while fetching ${apiUrl}; request will be retried by the auth interceptor if possible.`);
+                    return;
+                }
+
+                if (status === 403) {
+                    console.error(`Forbidden while fetching ${apiUrl}; current user does not have permission.`, error);
+                    return;
+                }
+            }
+
             console.error(`Error fetching ${apiUrl}:`, error);
         } finally {
             setLoading(false);

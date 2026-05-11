@@ -96,6 +96,8 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 .build();
     }
 
+
+    // Hàm kiểm tra khách hàng đã tồn tại chưa, nếu không có thì ném lỗi. Tương tự với kho hàng và sản phẩm. Nếu orderId được cung cấp, cũng kiểm tra order đó có tồn tại không.
     @Override
     @Transactional
     public CustomerReturnDetailResponseDTO createCustomerReturn(CustomerReturnRequestDTO dto) {
@@ -105,6 +107,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
         Staff staff = getAuthenticatedStaff();
 
+        // kiểm tra order nếu có orderId được cung cấp
         Order order = null;
         if (dto.getOrderId() != null) {
             order = orderRepository.findById(dto.getOrderId()).orElse(null);
@@ -112,6 +115,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
 
         validateAgainstOrderItemLimits(dto.getItems(), order, null);
 
+        // Kiểm tra kho hàng
         Warehouse warehouse = warehouseRepository.findById(dto.getWarehouseId())
                 .orElseThrow(() -> new RuntimeException("Warehouse not found"));
 
@@ -137,6 +141,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         String generatedReturnNo = crRepository.findReturnNoById(cr.getId());
         cr.setReturnNo(generatedReturnNo);
         
+        // Kiểm tra từng sản phẩm + order item trong vòng lặp
         for (CustomerReturnRequestDTO.CustomerReturnItemRequestDTO itemDto : dto.getItems()) {
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -330,6 +335,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         return getCustomerReturnDetailById(cr.getId());
     }
 
+    // hàm kiểm tra tính hợp lệ của danh sách item trả hàng, đảm bảo qty > 0 và refundAmount >= 0
     private void validateItemList(List<CustomerReturnRequestDTO.CustomerReturnItemRequestDTO> items) {
         if (items == null || items.isEmpty()) {
             throw new RuntimeException("Customer return items are required");
@@ -357,6 +363,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
         return payable;
     }
 
+    // Hàm kiểm tra số lượng trả hàng và số tiền hoàn lại không vượt quá giới hạn dựa trên order item, bao gồm cả các return khác đang ở trạng thái DRAFT hoặc đã POSTED. excludedReturnId được sử dụng để loại trừ return hiện tại khi kiểm tra (trong trường hợp update).
     private void validateAgainstOrderItemLimits(List<CustomerReturnRequestDTO.CustomerReturnItemRequestDTO> items,
                                                 Order order,
                                                 Long excludedReturnId) {
@@ -372,6 +379,9 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 throw new RuntimeException("Order Item does not belong to the specified Order: " + order.getId());
             }
 
+            // 1. KIỂM TRA SỐ LƯỢNG: Tổng qty trả <= số lượng còn được trả
+            // tính toán tổng qty và refund đã trả, bao gồm tất cả các return đang trạng thái DRAFT hoặc POSTED.
+            // Nếu excludedReturnId != null, nghĩa là đang kiểm tra cho một return đã tồn tại (trong trường hợp update), thì sẽ loại trừ return đó ra khỏi tính toán tổng qty và refund đã trả.
             Integer postedQty = excludedReturnId == null
                     ? crItemRepository.sumQtyByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.POSTED)
                     : crItemRepository.sumQtyByOrderItemIdAndReturnStatusExcludingReturnId(orderItem.getId(), DocumentStatus.POSTED, excludedReturnId);
@@ -388,6 +398,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
                 throw new RuntimeException("Returned quantity exceeds available quantity (sold - pending - posted) for order item: " + orderItem.getId());
             }
 
+            // 2. KIỂM TRA TIỀN HOÀN: Tổng tiền hoàn <= giá trị đơn còn được hoàn
             BigDecimal postedRefund = excludedReturnId == null
                     ? crItemRepository.sumRefundByOrderItemIdAndReturnStatus(orderItem.getId(), DocumentStatus.POSTED)
                     : crItemRepository.sumRefundByOrderItemIdAndReturnStatusExcludingReturnId(orderItem.getId(), DocumentStatus.POSTED, excludedReturnId);
@@ -400,6 +411,7 @@ public class CustomerReturnServiceImpl implements CustomerReturnService {
             BigDecimal maxRefund = orderItem.getLineRevenue() == null ? BigDecimal.ZERO : orderItem.getLineRevenue();
             BigDecimal requestedRefund = itemDto.getRefundAmount() == null ? BigDecimal.ZERO : itemDto.getRefundAmount();
 
+            // ❌ Nếu: Đã hoàn + Đang chờ + Muốn hoàn > Giá trị bán
             if (alreadyRefunded.add(pendingRefunded).add(requestedRefund).compareTo(maxRefund) > 0) {
                 throw new RuntimeException("Refund amount exceeds available amount (line revenue - pending - posted) for order item: " + orderItem.getId());
             }
