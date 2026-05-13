@@ -190,7 +190,7 @@ const StockAdjustmentFormScreen = () => {
         }
 
         setItems(prev => prev.map((it, i) => i === idx
-            ? { ...it, adjustQtyInput: normalized, adjustQty: parsedQty }
+            ? { ...it, adjustQtyInput: rawInput, adjustQty: parsedQty }
             : it));
     };
 

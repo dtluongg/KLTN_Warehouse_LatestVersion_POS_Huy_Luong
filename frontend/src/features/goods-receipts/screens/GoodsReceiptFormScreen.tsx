@@ -531,14 +531,11 @@ const GoodsReceiptFormScreen = () => {
                       <TextInput
                         style={[
                           styles.lineInput,
-                          !canEdit && styles.inputDisabled,
+                          styles.inputDisabled,
                         ]}
                         keyboardType="numeric"
                         value={String(item.unitCost)}
-                        onChangeText={(v) =>
-                          updateItem(idx, "unitCost", Number(v) || 0)
-                        }
-                        editable={canEdit}
+                        editable={false}
                       />
                     </View>
                     <View

@@ -64,4 +64,18 @@ public interface StockAdjustmentRepository extends JpaRepository<StockAdjustment
             @Param("warehouseId") Long warehouseId,
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate);
+
+    @Query(value = """
+            SELECT COALESCE(SUM(sai.diff_qty * sai.unit_cost_snapshot), 0)
+            FROM stock_adjustment_items sai
+            JOIN stock_adjustments sa ON sa.id = sai.adjustment_id
+            WHERE sa.status = 'POSTED' AND sai.diff_qty < 0
+              AND (:warehouseId IS NULL OR sa.warehouse_id = :warehouseId)
+              AND sa.created_at >= :fromTime
+              AND sa.created_at <= :toTime
+            """, nativeQuery = true)
+    java.math.BigDecimal sumLostStockValueInPeriod(
+            @Param("warehouseId") Long warehouseId,
+            @Param("fromTime") java.time.LocalDateTime fromTime,
+            @Param("toTime") java.time.LocalDateTime toTime);
 }

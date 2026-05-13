@@ -4,13 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import IUH.KLTN.LvsH.dto.AiSqlChatResponseDTO;
 import IUH.KLTN.LvsH.service.AiSqlChatService;
-import IUH.KLTN.LvsH.service.ai.SqlSafetyValidator;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -34,31 +34,41 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
 
     private static final Pattern STRICT_TEXT_FILTER_PATTERN = Pattern.compile(
             "\\b([a-zA-Z_][a-zA-Z0-9_]*\\.(?:name|code|short_name))\\b\\s*=\\s*'([^']+)'",
-            Pattern.CASE_INSENSITIVE
-    );
+            Pattern.CASE_INSENSITIVE);
 
     private static final Pattern ILIKE_TEXT_FILTER_PATTERN = Pattern.compile(
             "\\b([a-zA-Z_][a-zA-Z0-9_]*\\.(?:name|code|short_name))\\b\\s+ILIKE\\s+'([^']*)'",
-            Pattern.CASE_INSENSITIVE
-    );
+            Pattern.CASE_INSENSITIVE);
 
     private static final String SYSTEM_PROMPT = """
             Bạn là trợ lý tạo SQL cho hệ thống POS/kho.
 
             Nhiệm vụ:
             - Chuyển câu hỏi tiếng Việt của nhân viên thành đúng 1 câu SQL SELECT.
-            - Chỉ trả về SQL, không giải thích, không markdown.
+            - Phân tích câu hỏi xem nên biểu diễn dạng bảng hay biểu đồ. Chỉ vẽ biểu đồ cho thống kê, so sánh, xu hướng thời gian.
+            - BẮT BUỘC TRẢ VỀ JSON DUY NHẤT như sau (KHÔNG dùng Markdown bao quanh):
+            {
+                "sql": "câu lệnh sql",
+                "chart_type": "none" // Chọn: "none" (Bảng bình thường), "bar" (So sánh/Top), "pie" (Tỷ lệ phần trăm), "line" (Xu hướng thời gian)
+            }
 
             Ràng buộc bắt buộc:
+            - Bắt buộc sử dụng cú pháp của PostgreSQL (VD: dùng TO_CHAR, date_trunc). Tuyệt đối không dùng hàm của SQLite (như STRFTIME).
             - Chỉ được dùng SELECT.
             - Không dùng INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT, REVOKE, CALL.
+            - Khi tính toán hàng hoàn trả, bắt buộc phải dùng bảng customer_returns và customer_return_items.
             - Không được trả về nhiều hơn 1 câu lệnh.
             - Nếu truy vấn có thể trả nhiều dòng, thêm LIMIT 20.
-            - Chỉ được dùng đúng tên bảng và tên cột trong schema bên dưới.
+            - Chỉ được dùng đúng tên bảng và tên cột trong schema bên dưới. KHÔNG ĐƯỢC TỰ BỊA TÊN CỘT.
+            - CHÚ Ý ĐẶC BIÊT:
+                + Bảng orders có khoá chính là `id`, KHÔNG PHẢI `order_id`.
+                + Bảng customer_returns có khoá chính là `id`, KHÔNG PHẢI `return_id`.
+                + Cột `order_time`, `coupon_code` nằm ở bảng `orders`, TUYỆT ĐỐI KHÔNG nằm ở `order_items`. Nếu cần lấy `order_time`, phải JOIN với bảng `orders`.
             - Không được query bảng staff.
             - Khi lọc theo tên hoặc mã (name, code, short_name), luôn ưu tiên tìm gần đúng bằng ILIKE với %%keyword%%; hạn chế tối đa so sánh bằng '='.
             - Mặc định phải tìm không dấu ngay trong SQL cho name/code/short_name để user gõ không dấu vẫn khớp dữ liệu có dấu (ví dụ: 'kho chinh' khớp 'Kho Chính').
                         - Quy tắc thời gian/ngày bắt buộc:
+                            + Khi SELECT các cột ngày tháng (TIMESTAMP/DATE) để hiển thị, BẮT BUỘC phải dùng TO_CHAR(cột, 'DD/MM/YYYY') hoặc 'DD/MM/YYYY HH24:MI' để chuyển thành chuỗi (String), tuyệt đối không để nguyên kiểu dữ liệu gốc để tránh lỗi parse số của backend.
                             + Múi giờ mặc định khi hiểu câu hỏi là Asia/Ho_Chi_Minh.
                             + Với cột TIMESTAMP (ví dụ: orders.order_time, goods_receipts.receipt_date, returns.return_date, purchase_orders.order_date): KHÔNG dùng kiểu order_time::date = CURRENT_DATE.
                             + Với cột TIMESTAMP, phải lọc theo khoảng thời gian [đầu kỳ, cuối kỳ), ví dụ hôm nay:
@@ -68,7 +78,7 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
                             + "Tháng này" dùng date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh'); "năm nay" dùng date_trunc('year', ...).
                             + Chỉ dùng = CURRENT_DATE cho cột kiểu DATE thuần.
                         - Với truy vấn tổng hợp SUM/AVG/COUNT theo ngày kỳ, ưu tiên COALESCE cho SUM/AVG để không trả về NULL.
-            
+
 
             Schema duoc phep dung:
             categories(id, name, slug, is_active, deleted_at)
@@ -140,7 +150,6 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
             """;
 
     private final JdbcTemplate jdbcTemplate;
-    private final SqlSafetyValidator sqlSafetyValidator;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -162,17 +171,23 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
     @Value("${app.ai.sql.explain-max-rows:20}")
     private int explainMaxRows;
 
+    private static class AiGenerationResult {
+        String sql;
+        String chartType;
+    }
+
     @Override
+    @Transactional(readOnly = true)
     public AiSqlChatResponseDTO ask(String question) {
         long start = System.currentTimeMillis();
 
-        String generatedSql = generateSql(question);
-        String safeSql = sqlSafetyValidator.validateAndNormalize(generatedSql);
+        AiGenerationResult aiResult = generateSql(question);
+        String safeSql = aiResult.sql; // removed SqlSafetyValidator
 
         // Force accent-insensitive matching directly in the main SQL execution path.
         String normalizedSql = buildAccentInsensitiveSql(safeSql);
         if (!normalizedSql.equals(safeSql)) {
-            safeSql = sqlSafetyValidator.validateAndNormalize(normalizedSql);
+            safeSql = normalizedSql;
         }
 
         String executedSql = safeSql;
@@ -182,13 +197,14 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
         if (rows.isEmpty()) {
             String relaxedSql = buildFuzzyFallbackSql(executedSql);
             if (!relaxedSql.equals(executedSql)) {
-                String safeRelaxedSql = sqlSafetyValidator.validateAndNormalize(relaxedSql);
+                String safeRelaxedSql = relaxedSql;
                 QueryExecution relaxedExecution = executeSql(safeRelaxedSql);
                 List<Map<String, Object>> relaxedRows = relaxedExecution.rows;
                 if (!relaxedRows.isEmpty()) {
                     rows = relaxedRows;
                     executedSql = relaxedExecution.sql;
-                    log.info("AI SQL fallback applied. original='{}', fallback='{}', rowCount={}", safeSql, executedSql, rows.size());
+                    log.info("AI SQL fallback applied. original='{}', fallback='{}', rowCount={}", safeSql, executedSql,
+                            rows.size());
                 }
             }
         }
@@ -196,7 +212,7 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
         if (rows.isEmpty()) {
             String accentSql = buildAccentNormalizedSql(executedSql);
             if (!accentSql.equals(executedSql)) {
-                String safeAccentSql = sqlSafetyValidator.validateAndNormalize(accentSql);
+                String safeAccentSql = accentSql;
                 try {
                     QueryExecution accentExecution = executeSql(safeAccentSql);
                     List<Map<String, Object>> accentRows = accentExecution.rows;
@@ -224,35 +240,61 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
         }
 
         long duration = System.currentTimeMillis() - start;
-        log.info("AI SQL chat: question='{}', sql='{}', rowCount={}, durationMs={}", question, executedSql, rowCount, duration);
+        log.info("AI SQL chat: question='{}', sql='{}', rowCount={}, durationMs={}", question, executedSql, rowCount,
+                duration);
 
         return AiSqlChatResponseDTO.builder()
                 .question(question)
-            .sql(executedSql)
+                .sql(executedSql)
                 .answer(answer)
                 .summary(summary)
                 .rowCount(rowCount)
                 .rows(rows)
+                .chartType(aiResult.chartType)
                 .build();
     }
 
-    private String generateSql(String question) {
+    private AiGenerationResult generateSql(String question) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new RuntimeException("Missing app.ai.sql.api-key (or OPENAI_API_KEY) in environment");
         }
 
         try {
-            String rawSql = callChatCompletion(SYSTEM_PROMPT, question);
-            if (rawSql.isBlank()) {
-                throw new RuntimeException("AI returned empty SQL");
+            String rawJson = callChatCompletion(SYSTEM_PROMPT, question);
+            if (rawJson.isBlank()) {
+                throw new RuntimeException("AI returned empty result");
             }
-            return cleanupSql(rawSql);
+            
+            // Clean up Markdown if AI disobeys
+            if (rawJson.startsWith("```json")) {
+                rawJson = rawJson.substring(7);
+            } else if (rawJson.startsWith("```")) {
+                rawJson = rawJson.substring(3);
+            }
+            if (rawJson.endsWith("```")) {
+                rawJson = rawJson.substring(0, rawJson.length() - 3);
+            }
+            rawJson = rawJson.trim();
+
+            JsonNode root = objectMapper.readTree(rawJson);
+            String rawSql = root.path("sql").asText("");
+            String chartType = root.path("chart_type").asText("none");
+
+            if (rawSql.isBlank()) {
+                throw new RuntimeException("AI returned JSON without 'sql'");
+            }
+            
+            AiGenerationResult result = new AiGenerationResult();
+            result.sql = cleanupSql(rawSql);
+            result.chartType = chartType;
+            return result;
         } catch (Exception ex) {
-            throw new RuntimeException("Failed to generate SQL: " + ex.getMessage(), ex);
+            throw new RuntimeException("Failed to generate SQL (expected JSON): " + ex.getMessage(), ex);
         }
     }
 
-    private String explainResult(String question, String sql, List<Map<String, Object>> rows, int rowCount, String fallbackSummary) {
+    private String explainResult(String question, String sql, List<Map<String, Object>> rows, int rowCount,
+            String fallbackSummary) {
         List<Map<String, Object>> sampleRows = rows.stream().limit(Math.max(1, explainMaxRows)).toList();
 
         String prompt = """
@@ -270,8 +312,7 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
                 sql,
                 rowCount,
                 toJson(sampleRows),
-                fallbackSummary
-        );
+                fallbackSummary);
 
         String explained = callChatCompletion(EXPLAIN_SYSTEM_PROMPT, prompt);
         if (explained == null || explained.isBlank()) {
@@ -296,9 +337,11 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
                     .connectTimeout(Duration.ofMillis(timeoutMs))
                     .build();
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = client.send(request,
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("AI provider error: HTTP " + response.statusCode() + " - " + response.body());
+                throw new RuntimeException(
+                        "AI provider error: HTTP " + response.statusCode() + " - " + response.body());
             }
 
             JsonNode root = objectMapper.readTree(response.body());
@@ -316,9 +359,7 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
                     "temperature", 0,
                     "messages", List.of(
                             Map.of("role", "system", "content", systemPrompt),
-                            Map.of("role", "user", "content", userPrompt)
-                    )
-            );
+                            Map.of("role", "user", "content", userPrompt)));
             return objectMapper.writeValueAsString(body);
         } catch (Exception ex) {
             throw new RuntimeException("Failed to build AI request payload", ex);
@@ -402,6 +443,8 @@ public class AiSqlChatServiceImpl implements AiSqlChatService {
     }
 
     private QueryExecution executeSql(String sql) {
+        jdbcTemplate.execute("SET LOCAL ROLE ai_reader");
+        jdbcTemplate.execute("SET LOCAL statement_timeout = '10s'");
         return new QueryExecution(sql, jdbcTemplate.queryForList(sql));
     }
 

@@ -22,6 +22,8 @@ import { ProductGrid } from "../components/ProductGrid";
 import { CartSummary } from "../components/CartSummary";
 import { QRPaymentModal } from "../components/QRPaymentModal";
 import { showAlert } from "../../../utils/alerts";
+import { printDocument } from "../../../utils/printUtils";
+import { generateOrderReceiptHTML } from "../../../utils/printTemplates";
 
 export const PosScreen = () => {
     const { colors, metrics } = useTheme();
@@ -177,6 +179,16 @@ export const PosScreen = () => {
             }
 
             showAlert("Thành công", `Đã tạo Đơn hàng #${orderNo}`);
+            
+            // In hoá đơn tự động
+            try {
+                const detailRes = await axiosClient.get(`/orders/${orderId}`);
+                const html = generateOrderReceiptHTML(detailRes.data);
+                await printDocument(html);
+            } catch (printErr) {
+                console.log("Lỗi in hoá đơn tự động", printErr);
+            }
+
             clearCart();
             fetchProductsByWarehouse();
         } catch (error: any) {
@@ -313,10 +325,19 @@ export const PosScreen = () => {
                     setShowQrModal(false);
                     setPendingOrderId(null);
                 }}
-                onSuccess={() => {
+                onSuccess={async () => {
                     setShowQrModal(false);
-                    setPendingOrderId(null);
                     showAlert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
+                    if (pendingOrderId) {
+                        try {
+                            const detailRes = await axiosClient.get(`/orders/${pendingOrderId}`);
+                            const html = generateOrderReceiptHTML(detailRes.data);
+                            await printDocument(html);
+                        } catch (printErr) {
+                            console.log("Lỗi in hoá đơn tự động", printErr);
+                        }
+                    }
+                    setPendingOrderId(null);
                     fetchProductsByWarehouse();
                 }}
                 onCancel={() => {
@@ -324,10 +345,19 @@ export const PosScreen = () => {
                     setPendingOrderId(null);
                     fetchProductsByWarehouse();
                 }}
-                onChangeMethodToCash={() => {
+                onChangeMethodToCash={async () => {
                     setShowQrModal(false);
-                    setPendingOrderId(null);
                     showAlert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
+                    if (pendingOrderId) {
+                        try {
+                            const detailRes = await axiosClient.get(`/orders/${pendingOrderId}`);
+                            const html = generateOrderReceiptHTML(detailRes.data);
+                            await printDocument(html);
+                        } catch (printErr) {
+                            console.log("Lỗi in hoá đơn tự động", printErr);
+                        }
+                    }
+                    setPendingOrderId(null);
                     fetchProductsByWarehouse();
                 }}
             />

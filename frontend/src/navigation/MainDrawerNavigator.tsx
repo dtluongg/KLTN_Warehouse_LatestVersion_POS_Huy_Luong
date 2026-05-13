@@ -24,6 +24,8 @@ import CouponListScreen from "../features/coupons/screens/CouponListScreen";
 import StaffListScreen from "../features/staff/screens/StaffListScreen";
 import AiSqlChatScreen from "../features/ai-sql-chat/screens/AiSqlChatScreen";
 import WarehouseStatisticsScreen from "../features/reports/screens/WarehouseStatisticsScreen";
+import RevenueReportScreen from "../features/reports/screens/RevenueReportScreen";
+import SalesReportsScreen from "../features/reports/screens/SalesReportsScreen";
 import { BREAKPOINTS } from "../utils/responsive";
 
 const Drawer = createDrawerNavigator();
@@ -69,6 +71,16 @@ export default function MainDrawerNavigator() {
                 name="Customers"
                 component={CustomerListScreen}
                 options={{ title: "Khách hàng" }}
+            />
+            <Drawer.Screen
+                name="RevenueReport"
+                component={RevenueReportScreen}
+                options={{ title: "Doanh thu" }}
+            />
+            <Drawer.Screen
+                name="SalesReports"
+                component={SalesReportsScreen}
+                options={{ title: "Báo cáo thu ngân" }}
             />
 
             {/* ── MUA HÀNG & NHẬP KHO ── */}

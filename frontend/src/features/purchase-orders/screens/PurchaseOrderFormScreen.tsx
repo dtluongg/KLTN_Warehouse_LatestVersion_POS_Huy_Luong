@@ -62,7 +62,7 @@ const PurchaseOrderFormScreen = () => {
   const [supplierName, setSupplierName] = useState<string>("");
   const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [warehouseName, setWarehouseName] = useState<string>("");
-  const [expectedDate, setExpectedDate] = useState<string>("");
+  const [expectedDate, setExpectedDate] = useState<string>(() => new Date().toISOString().substring(0, 10));
   const [note, setNote] = useState<string>("");
   const [discountAmount, setDiscountAmount] = useState<string>("0");
   const [surchargeAmount, setSurchargeAmount] = useState<string>("0");

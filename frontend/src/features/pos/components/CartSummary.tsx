@@ -271,6 +271,16 @@ export const CartSummary = ({
                                     onChangeText={(val) => setSurchargeAmount(Number(val) || 0)}
                                 />
                             </View>
+                            <View style={[styles.modifierRow, { marginTop: 4 }]}>
+                                <Typography variant="caption" color={colors.textPrimary} style={{ flex: 1 }}>Ghi chú:</Typography>
+                                <TextInput
+                                    style={[styles.numericInput, { borderColor: colors.border, backgroundColor: colors.surface, color: colors.textPrimary, textAlign: 'left' }]}
+                                    placeholder="Nhập ghi chú..."
+                                    placeholderTextColor={colors.textDisabled}
+                                    value={note}
+                                    onChangeText={setNote}
+                                />
+                            </View>
                         </View>
                     )}
 
@@ -281,7 +291,7 @@ export const CartSummary = ({
                                 Hình thức Thanh toán
                             </Typography>
                             <View style={styles.paymentMethodRow}>
-                                {["CASH", "TRANSFER", "MIX", "DEBT"].map((method) => {
+                                {["CASH", "TRANSFER", "CARD"].map((method) => {
                                     const isActive = paymentMethod === method;
                                     return (
                                         <TouchableOpacity
@@ -294,7 +304,7 @@ export const CartSummary = ({
                                             onPress={() => setPaymentMethod(method as any)}
                                         >
                                             <Typography variant="captionBold" color={isActive ? colors.buttonText : colors.textPrimary}>
-                                                {method === "CASH" ? "Tiền mặt" : method === "TRANSFER" ? "C/K" : method === "MIX" ? "Mix" : "Ghi Nợ"}
+                                                {method === "CASH" ? "Tiền mặt" : method === "TRANSFER" ? "Chuyển khoản" : "Quẹt thẻ"}
                                             </Typography>
                                         </TouchableOpacity>
                                     );

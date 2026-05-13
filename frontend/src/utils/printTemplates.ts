@@ -38,90 +38,79 @@ const commonStyles = `
 
 export const generateOrderReceiptHTML = (order: any) => {
     const itemsHtml = order?.items?.map((item: any, index: number) => `
-        <tr>
-            <td class="text-center">${index + 1}</td>
-            <td>${item.productSku || '-'}</td>
-            <td><strong>${item.productShortName || item.productName || '-'}</strong></td>
-            <td class="text-right">${item.qty}</td>
-            <td class="text-right">${formatCurrency(item.salePrice)}</td>
-            <td class="text-right">${formatCurrency(item.lineRevenue)}</td>
-        </tr>
-    `).join('') || '<tr><td colspan="6" class="text-center">Không có sản phẩm</td></tr>';
+        <div class="item-row">
+            <div class="item-name">${index + 1}. ${item.productShortName || item.productName || '-'}</div>
+            <div class="item-details">
+                <span>SL: ${item.qty} x ${formatCurrency(item.salePrice)}</span>
+                <span>${formatCurrency(item.lineRevenue)}</span>
+            </div>
+        </div>
+    `).join('') || '<div class="text-center">Không có sản phẩm</div>';
 
     return `
         <html>
             <head>
                 <meta charset="utf-8">
-                ${commonStyles}
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 10px; color: #1f2937; max-width: 300px; margin: 0 auto; line-height: 1.4; font-size: 12px; }
+                    .header { text-align: center; margin-bottom: 15px; border-bottom: 1px dashed #e5e7eb; padding-bottom: 10px; }
+                    .header h1 { margin: 0; font-size: 18px; color: #111827; text-transform: uppercase; font-weight: bold; }
+                    .header p { margin: 3px 0; color: #4b5563; font-size: 12px; }
+                    .info-section { margin-bottom: 15px; border-bottom: 1px dashed #e5e7eb; padding-bottom: 10px; font-size: 11px; }
+                    .info-item { display: flex; justify-content: space-between; margin-bottom: 4px; }
+                    .item-list { margin-bottom: 15px; font-size: 11px; width: 100%; border-bottom: 1px dashed #e5e7eb; }
+                    .item-row { margin-bottom: 8px; border-bottom: 1px dotted #e5e7eb; padding-bottom: 5px; }
+                    .item-row:last-child { border-bottom: none; }
+                    .item-name { font-weight: bold; margin-bottom: 2px; }
+                    .item-details { display: flex; justify-content: space-between; color: #4b5563; }
+                    .total-section { margin-bottom: 15px; font-size: 12px; border-bottom: 1px dashed #e5e7eb; padding-bottom: 10px; }
+                    .total-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+                    .total-row.bold { font-weight: bold; font-size: 14px; margin-top: 5px; border-top: 1px dashed #e5e7eb; padding-top: 5px; }
+                    .footer { text-align: center; font-size: 11px; color: #6b7280; }
+                    .text-center { text-align: center; }
+                </style>
             </head>
             <body>
                 <div class="header">
                     <h1>HÓA ĐƠN BÁN HÀNG</h1>
-                    <p>Mã hóa đơn: <strong>${order?.orderNo || '-'}</strong></p>
-                    <p>Ngày lập: ${formatDate(order?.orderTime || order?.createdAt)}</p>
+                    <p>Mã: <strong>${order?.orderNo || '-'}</strong></p>
+                    <p>Ngày: ${formatDate(order?.orderTime || order?.createdAt)}</p>
                 </div>
 
-                <div class="info-grid">
-                    <div>
-                        <div class="info-item"><span class="info-label">Khách hàng:</span> ${order?.customerName || 'Khách lẻ'}</div>
-                        <div class="info-item"><span class="info-label">Số điện thoại:</span> ${order?.customerPhone || '-'}</div>
-                        <div class="info-item"><span class="info-label">Kênh bán:</span> ${order?.salesChannel || '-'}</div>
-                    </div>
-                    <div>
-                        <div class="info-item"><span class="info-label">Kho hàng:</span> ${order?.warehouseName || '-'}</div>
-                        <div class="info-item"><span class="info-label">Nhân viên lập:</span> ${order?.createdBy || '-'}</div>
-                        <div class="info-item"><span class="info-label">Trạng thái:</span> ${order?.status || '-'}</div>
-                    </div>
+                <div class="info-section">
+                    <div class="info-item"><span>KH:</span> <span>${order?.customerName || 'Khách lẻ'}</span></div>
+                    <div class="info-item"><span>SĐT:</span> <span>${order?.customerPhone || '-'}</span></div>
+                    <div class="info-item"><span>NV:</span> <span>${order?.createdBy || '-'}</span></div>
+                    ${order?.note ? `<div class="info-item"><span>Ghi chú:</span> <span>${order.note}</span></div>` : ''}
                 </div>
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th width="5%">STT</th>
-                            <th width="15%">Mã SP</th>
-                            <th width="35%">Tên sản phẩm</th>
-                            <th width="10%" class="text-right">SL</th>
-                            <th width="15%" class="text-right">Đơn giá</th>
-                            <th width="20%" class="text-right">Thành tiền</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${itemsHtml}
-                    </tbody>
-                </table>
+                <div class="item-list">
+                    ${itemsHtml}
+                </div>
 
                 <div class="total-section">
                     <div class="total-row">
-                        <span>Tổng tiền hàng:</span>
+                        <span>Tiền hàng:</span>
                         <span>${formatCurrency(order?.grossAmount)}</span>
                     </div>
+                    ${order?.discountAmount > 0 ? `
                     <div class="total-row">
                         <span>Chiết khấu:</span>
                         <span>- ${formatCurrency(order?.discountAmount)}</span>
-                    </div>
+                    </div>` : ''}
                     ${order?.couponDiscountAmount > 0 ? `
                     <div class="total-row">
                         <span>Voucher (${order?.couponCode}):</span>
                         <span>- ${formatCurrency(order?.couponDiscountAmount)}</span>
                     </div>` : ''}
+                    ${order?.surchargeAmount > 0 ? `
                     <div class="total-row">
                         <span>Phụ phí:</span>
                         <span>+ ${formatCurrency(order?.surchargeAmount)}</span>
-                    </div>
+                    </div>` : ''}
                     <div class="total-row bold">
                         <span>TỔNG CỘNG:</span>
                         <span>${formatCurrency(order?.netAmount)}</span>
-                    </div>
-                </div>
-
-                <div class="signature-grid">
-                    <div>
-                        <div class="signature-title">Người mua hàng</div>
-                        <div>(Ký, ghi rõ họ tên)</div>
-                    </div>
-                    <div>
-                        <div class="signature-title">Người lập phiếu</div>
-                        <div>(Ký, ghi rõ họ tên)</div>
                     </div>
                 </div>
 
@@ -401,8 +390,8 @@ export const generateStockAdjustmentHTML = (adj: any) => {
             <td>${item.productName || '-'}</td>
             <td class="text-right">${item.systemQty || 0}</td>
             <td class="text-right">${item.actualQty || 0}</td>
-            <td class="text-right" style="color: ${item.differenceQty > 0 ? '#059669' : (item.differenceQty < 0 ? '#dc2626' : '#374151')}">
-                <strong>${item.differenceQty > 0 ? '+' : ''}${item.differenceQty || 0}</strong>
+            <td class="text-right" style="color: ${item.adjustQty > 0 ? '#059669' : (item.adjustQty < 0 ? '#dc2626' : '#374151')}">
+                <strong>${item.adjustQty > 0 ? '+' : ''}${item.adjustQty || 0}</strong>
             </td>
         </tr>
     `).join('') || '<tr><td colspan="6" class="text-center">Không có sản phẩm</td></tr>';
@@ -454,6 +443,288 @@ export const generateStockAdjustmentHTML = (adj: any) => {
                     </div>
                     <div>
                         <div class="signature-title">Quản lý kho</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                </div>
+            </body>
+        </html>
+    `;
+};
+
+export const generateSupplierReturnHTML = (ret: any) => {
+    const itemsHtml = ret?.items?.map((item: any, index: number) => `
+        <tr>
+            <td class="text-center">${index + 1}</td>
+            <td>${item.productSku || '-'}</td>
+            <td>${item.productName || '-'}</td>
+            <td class="text-right">${item.qty || 0}</td>
+            <td class="text-right">${formatCurrency(item.refundPrice)}</td>
+            <td class="text-right">${formatCurrency(item.lineRefund)}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="6" class="text-center">Không có sản phẩm</td></tr>';
+
+    return `
+        <html>
+            <head>
+                <meta charset="utf-8">
+                ${commonStyles}
+            </head>
+            <body>
+                <div class="header">
+                    <h1>PHIẾU TRẢ HÀNG NHÀ CUNG CẤP</h1>
+                    <p>Mã phiếu: <strong>${ret?.returnNo || '-'}</strong></p>
+                    <p>Ngày lập: ${formatDate(ret?.returnDate || ret?.createdAt)}</p>
+                </div>
+
+                <div class="info-grid">
+                    <div>
+                        <div class="info-item"><span class="info-label">Nhà cung cấp:</span> ${ret?.supplierName || '-'}</div>
+                        <div class="info-item"><span class="info-label">Thuộc GR:</span> ${ret?.grNo || '-'}</div>
+                    </div>
+                    <div>
+                        <div class="info-item"><span class="info-label">Kho xuất:</span> ${ret?.warehouseName || '-'}</div>
+                        <div class="info-item"><span class="info-label">Người lập:</span> ${ret?.createdBy || '-'}</div>
+                    </div>
+                </div>
+                ${ret?.note ? `<div style="margin-bottom: 20px;"><strong>Ghi chú:</strong> ${ret.note}</div>` : ''}
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="5%">STT</th>
+                            <th width="15%">Mã SP</th>
+                            <th width="40%">Tên sản phẩm</th>
+                            <th width="10%" class="text-right">SL Trả</th>
+                            <th width="15%" class="text-right">Đơn giá</th>
+                            <th width="15%" class="text-right">Hoàn tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                    </tbody>
+                </table>
+
+                <div class="total-section">
+                    <div class="total-row bold">
+                        <span>TỔNG TIỀN HOÀN TRẢ:</span>
+                        <span>${formatCurrency(ret?.totalRefundAmount)}</span>
+                    </div>
+                </div>
+
+                <div class="signature-grid">
+                    <div>
+                        <div class="signature-title">Người giao (Kho)</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                    <div>
+                        <div class="signature-title">Nhà cung cấp</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                </div>
+            </body>
+        </html>
+    `;
+};
+
+export const generateCashDepositReportHTML = (orders: any[], fromIso: string, toIso: string) => {
+    const totalCash = orders.reduce((sum, o) => sum + Number(o.netAmount || 0), 0);
+
+    const itemsHtml = orders.map((o: any, index: number) => `
+        <tr>
+            <td class="text-center">${index + 1}</td>
+            <td>${o.orderNo || '-'}</td>
+            <td>${o.customer?.name || 'Khách lẻ'}</td>
+            <td>${formatDate(o.orderTime || o.createdAt)}</td>
+            <td class="text-right">${formatCurrency(o.netAmount)}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="5" class="text-center">Không có giao dịch tiền mặt</td></tr>';
+
+    return `
+        <html>
+            <head>
+                <meta charset="utf-8">
+                ${commonStyles}
+            </head>
+            <body>
+                <div class="header">
+                    <h1>BÁO CÁO NỘP TIỀN MẶT</h1>
+                    <p>Từ: ${formatDate(fromIso)} - Đến: ${formatDate(toIso)}</p>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Tổng số giao dịch:</strong> ${orders.length}</p>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="10%">STT</th>
+                            <th width="20%">Mã đơn</th>
+                            <th width="30%">Khách hàng</th>
+                            <th width="20%">Thời gian</th>
+                            <th width="20%" class="text-right">Số tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                    </tbody>
+                </table>
+
+                <div class="total-section">
+                    <div class="total-row bold">
+                        <span>TỔNG TIỀN NỘP:</span>
+                        <span>${formatCurrency(totalCash)}</span>
+                    </div>
+                </div>
+
+                <div class="signature-grid">
+                    <div>
+                        <div class="signature-title">Người nộp (Thu ngân)</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                    <div>
+                        <div class="signature-title">Người nhận (Kế toán/Quản lý)</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                </div>
+            </body>
+        </html>
+    `;
+};
+
+export const generatePaymentMethodReportHTML = (orders: any[], fromIso: string, toIso: string) => {
+    const grouped = orders.reduce((acc, curr) => {
+        const method = curr.paymentMethod || 'UNKNOWN';
+        if (!acc[method]) acc[method] = { count: 0, total: 0 };
+        acc[method].count += 1;
+        acc[method].total += Number(curr.netAmount || 0);
+        return acc;
+    }, {} as Record<string, { count: number, total: number }>);
+
+    const methodsHtml = Object.entries(grouped).map(([method, data]) => {
+        const methodName = method === 'CASH' ? 'Tiền mặt' : method === 'TRANSFER' ? 'Chuyển khoản' : method === 'CARD' ? 'Quẹt thẻ' : method;
+        return `
+            <tr>
+                <td>${methodName}</td>
+                <td class="text-center">${data.count}</td>
+                <td class="text-right">${formatCurrency(data.total)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const grandTotal = orders.reduce((sum, o) => sum + Number(o.netAmount || 0), 0);
+
+    return `
+        <html>
+            <head>
+                <meta charset="utf-8">
+                ${commonStyles}
+            </head>
+            <body>
+                <div class="header">
+                    <h1>BÁO CÁO LOẠI TIỀN</h1>
+                    <p>Từ: ${formatDate(fromIso)} - Đến: ${formatDate(toIso)}</p>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Tổng số giao dịch:</strong> ${orders.length}</p>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="40%">Hình thức thanh toán</th>
+                            <th width="20%" class="text-center">Số giao dịch</th>
+                            <th width="40%" class="text-right">Tổng tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${methodsHtml}
+                    </tbody>
+                </table>
+
+                <div class="total-section">
+                    <div class="total-row bold">
+                        <span>TỔNG DOANH THU:</span>
+                        <span>${formatCurrency(grandTotal)}</span>
+                    </div>
+                </div>
+
+                <div class="signature-grid">
+                    <div>
+                        <div class="signature-title">Người lập báo cáo</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                    <div>
+                        <div class="signature-title">Quản lý duyệt</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                </div>
+            </body>
+        </html>
+    `;
+};
+
+export const generateCustomerReturnListReportHTML = (returns: any[], fromIso: string, toIso: string) => {
+    const totalRefund = returns.reduce((sum, r) => sum + Number(r.totalRefund || 0), 0);
+
+    const itemsHtml = returns.map((r: any, index: number) => `
+        <tr>
+            <td class="text-center">${index + 1}</td>
+            <td>${r.returnNo || '-'}</td>
+            <td>${r.orderNo || '-'}</td>
+            <td>${r.customer?.name || '-'}</td>
+            <td>${formatDate(r.returnDate || r.createdAt)}</td>
+            <td class="text-right">${formatCurrency(r.totalRefund)}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="6" class="text-center">Không có phiếu trả hàng</td></tr>';
+
+    return `
+        <html>
+            <head>
+                <meta charset="utf-8">
+                ${commonStyles}
+            </head>
+            <body>
+                <div class="header">
+                    <h1>BÁO CÁO KHÁCH TRẢ HÀNG</h1>
+                    <p>Từ: ${formatDate(fromIso)} - Đến: ${formatDate(toIso)}</p>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Tổng số phiếu trả:</strong> ${returns.length}</p>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="5%">STT</th>
+                            <th width="15%">Mã trả hàng</th>
+                            <th width="15%">Mã đơn (gốc)</th>
+                            <th width="25%">Khách hàng</th>
+                            <th width="20%">Thời gian</th>
+                            <th width="20%" class="text-right">Tiền hoàn trả</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                    </tbody>
+                </table>
+
+                <div class="total-section">
+                    <div class="total-row bold">
+                        <span>TỔNG TIỀN HOÀN TRẢ:</span>
+                        <span style="color: #dc2626;">${formatCurrency(totalRefund)}</span>
+                    </div>
+                </div>
+
+                <div class="signature-grid">
+                    <div>
+                        <div class="signature-title">Người lập báo cáo</div>
+                        <div>(Ký, ghi rõ họ tên)</div>
+                    </div>
+                    <div>
+                        <div class="signature-title">Kế toán duyệt</div>
                         <div>(Ký, ghi rõ họ tên)</div>
                     </div>
                 </div>
