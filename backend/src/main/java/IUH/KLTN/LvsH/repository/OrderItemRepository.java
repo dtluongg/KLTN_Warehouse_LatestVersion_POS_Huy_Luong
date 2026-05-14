@@ -135,4 +135,25 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 			@Param("productId") Long productId,
 			@Param("fromTime") LocalDateTime fromTime,
 			@Param("toTime") LocalDateTime toTime);
+
+	interface GrossRevenueProfitProjection {
+		BigDecimal getRevenue();
+		BigDecimal getProfit();
+	}
+
+	@Query(value = """
+			SELECT
+				COALESCE(SUM(oi.line_revenue), 0) AS "revenue",
+				COALESCE(SUM(oi.line_profit), 0) AS "profit"
+			FROM orders o
+			JOIN order_items oi ON oi.order_id = o.id
+			WHERE o.status = 'POSTED'
+			  AND o.order_time >= :fromTime
+			  AND o.order_time <= :toTime
+			  AND (:warehouseId IS NULL OR o.warehouse_id = :warehouseId)
+			""", nativeQuery = true)
+	GrossRevenueProfitProjection getGrossRevenueAndProfitInPeriod(
+			@Param("warehouseId") Long warehouseId,
+			@Param("fromTime") LocalDateTime fromTime,
+			@Param("toTime") LocalDateTime toTime);
 }

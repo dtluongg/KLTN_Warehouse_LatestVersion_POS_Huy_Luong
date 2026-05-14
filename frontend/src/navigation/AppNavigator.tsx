@@ -38,6 +38,8 @@ import StaffFormScreen from "../features/staff/screens/StaffFormScreen";
 import CustomerFormScreen from "../features/customers/screens/CustomerFormScreen";
 import WarehouseFormScreen from "../features/warehouses/screens/WarehouseFormScreen";
 import WarehouseStatisticsScreen from "../features/reports/screens/WarehouseStatisticsScreen";
+import RevenueReportScreen from "../features/reports/screens/RevenueReportScreen";
+import SalesReportsScreen from "../features/reports/screens/SalesReportsScreen";
 
 const Stack = createNativeStackNavigator();
 

@@ -12,6 +12,14 @@ export type InventoryValueRow = {
     category?: string;
 };
 
+export type SalesSummaryRow = {
+    netRevenue: number;
+    totalReturns: number;
+    cogs: number;
+    stockAdjustments: number;
+    grossProfit: number;
+};
+
 export type DaysOfCoverageRow = {
     warehouseId: number;
     warehouseName: string;
@@ -118,5 +126,12 @@ export const reportApi = {
             params: { warehouseId, fromDate, toDate },
         });
         return res.data || [];
+    },
+
+    async getSalesSummary(warehouseId?: number, fromDate?: string, toDate?: string) {
+        const res = await axiosClient.get<SalesSummaryRow>("/sales-reports/summary", {
+            params: { warehouseId, fromDate, toDate },
+        });
+        return res.data;
     },
 };

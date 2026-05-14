@@ -71,11 +71,6 @@ const MENU_GROUPS: MenuGroup[] = [
         section: "Tồn kho và kiểm kho",
         items: [
             {
-                label: "Thống kê kho",
-                route: "WarehouseStatistics",
-                icon: "bar-chart-2",
-            },
-            {
                 label: "Kiểm kho / điều chỉnh",
                 route: "StockAdjustments",
                 icon: "sliders",
@@ -84,6 +79,26 @@ const MENU_GROUPS: MenuGroup[] = [
                 label: "Lịch sử nhập xuất kho",
                 route: "InventoryMovements",
                 icon: "activity",
+            },
+        ],
+    },
+    {
+        section: "Báo cáo và thống kê",
+        items: [
+            {
+                label: "Thống kê kho",
+                route: "WarehouseStatistics",
+                icon: "bar-chart-2",
+            },
+            {
+                label: "Doanh thu",
+                route: "RevenueReport",
+                icon: "trending-up",
+            },
+            {
+                label: "Báo cáo thu ngân",
+                route: "SalesReports",
+                icon: "file-text",
             },
         ],
     },

@@ -299,14 +299,15 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
                 throw new RuntimeException("Goods receipt product does not match the referenced purchase order item: " + itemDto.getPoItemId());
             }
 
-            BigDecimal lineTotal = itemDto.getUnitCost().multiply(BigDecimal.valueOf(itemDto.getReceivedQty()));
+            BigDecimal incomingUnitCost = poItem.getExpectedUnitCost() != null ? poItem.getExpectedUnitCost() : BigDecimal.ZERO;
+            BigDecimal lineTotal = incomingUnitCost.multiply(BigDecimal.valueOf(itemDto.getReceivedQty()));
 
             GoodsReceiptItem item = GoodsReceiptItem.builder()
                     .goodsReceipt(gr)
                     .purchaseOrderItem(poItem)
                     .product(product)
                     .receivedQty(itemDto.getReceivedQty())
-                    .unitCost(itemDto.getUnitCost())
+                    .unitCost(incomingUnitCost)
                     .lineTotal(lineTotal)
                     .build();
 
@@ -330,10 +331,6 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
             if (itemDto.getReceivedQty() == null || itemDto.getReceivedQty() <= 0) {
                 throw new RuntimeException("receivedQty must be greater than 0");
             }
-            if (itemDto.getUnitCost() == null || itemDto.getUnitCost().compareTo(BigDecimal.ZERO) < 0) {
-                throw new RuntimeException("unitCost must be >= 0");
-            }
-
             PurchaseOrderItem poItem = poItemRepository.findById(itemDto.getPoItemId())
                     .orElseThrow(() -> new RuntimeException("Purchase Order Item not found"));
 
@@ -455,14 +452,15 @@ public class GoodsReceiptServiceImpl implements GoodsReceiptService {
             if (itemDto.getReceivedQty() == null || itemDto.getReceivedQty() <= 0) {
                 throw new RuntimeException("receivedQty must be greater than 0");
             }
-            if (itemDto.getUnitCost() == null || itemDto.getUnitCost().compareTo(BigDecimal.ZERO) < 0) {
-                throw new RuntimeException("unitCost must be >= 0");
-            }
+            PurchaseOrderItem poItem = poItemRepository.findById(itemDto.getPoItemId())
+                    .orElseThrow(() -> new RuntimeException("Purchase Order Item not found"));
+                    
+            BigDecimal incomingUnitCost = poItem.getExpectedUnitCost() != null ? poItem.getExpectedUnitCost() : BigDecimal.ZERO;
 
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
 
-            BigDecimal lineTotal = itemDto.getUnitCost().multiply(BigDecimal.valueOf(itemDto.getReceivedQty()));
+            BigDecimal lineTotal = incomingUnitCost.multiply(BigDecimal.valueOf(itemDto.getReceivedQty()));
             BigDecimal vatRate = product.getVatRate() == null ? BigDecimal.ZERO : product.getVatRate();
             BigDecimal lineVat = lineTotal.multiply(vatRate).divide(BigDecimal.valueOf(100));
 

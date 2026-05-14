@@ -218,6 +218,23 @@ const SupplierReturnListScreen = () => {
                     shouldShow: (row) =>
                         canApproveSupplierReturn && String(row?.status || "") === "DRAFT",
                 },
+                {
+                    label: "In",
+                    tone: "neutral",
+                    onPress: async (row) => {
+                        try {
+                            const res = await axiosClient.get(`/supplier-returns/${row.id}`);
+                            const { generateSupplierReturnHTML } = await import("../../../utils/printTemplates");
+                            const { printDocument } = await import("../../../utils/printUtils");
+                            const html = generateSupplierReturnHTML(res.data);
+                            await printDocument(html);
+                        } catch (e) {
+                            showAlert("Lỗi", "Không thể lấy thông tin in.");
+                        }
+                    },
+                    showOnDesktop: true,
+                    showOnMobile: true,
+                },
             ]}
             renderDetailContent={(row) => <SupplierReturnDetailView id={row.id} />}
             renderFilters={(setFilters, currentFilters) => {

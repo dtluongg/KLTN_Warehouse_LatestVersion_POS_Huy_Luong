@@ -1,13 +1,13 @@
-{	"servers": {
+{
+	"servers": {
 		"serena": {
-			"type": "stdio",
+      "type": "stdio",
       "command": "cmd.exe",
       "args": [
         "/c",
         "serena start-mcp-server --context ide"
       ]
-		}
+    }
 	},
 	"inputs": []
-
-  }
+}

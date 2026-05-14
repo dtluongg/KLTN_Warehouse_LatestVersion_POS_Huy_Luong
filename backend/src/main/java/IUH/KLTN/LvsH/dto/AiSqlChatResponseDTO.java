@@ -15,4 +15,5 @@ public class AiSqlChatResponseDTO {
     private String summary;
     private int rowCount;
     private List<Map<String, Object>> rows;
+    private String chartType;
 }

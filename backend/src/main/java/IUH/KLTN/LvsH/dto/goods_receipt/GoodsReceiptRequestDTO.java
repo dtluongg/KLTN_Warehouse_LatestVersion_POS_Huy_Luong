@@ -46,9 +46,5 @@ public class GoodsReceiptRequestDTO {
         @NotNull(message = "receivedQty is required")
         @Positive(message = "receivedQty must be greater than 0")
         private Integer receivedQty;
-
-        @NotNull(message = "unitCost is required")
-        @PositiveOrZero(message = "unitCost must be >= 0")
-        private BigDecimal unitCost;
     }
 }
