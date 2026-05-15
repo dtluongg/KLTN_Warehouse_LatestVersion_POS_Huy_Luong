@@ -167,6 +167,16 @@ export default function AppNavigator() {
                             options={{ title: "Thống kê kho" }}
                         />
                         <Stack.Screen
+                            name="RevenueReport"
+                            component={RevenueReportScreen}
+                            options={{ title: "Báo cáo doanh thu" }}
+                        />
+                        <Stack.Screen
+                            name="SalesReports"
+                            component={SalesReportsScreen}
+                            options={{ title: "Báo cáo thu ngân" }}
+                        />
+                        <Stack.Screen
                             name="PurchaseOrderForm"
                             component={PurchaseOrderFormScreen}
                             options={{ headerShown: false }}

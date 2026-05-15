@@ -341,40 +341,25 @@ const WarehouseStatisticsScreen = () => {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}> 
-            <ScreenHeader
-                title="Thống kê kho"
-                subtitle={`Kho đang xem: ${activeWarehouseName}`}
-                rightSlot={
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                        <TouchableOpacity
-                            style={[
-                                styles.refreshButton,
-                                { borderRadius: metrics.borderRadius.pill, borderColor: colors.border, backgroundColor: colors.surface },
-                            ]}
-                            onPress={() => setShowAdvanced((prev) => !prev)}
-                        >
-                            <Feather name={showAdvanced ? "chevron-up" : "sliders"} size={14} color={colors.primary} />
-                            <Typography variant="captionBold" color={colors.primary}>
-                                Nâng cao
-                            </Typography>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.refreshButton,
-                                { borderRadius: metrics.borderRadius.pill, borderColor: colors.border, backgroundColor: colors.surface },
-                            ]}
-                            onPress={() => fetchAll()}
-                        >
-                            <Feather name="refresh-cw" size={14} color={colors.primary} />
-                            <Typography variant="captionBold" color={colors.primary}>
-                                Làm mới
-                            </Typography>
-                        </TouchableOpacity>
-                    </View>
-                }
-            />
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            {/* Toolbar compact — action buttons căn phải */}
+            <View style={[styles.toolbar, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                    style={[styles.refreshButton, { borderRadius: metrics.borderRadius.pill, borderColor: colors.border, backgroundColor: colors.background }]}
+                    onPress={() => setShowAdvanced((prev) => !prev)}
+                >
+                    <Feather name={showAdvanced ? "chevron-up" : "sliders"} size={14} color={colors.primary} />
+                    <Typography variant="captionBold" color={colors.primary}>Nâng cao</Typography>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.refreshButton, { borderRadius: metrics.borderRadius.pill, borderColor: colors.border, backgroundColor: colors.background }]}
+                    onPress={() => fetchAll()}
+                >
+                    <Feather name="refresh-cw" size={14} color={colors.primary} />
+                    <Typography variant="captionBold" color={colors.primary}>Làm mới</Typography>
+                </TouchableOpacity>
+            </View>
 
             <ScrollView
                 style={styles.scroll}
@@ -539,6 +524,13 @@ export default WarehouseStatisticsScreen;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    toolbar: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        padding: 10,
+        borderBottomWidth: 1,
     },
     scroll: {
         flex: 1,

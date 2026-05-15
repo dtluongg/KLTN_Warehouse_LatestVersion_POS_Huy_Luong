@@ -11,6 +11,7 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    useWindowDimensions,
 } from "react-native";
 import { BarChart, PieChart, LineChart } from "react-native-chart-kit";
 import { Feather } from "@expo/vector-icons";
@@ -232,6 +233,10 @@ const AiSqlChatScreen = () => {
     const [isLibraryVisible, setLibraryVisible] = useState(false);
     const [expandedCategoryIndex, setExpandedCategoryIndex] = useState<number | null>(0);
     const [randomPrompts, setRandomPrompts] = useState<string[]>([]);
+    const [showPromptCard, setShowPromptCard] = useState(false); // Mobile: ẩn mặc định
+
+    const { width } = useWindowDimensions();
+    const isMobile = width < 1024;
 
     React.useEffect(() => {
         setRandomPrompts(getRandomPrompts(2));
@@ -311,44 +316,75 @@ const AiSqlChatScreen = () => {
             style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-            <ScreenHeader
-                title="AI Chat SQL"
-                subtitle="Hỏi dữ liệu kho, đơn hàng, nhập/xuất bằng ngôn ngữ tự nhiên"
-            />
 
             <View style={styles.body}>
-                <View style={styles.promptCard}>
-                    <Text style={styles.cardTitle}>Gợi ý câu hỏi</Text>
-                    <View style={styles.promptChips}>
+                {/* Gợi ý câu hỏi — trên mobile: ẩn/hiện bằng toggle */}
+                {isMobile ? (
+                    <>
                         <TouchableOpacity
-                            style={[styles.promptChip, styles.libraryChip]}
-                            onPress={() => setLibraryVisible(true)}
+                            style={[styles.promptToggleBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+                            onPress={() => setShowPromptCard(v => !v)}
                         >
-                            <Feather name="book-open" size={14} color="#fff" />
-                            <Text style={styles.libraryChipText}>
-                                📖 Thư viện 50+ câu hỏi
+                            <Feather name="zap" size={14} color={theme.colors.primary} />
+                            <Text style={[styles.promptToggleBtnText, { color: theme.colors.primary }]}>
+                                {showPromptCard ? "Ẩn gợi ý câu hỏi" : "Gợi ý câu hỏi & Thư viện"}
                             </Text>
+                            <Feather name={showPromptCard ? "chevron-up" : "chevron-down"} size={14} color={theme.colors.mutedForeground} />
                         </TouchableOpacity>
-
-                        {randomPrompts.map((item) => (
+                        {showPromptCard && (
+                            <View style={styles.promptCard}>
+                                <View style={styles.promptChips}>
+                                    <TouchableOpacity
+                                        style={[styles.promptChip, styles.libraryChip]}
+                                        onPress={() => setLibraryVisible(true)}
+                                    >
+                                        <Feather name="book-open" size={14} color="#fff" />
+                                        <Text style={styles.libraryChipText}>📖 Thư viện 50+ câu hỏi</Text>
+                                    </TouchableOpacity>
+                                    {randomPrompts.map((item) => (
+                                        <TouchableOpacity
+                                            key={item}
+                                            style={styles.promptChip}
+                                            onPress={() => sendQuestion(item)}
+                                            disabled={loading}
+                                        >
+                                            <Feather name="message-circle" size={14} color={theme.colors.primary} />
+                                            <Text style={styles.promptChipText} numberOfLines={1}>
+                                                {item.length > 35 ? item.substring(0, 35) + "..." : item}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+                    </>
+                ) : (
+                    <View style={styles.promptCard}>
+                        <Text style={styles.cardTitle}>Gợi ý câu hỏi</Text>
+                        <View style={styles.promptChips}>
                             <TouchableOpacity
-                                key={item}
-                                style={styles.promptChip}
-                                onPress={() => sendQuestion(item)}
-                                disabled={loading}
+                                style={[styles.promptChip, styles.libraryChip]}
+                                onPress={() => setLibraryVisible(true)}
                             >
-                                <Feather
-                                    name="message-circle"
-                                    size={14}
-                                    color={theme.colors.primary}
-                                />
-                                <Text style={styles.promptChipText} numberOfLines={1}>
-                                    {item.length > 35 ? item.substring(0, 35) + "..." : item}
-                                </Text>
+                                <Feather name="book-open" size={14} color="#fff" />
+                                <Text style={styles.libraryChipText}>📖 Thư viện 50+ câu hỏi</Text>
                             </TouchableOpacity>
-                        ))}
+                            {randomPrompts.map((item) => (
+                                <TouchableOpacity
+                                    key={item}
+                                    style={styles.promptChip}
+                                    onPress={() => sendQuestion(item)}
+                                    disabled={loading}
+                                >
+                                    <Feather name="message-circle" size={14} color={theme.colors.primary} />
+                                    <Text style={styles.promptChipText} numberOfLines={1}>
+                                        {item.length > 35 ? item.substring(0, 35) + "..." : item}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
-                </View>
+                )}
 
                 {/* MODAL THƯ VIỆN CÂU HỎI */}
                 <Modal
@@ -542,6 +578,20 @@ const styles = StyleSheet.create({
         borderRadius: theme.borderRadius.lg,
         padding: theme.spacing.md,
         gap: theme.spacing.sm,
+    },
+    promptToggleBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        borderWidth: 1,
+        borderRadius: theme.borderRadius.md,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    promptToggleBtnText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: "600",
     },
     cardTitle: {
         ...theme.typography.label,

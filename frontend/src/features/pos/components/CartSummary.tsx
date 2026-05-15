@@ -120,11 +120,15 @@ export const CartSummary = ({
             >
 
 
-                {/* Cart Header */}
+                {/* Cart Header — không có title thừa */}
                 <View style={[styles.cartHeader, { borderBottomColor: colors.border }]}>
-                    <Typography variant="heading2" color={colors.textHero}>
-                        Giỏ Hàng {cart.length > 0 && `(${cart.length})`}
-                    </Typography>
+                    {cart.length > 0 && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Feather name="shopping-cart" size={16} color={colors.primary} />
+                            <Typography variant="captionBold" color={colors.primary}>{cart.length} sản phẩm</Typography>
+                        </View>
+                    )}
+                    <View style={{ flex: 1 }} />
                     <TouchableOpacity onPress={clearCart}>
                         <Typography variant="bodyEmphasized" color={colors.danger}>Xóa hết</Typography>
                     </TouchableOpacity>

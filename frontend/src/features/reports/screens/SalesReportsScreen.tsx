@@ -254,29 +254,24 @@ const SalesReportsScreen = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <ScreenHeader
-                title="Báo cáo Thu ngân"
-                subtitle={`Kho: ${activeWarehouseName}`}
-                rightSlot={
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TouchableOpacity
-                            style={[styles.headerBtn, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                            onPress={() => fetchData()}
-                        >
-                            <Feather name="refresh-cw" size={14} color={colors.primary} />
-                            <Typography variant="captionBold" color={colors.primary}>Tải lại</Typography>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                            style={[styles.headerBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                            onPress={handlePrint}
-                        >
-                            <Feather name="printer" size={14} color={colors.buttonText} />
-                            <Typography variant="captionBold" color={colors.buttonText}>In Báo cáo (A4)</Typography>
-                        </TouchableOpacity>
-                    </View>
-                }
-            />
+            {/* Toolbar compact — không có title thừa */}
+            <View style={[styles.toolbar, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                    style={[styles.headerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+                    onPress={() => fetchData()}
+                >
+                    <Feather name="refresh-cw" size={14} color={colors.primary} />
+                    <Typography variant="captionBold" color={colors.primary}>Tải lại</Typography>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.headerBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                    onPress={handlePrint}
+                >
+                    <Feather name="printer" size={14} color={colors.buttonText} />
+                    <Typography variant="captionBold" color={colors.buttonText}>In Báo cáo (A4)</Typography>
+                </TouchableOpacity>
+            </View>
 
             <ScrollView 
                 style={styles.scroll} 
@@ -441,6 +436,7 @@ const styles = StyleSheet.create({
     content: { padding: 16, gap: 16, paddingBottom: 40 },
     pillsWrap: { gap: 8 },
     pill: { borderWidth: 1, paddingVertical: 8, paddingHorizontal: 12 },
+    toolbar: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderBottomWidth: 1 },
     headerBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20 },
     center: { padding: 40, alignItems: "center" },
     filterCard: { padding: 16 },
