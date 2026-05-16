@@ -214,19 +214,17 @@ const RevenueReportScreen = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <ScreenHeader
-                title="Báo cáo Doanh thu"
-                subtitle={`Kho đang xem: ${activeWarehouseName}`}
-                rightSlot={
-                    <TouchableOpacity
-                        style={[styles.refreshButton, { borderRadius: metrics.borderRadius.pill, borderColor: colors.border, backgroundColor: colors.surface }]}
-                        onPress={() => fetchSummary()}
-                    >
-                        <Feather name="refresh-cw" size={14} color={colors.primary} />
-                        <Typography variant="captionBold" color={colors.primary}>Làm mới</Typography>
-                    </TouchableOpacity>
-                }
-            />
+            {/* Toolbar compact — không có title thừa */}
+            <View style={[styles.toolbar, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                    style={[styles.refreshButton, { borderRadius: metrics.borderRadius.pill, borderColor: colors.border, backgroundColor: colors.background }]}
+                    onPress={() => fetchSummary()}
+                >
+                    <Feather name="refresh-cw" size={14} color={colors.primary} />
+                    <Typography variant="captionBold" color={colors.primary}>Làm mới</Typography>
+                </TouchableOpacity>
+            </View>
 
             <ScrollView 
                 style={styles.scroll} 
@@ -374,6 +372,7 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scroll: { flex: 1 },
     content: { padding: 16, gap: 16, paddingBottom: 40 },
+    toolbar: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderBottomWidth: 1 },
     refreshButton: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, paddingVertical: 8, paddingHorizontal: 12 },
     pillsWrap: { gap: 8 },
     pill: { borderWidth: 1, paddingVertical: 8, paddingHorizontal: 12 },

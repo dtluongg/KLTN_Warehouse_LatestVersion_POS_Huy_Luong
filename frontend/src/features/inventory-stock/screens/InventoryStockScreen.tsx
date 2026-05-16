@@ -5,6 +5,7 @@ import {
     FlatList,
     Modal,
     RefreshControl,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -13,7 +14,7 @@ import {
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { axiosClient } from "../../../api/axiosClient";
-import { EmptyState, ScreenHeader, SearchBar } from "../../../components/ui";
+import { EmptyState, SearchBar } from "../../../components/ui";
 import { useResponsive } from "../../../utils/responsive";
 import { theme } from "../../../utils/theme";
 
@@ -57,6 +58,14 @@ const InventoryStockScreen = () => {
     const [showWarehouseModal, setShowWarehouseModal] = useState(false);
     const [searchKeyword, setSearchKeyword] = useState("");
 
+    // Category filter
+    const [categories, setCategories] = useState<
+        { id: string | number; name: string }[]
+    >([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+        null,
+    );
+
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -64,11 +73,20 @@ const InventoryStockScreen = () => {
     const fetchData = useCallback(async () => {
         try {
             setErrorMessage(null);
-            const warehouseRes = await axiosClient.get("/warehouses");
+            const [warehouseRes, categoryRes] = await Promise.all([
+                axiosClient.get("/warehouses"),
+                axiosClient.get("/categories"),
+            ]);
+
             const activeWarehouses: Warehouse[] = (
-                warehouseRes.data.content || warehouseRes.data || []
+                warehouseRes.data.content ||
+                warehouseRes.data ||
+                []
             ).filter((w: Warehouse) => w.isActive);
             setWarehouses(activeWarehouses);
+
+            const catList = categoryRes.data.content || categoryRes.data || [];
+            setCategories(catList);
 
             if (activeWarehouses.length === 0) {
                 setStocksByWarehouse({});
@@ -162,19 +180,25 @@ const InventoryStockScreen = () => {
         const sortedRows = [...inventoryRows].sort((a, b) =>
             a.name.localeCompare(b.name),
         );
-        if (!searchKeyword.trim()) {
-            return sortedRows;
-        }
 
-        const keyword = searchKeyword.toLowerCase();
         return sortedRows.filter((row) => {
-            return (
+            const keyword = searchKeyword.toLowerCase().trim();
+            const matchKeyword =
+                !keyword ||
                 (row.name || "").toLowerCase().includes(keyword) ||
                 (row.sku || "").toLowerCase().includes(keyword) ||
-                (row.barcode || "").toLowerCase().includes(keyword)
-            );
+                (row.barcode || "").toLowerCase().includes(keyword);
+
+            const rowCategoryId =
+                (row as any).categoryId ?? (row as any).category?.id;
+            const matchCategory =
+                !selectedCategoryId ||
+                (rowCategoryId != null &&
+                    String(rowCategoryId) === selectedCategoryId);
+
+            return matchKeyword && matchCategory;
         });
-    }, [inventoryRows, searchKeyword]);
+    }, [inventoryRows, searchKeyword, selectedCategoryId]);
 
     const selectedWarehouseLabel =
         selectedWarehouse === "SYSTEM"
@@ -297,11 +321,57 @@ const InventoryStockScreen = () => {
 
     return (
         <View style={styles.container}>
-            <ScreenHeader
-                title="Tồn kho"
-                subtitle={`${filteredRows.length} sản phẩm`}
-            />
+            {/* Toolbar: bên phải là nút Kho */}
+            <View
+                style={[
+                    styles.toolbar,
+                    {
+                        borderBottomColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                    },
+                ]}
+            >
+                <Text
+                    style={[
+                        styles.countLabel,
+                        { color: theme.colors.mutedForeground },
+                    ]}
+                >
+                    {filteredRows.length} sản phẩm
+                </Text>
+                <TouchableOpacity
+                    style={[
+                        styles.warehouseBtn,
+                        {
+                            borderColor: theme.colors.border,
+                            backgroundColor: theme.colors.background,
+                        },
+                    ]}
+                    onPress={() => setShowWarehouseModal(true)}
+                >
+                    <MaterialCommunityIcons
+                        name="warehouse"
+                        size={14}
+                        color={theme.colors.primary}
+                    />
+                    <Text
+                        style={[
+                            styles.warehouseBtnText,
+                            { color: theme.colors.primary },
+                        ]}
+                        numberOfLines={1}
+                    >
+                        {selectedWarehouseLabel}
+                    </Text>
+                    <Feather
+                        name="chevron-down"
+                        size={14}
+                        color={theme.colors.mutedForeground}
+                    />
+                </TouchableOpacity>
+            </View>
 
+            {/* Search bar */}
             <View style={styles.searchArea}>
                 <SearchBar
                     value={searchKeyword}
@@ -310,24 +380,64 @@ const InventoryStockScreen = () => {
                 />
             </View>
 
-            <TouchableOpacity
-                style={styles.warehouseBanner}
-                onPress={() => setShowWarehouseModal(true)}
-            >
-                <MaterialCommunityIcons
-                    name="warehouse"
-                    size={16}
-                    color={theme.colors.primary}
-                />
-                <Text style={styles.warehouseBannerText} numberOfLines={1}>
-                    {selectedWarehouseLabel}
-                </Text>
-                <Feather
-                    name="chevron-down"
-                    size={14}
-                    color={theme.colors.mutedForeground}
-                />
-            </TouchableOpacity>
+            {/* Category filter pills */}
+            {categories.length > 0 && (
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.categoryPillsScroll}
+                    contentContainerStyle={styles.categoryPillsWrap}
+                >
+                    <TouchableOpacity
+                        style={[
+                            styles.categoryPill,
+                            !selectedCategoryId && styles.categoryPillActive,
+                        ]}
+                        onPress={() => setSelectedCategoryId(null)}
+                    >
+                        <Text
+                            style={[
+                                styles.categoryPillText,
+                                !selectedCategoryId &&
+                                    styles.categoryPillTextActive,
+                            ]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            Tất cả
+                        </Text>
+                    </TouchableOpacity>
+                    {categories.map((cat) => {
+                        const categoryId = String(cat.id);
+                        const active = selectedCategoryId === categoryId;
+                        return (
+                            <TouchableOpacity
+                                key={cat.id}
+                                style={[
+                                    styles.categoryPill,
+                                    active && styles.categoryPillActive,
+                                ]}
+                                onPress={() =>
+                                    setSelectedCategoryId(
+                                        active ? null : categoryId,
+                                    )
+                                }
+                            >
+                                <Text
+                                    style={[
+                                        styles.categoryPillText,
+                                        active && styles.categoryPillTextActive,
+                                    ]}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                >
+                                    {cat.name}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+            )}
 
             {errorMessage ? (
                 <View style={styles.errorBox}>
@@ -422,29 +532,70 @@ const styles = StyleSheet.create({
         color: theme.colors.mutedForeground,
         fontSize: 14,
     },
+    toolbar: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+    },
+    countLabel: {
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    warehouseBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderWidth: 1,
+        borderRadius: theme.borderRadius.md,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
+    warehouseBtnText: {
+        fontSize: 13,
+        fontWeight: "700",
+        maxWidth: 140,
+    },
     searchArea: {
         paddingHorizontal: theme.spacing.md,
         paddingTop: theme.spacing.sm,
         paddingBottom: theme.spacing.sm,
     },
-    warehouseBanner: {
-        marginHorizontal: theme.spacing.md,
-        marginBottom: theme.spacing.sm,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: theme.borderRadius.md,
-        borderWidth: 1,
-        borderColor: "#86efac",
-        backgroundColor: "#dcfce7",
+    categoryPillsScroll: {
+        flexGrow: 0,
+        maxHeight: 44,
+    },
+    categoryPillsWrap: {
+        paddingHorizontal: 16,
+        paddingBottom: 10,
+        gap: 8,
         flexDirection: "row",
         alignItems: "center",
-        gap: 8,
     },
-    warehouseBannerText: {
-        flex: 1,
-        color: theme.colors.primary,
+    categoryPill: {
+        alignSelf: "center",
+        flexShrink: 0,
+        maxWidth: 180,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
+    },
+    categoryPillActive: {
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
+    },
+    categoryPillText: {
         fontSize: 13,
-        fontWeight: "700",
+        fontWeight: "600",
+        color: theme.colors.foreground,
+    },
+    categoryPillTextActive: {
+        color: "#fff",
     },
     errorBox: {
         marginHorizontal: theme.spacing.md,

@@ -10,6 +10,7 @@ import {
     View,
     Pressable,
     ScrollView,
+    Text,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -128,7 +129,7 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
 
     const [searchInput, setSearchInput] = useState("");
     const [selectedRow, setSelectedRow] = useState<any | null>(null);
-    const [showFilters, setShowFilters] = useState(true); // Default show filters in SaaS layout
+    const [showFilterModal, setShowFilterModal] = useState(false); // Mobile: filter modal
 
     const { isDesktop } = useResponsive();
 
@@ -358,12 +359,13 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
     return (
         <View style={[{ flex: 1, backgroundColor: colors.background }]}>
             <View style={styles.topSection}>
-                <ScreenHeader
-                    title={title}
-                    subtitle=""
-                    rightSlot={
-                        <View style={styles.rightHeaderWrap}>
-                            {isDesktop && (
+                {/* Desktop: ScreenHeader với Search + Thêm */}
+                {isDesktop && (
+                    <ScreenHeader
+                        title={title}
+                        subtitle=""
+                        rightSlot={
+                            <View style={styles.rightHeaderWrap}>
                                 <View style={{ width: 300, marginRight: 16 }}>
                                     <SearchBar
                                         value={searchInput}
@@ -371,19 +373,20 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
                                         placeholder={searchPlaceholder}
                                     />
                                 </View>
-                            )}
-                            {typeof extraHeaderActions === 'function' ? extraHeaderActions(pageState.filters || {}, searchInput) : extraHeaderActions}
-                            {createAction && (
-                                <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: 99 }]} onPress={createAction.onPress}>
-                                    <Typography variant="bodyEmphasized" color={colors.buttonText}>{createAction.label}</Typography>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                    }
-                />
+                                {typeof extraHeaderActions === 'function' ? extraHeaderActions(pageState.filters || {}, searchInput) : extraHeaderActions}
+                                {createAction && (
+                                    <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: 99 }]} onPress={createAction.onPress}>
+                                        <Typography variant="bodyEmphasized" color={colors.buttonText}>{createAction.label}</Typography>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        }
+                    />
+                )}
 
+                {/* Mobile: Ẩn ScreenHeader (Stack.Navigator đã có title + back). Chỉ render Search + Filter + Thêm */}
                 {!isDesktop && (
-                    <View style={{ paddingBottom: 16, flexDirection: "row", gap: 8, paddingHorizontal: 16 }}>
+                    <View style={{ paddingTop: 12, paddingBottom: 12, flexDirection: "row", gap: 8, paddingHorizontal: 16, alignItems: "center" }}>
                         <View style={{ flex: 1 }}>
                             <SearchBar
                                 value={searchInput}
@@ -392,19 +395,71 @@ const DataTableScreen: React.FC<DataTableScreenProps> = ({
                             />
                         </View>
                         {renderFilters && (
-                            <TouchableOpacity style={[styles.filterMobileBtn, { backgroundColor: "rgba(0, 113, 227, 0.08)" }]} onPress={() => setShowFilters(!showFilters)}>
+                            <TouchableOpacity
+                                style={[styles.filterMobileBtn, { backgroundColor: "rgba(0, 113, 227, 0.08)" }]}
+                                onPress={() => setShowFilterModal(true)}
+                            >
                                 <Feather name="filter" size={20} color={colors.primary} />
+                            </TouchableOpacity>
+                        )}
+                        {createAction && (
+                            <TouchableOpacity
+                                style={[styles.createButtonMobile, { backgroundColor: colors.primary }]}
+                                onPress={createAction.onPress}
+                            >
+                                <Feather name="plus" size={20} color={colors.buttonText} />
                             </TouchableOpacity>
                         )}
                     </View>
                 )}
 
-                {showFilters && renderFilters && (
+                {/* Desktop: inline filter panel */}
+                {isDesktop && renderFilters && (
                     <View style={[styles.filterPanel]}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                             {renderFilters(tablePagination.setFilters, pageState.filters || {})}
                         </ScrollView>
                     </View>
+                )}
+
+                {/* Mobile: Filter Bottom Sheet Modal */}
+                {!isDesktop && renderFilters && (
+                    <Modal
+                        visible={showFilterModal}
+                        transparent
+                        animationType="slide"
+                        onRequestClose={() => setShowFilterModal(false)}
+                    >
+                        <View style={styles.filterModalOverlay}>
+                            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFilterModal(false)} />
+                            <View style={[styles.filterModalSheet, { backgroundColor: colors.surface }]}>
+                                <View style={[styles.filterModalHeader, { borderBottomColor: colors.border }]}>
+                                    <Typography variant="bodyEmphasized" color={colors.textPrimary}>Bộ lọc</Typography>
+                                    <TouchableOpacity
+                                        style={[styles.filterModalCloseBtn, { backgroundColor: colors.background }]}
+                                        onPress={() => setShowFilterModal(false)}
+                                    >
+                                        <Feather name="x" size={18} color={colors.textPrimary} />
+                                    </TouchableOpacity>
+                                </View>
+                                <ScrollView
+                                    style={{ flex: 1 }}
+                                    contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 40 }}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    {renderFilters(tablePagination.setFilters, pageState.filters || {})}
+                                </ScrollView>
+                                <View style={[styles.filterModalFooter, { borderTopColor: colors.border, backgroundColor: colors.surface }]}>
+                                    <TouchableOpacity
+                                        style={[styles.filterModalApplyBtn, { backgroundColor: colors.primary }]}
+                                        onPress={() => setShowFilterModal(false)}
+                                    >
+                                        <Typography variant="bodyEmphasized" color={colors.buttonText}>Áp dụng</Typography>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
                 )}
             </View>
 
@@ -427,12 +482,19 @@ export default DataTableScreen;
 
 const styles = StyleSheet.create({
     loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-    topSection: { paddingHorizontal: 16, paddingBottom: 16 },
+    topSection: {},
     searchWrapper: { paddingHorizontal: 16, paddingVertical: 12 },
     searchButton: { justifyContent: "center", alignItems: "center", paddingHorizontal: 16 },
     filterPanel: { paddingHorizontal: 16, paddingBottom: 16 },
     rightHeaderWrap: { flexDirection: "row", alignItems: "center" },
     createButton: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24, paddingVertical: 12 },
+    // Filter Bottom Sheet (Mobile)
+    filterModalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
+    filterModalSheet: { maxHeight: "85%", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" },
+    filterModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1 },
+    filterModalCloseBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+    filterModalFooter: { padding: 16, borderTopWidth: 1 },
+    filterModalApplyBtn: { borderRadius: 12, paddingVertical: 14, alignItems: "center" },
     
     // Island UI
     tableIsland: { flex: 1, marginBottom: 24, overflow: "hidden" },
@@ -440,6 +502,7 @@ const styles = StyleSheet.create({
     tableRow: { flexDirection: "row", marginVertical: 4 },
     
     filterMobileBtn: { height: 48, width: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+    createButtonMobile: { height: 48, width: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
 
     mobileListContent: { padding: 16 },
     mobileCard: { paddingHorizontal: 16, paddingVertical: 8, marginBottom: 12 },

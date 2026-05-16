@@ -4,12 +4,11 @@ import {
     ScrollView,
     StyleSheet,
     useWindowDimensions,
-    Alert,
     TouchableOpacity,
     Modal,
     ActivityIndicator,
     Image,
-    Linking
+    Pressable,
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { usePosStore } from "../../../store/posStore";
@@ -51,6 +50,9 @@ export const PosScreen = () => {
     const [timeLeftSec, setTimeLeftSec] = useState(120);
     const [checkoutError, setCheckoutError] = useState<string>("");
 
+    // Mobile: Cart Bottom Sheet
+    const [showCartSheet, setShowCartSheet] = useState(false);
+
     const {
         cart,
         addToCart,
@@ -61,6 +63,8 @@ export const PosScreen = () => {
         paymentMethod,
         note,
         clearCart,
+        getNetAmount,
+        getGrossAmount,
     } = usePosStore();
 
     useEffect(() => {
@@ -169,6 +173,7 @@ export const PosScreen = () => {
                 setPendingAmount(netAmount);
                 setTimeLeftSec(120);
                 setShowQrModal(true);
+                setShowCartSheet(false);
 
                 showAlert(
                     "Đã tạo QR",
@@ -179,7 +184,8 @@ export const PosScreen = () => {
             }
 
             showAlert("Thành công", `Đã tạo Đơn hàng #${orderNo}`);
-            
+            setShowCartSheet(false);
+
             // In hoá đơn tự động
             try {
                 const detailRes = await axiosClient.get(`/orders/${orderId}`);
@@ -210,7 +216,6 @@ export const PosScreen = () => {
             visible={showWarehouseModal}
             transparent
             animationType="fade"
-
         >
             <View style={styles.modalOverlay}>
                 <View style={[styles.modalBox, { backgroundColor: colors.surface }]}>
@@ -271,49 +276,142 @@ export const PosScreen = () => {
             </View>
         </Modal>
     );
-    // Layout Rendering
-    const content = (
-        <>
-            <ProductGrid
-                products={products}
-                loading={loading}
-                searchKeyword={searchKeyword}
-                setSearchKeyword={setSearchKeyword}
-                activeCategoryId={activeCategoryId}
-                setActiveCategoryId={setActiveCategoryId}
-                handleAddToCart={handleAddToCart}
-            />
-            <CartSummary
-                customers={customers}
-                warehouseId={warehouseId}
-                warehouseName={warehouseName}
-                setShowWarehouseModal={setShowWarehouseModal}
-                handleCheckout={handleCheckout}
-                loading={loading}
-            />
-            {!!checkoutError && (
-                <View style={[styles.checkoutErrorBox, { borderColor: colors.danger, backgroundColor: "rgba(255,59,48,0.08)" }]}>
-                    <Typography variant="captionBold" color={colors.danger}>Lỗi thanh toán: {checkoutError}</Typography>
+
+    // ─── DESKTOP Layout ─────────────────────────────────────────────────────────
+    if (isLargeScreen) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={{ flexDirection: 'row', flex: 1 }}>
+                    <ProductGrid
+                        products={products}
+                        loading={loading}
+                        searchKeyword={searchKeyword}
+                        setSearchKeyword={setSearchKeyword}
+                        activeCategoryId={activeCategoryId}
+                        setActiveCategoryId={setActiveCategoryId}
+                        handleAddToCart={handleAddToCart}
+                    />
+                    <CartSummary
+                        customers={customers}
+                        warehouseId={warehouseId}
+                        warehouseName={warehouseName}
+                        setShowWarehouseModal={setShowWarehouseModal}
+                        handleCheckout={handleCheckout}
+                        loading={loading}
+                    />
                 </View>
-            )}
-        </>
-    );
+                {renderWarehouseModal()}
+                <QRPaymentModal
+                    visible={showQrModal}
+                    qrData={qrData}
+                    pendingOrderId={pendingOrderId}
+                    pendingOrderNo={pendingOrderNo}
+                    pendingAmount={pendingAmount}
+                    initialTimeLeftSec={timeLeftSec}
+                    onClose={() => { setShowQrModal(false); setPendingOrderId(null); }}
+                    onSuccess={async () => {
+                        setShowQrModal(false);
+                        showAlert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
+                        if (pendingOrderId) {
+                            try {
+                                const detailRes = await axiosClient.get(`/orders/${pendingOrderId}`);
+                                const html = generateOrderReceiptHTML(detailRes.data);
+                                await printDocument(html);
+                            } catch (printErr) { console.log("Lỗi in hoá đơn", printErr); }
+                        }
+                        setPendingOrderId(null);
+                        fetchProductsByWarehouse();
+                    }}
+                    onCancel={() => { setShowQrModal(false); setPendingOrderId(null); fetchProductsByWarehouse(); }}
+                    onChangeMethodToCash={async () => {
+                        setShowQrModal(false);
+                        showAlert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
+                        if (pendingOrderId) {
+                            try {
+                                const detailRes = await axiosClient.get(`/orders/${pendingOrderId}`);
+                                const html = generateOrderReceiptHTML(detailRes.data);
+                                await printDocument(html);
+                            } catch (printErr) { console.log("Lỗi in hoá đơn", printErr); }
+                        }
+                        setPendingOrderId(null);
+                        fetchProductsByWarehouse();
+                    }}
+                />
+            </View>
+        );
+    }
+
+    // ─── MOBILE Layout ───────────────────────────────────────────────────────────
+    const totalItems = cart.reduce((sum, i) => sum + i.quantity, 0);
+    const netAmount = getNetAmount();
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {isLargeScreen ? (
-                <View style={{ flexDirection: 'row', flex: 1 }}>{content}</View>
-            ) : (
-                <ScrollView
-                    style={{ flex: 1 }}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    {content}
-                </ScrollView>
-            )}
+            {/* Danh sách sản phẩm chiếm toàn màn hình */}
+            <View style={{ flex: 1 }}>
+                <ProductGrid
+                    products={products}
+                    loading={loading}
+                    searchKeyword={searchKeyword}
+                    setSearchKeyword={setSearchKeyword}
+                    activeCategoryId={activeCategoryId}
+                    setActiveCategoryId={setActiveCategoryId}
+                    handleAddToCart={handleAddToCart}
+                />
+            </View>
+
+            {/* Floating Cart Bar — luôn nổi ở dưới đáy */}
+            <TouchableOpacity
+                style={[styles.floatingCartBar, { backgroundColor: colors.primary }]}
+                onPress={() => setShowCartSheet(true)}
+                activeOpacity={0.85}
+            >
+                <View style={styles.floatingCartLeft}>
+                    <View style={[styles.floatingCartBadge, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                        <Typography variant="captionBold" color="#fff">{totalItems}</Typography>
+                    </View>
+                    <Typography variant="bodyEmphasized" color="#fff">
+                        {warehouseName ? warehouseName : "Chưa chọn kho"}
+                    </Typography>
+                </View>
+                <View style={styles.floatingCartRight}>
+                    <Typography variant="bodyEmphasized" color="#fff">
+                        {netAmount.toLocaleString("vi-VN")} đ
+                    </Typography>
+                    <Feather name="chevron-up" size={20} color="#fff" />
+                </View>
+            </TouchableOpacity>
+
+            {/* Cart Bottom Sheet Modal */}
+            <Modal
+                visible={showCartSheet}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowCartSheet(false)}
+            >
+                <View style={styles.cartSheetOverlay}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCartSheet(false)} />
+                    <View style={[styles.cartSheetBox, { backgroundColor: colors.surface }]}>
+                        {/* Handle bar */}
+                        <View style={styles.cartSheetHandle}>
+                            <View style={[styles.cartHandleBar, { backgroundColor: colors.border }]} />
+                        </View>
+                        <CartSummary
+                            customers={customers}
+                            warehouseId={warehouseId}
+                            warehouseName={warehouseName}
+                            setShowWarehouseModal={(v: boolean) => {
+                                setShowCartSheet(false);
+                                setShowWarehouseModal(v);
+                            }}
+                            handleCheckout={handleCheckout}
+                            loading={loading}
+                        />
+                    </View>
+                </View>
+            </Modal>
+
             {renderWarehouseModal()}
-            {/* Remove renderQrPaymentModal call */}
             <QRPaymentModal
                 visible={showQrModal}
                 qrData={qrData}
@@ -321,10 +419,7 @@ export const PosScreen = () => {
                 pendingOrderNo={pendingOrderNo}
                 pendingAmount={pendingAmount}
                 initialTimeLeftSec={timeLeftSec}
-                onClose={() => {
-                    setShowQrModal(false);
-                    setPendingOrderId(null);
-                }}
+                onClose={() => { setShowQrModal(false); setPendingOrderId(null); }}
                 onSuccess={async () => {
                     setShowQrModal(false);
                     showAlert("Thành công", `Đơn #${pendingOrderNo} đã thanh toán thành công.`);
@@ -333,18 +428,12 @@ export const PosScreen = () => {
                             const detailRes = await axiosClient.get(`/orders/${pendingOrderId}`);
                             const html = generateOrderReceiptHTML(detailRes.data);
                             await printDocument(html);
-                        } catch (printErr) {
-                            console.log("Lỗi in hoá đơn tự động", printErr);
-                        }
+                        } catch (printErr) { console.log("Lỗi in hoá đơn", printErr); }
                     }
                     setPendingOrderId(null);
                     fetchProductsByWarehouse();
                 }}
-                onCancel={() => {
-                    setShowQrModal(false);
-                    setPendingOrderId(null);
-                    fetchProductsByWarehouse();
-                }}
+                onCancel={() => { setShowQrModal(false); setPendingOrderId(null); fetchProductsByWarehouse(); }}
                 onChangeMethodToCash={async () => {
                     setShowQrModal(false);
                     showAlert("Thành công", "Đã đổi sang thanh toán tiền mặt.");
@@ -353,9 +442,7 @@ export const PosScreen = () => {
                             const detailRes = await axiosClient.get(`/orders/${pendingOrderId}`);
                             const html = generateOrderReceiptHTML(detailRes.data);
                             await printDocument(html);
-                        } catch (printErr) {
-                            console.log("Lỗi in hoá đơn tự động", printErr);
-                        }
+                        } catch (printErr) { console.log("Lỗi in hoá đơn", printErr); }
                     }
                     setPendingOrderId(null);
                     fetchProductsByWarehouse();
@@ -381,11 +468,29 @@ const styles = StyleSheet.create({
         flexDirection: "row", alignItems: "center", padding: 12,
         borderRadius: 8, borderWidth: 1
     },
-    checkoutErrorBox: { marginHorizontal: 12, marginBottom: 12, borderWidth: 1, borderRadius: 8, padding: 10 },
     modalConfirmBtn: { padding: 12, alignItems: "center" },
-    modalCloseBtn: { padding: 12, alignItems: "center", borderWidth: 1, marginTop: 8 },
-    qrWrap: { borderWidth: 1, borderRadius: 12, padding: 12, alignItems: "center", justifyContent: "center" },
-    qrImage: { width: 260, height: 260 }
+    // Floating Cart Bar
+    floatingCartBar: {
+        flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+        paddingHorizontal: 20, paddingVertical: 14,
+        marginHorizontal: 12, marginBottom: 12,
+        borderRadius: 16, elevation: 8,
+        shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    },
+    floatingCartLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+    floatingCartRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+    floatingCartBadge: {
+        width: 26, height: 26, borderRadius: 13,
+        alignItems: "center", justifyContent: "center",
+    },
+    // Cart Bottom Sheet
+    cartSheetOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
+    cartSheetBox: {
+        height: "90%", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        overflow: "hidden",
+    },
+    cartSheetHandle: { alignItems: "center", paddingVertical: 10 },
+    cartHandleBar: { width: 40, height: 4, borderRadius: 2 },
 });
 
 export default PosScreen;

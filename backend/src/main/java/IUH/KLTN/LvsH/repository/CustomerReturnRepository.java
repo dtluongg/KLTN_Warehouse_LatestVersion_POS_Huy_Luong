@@ -16,7 +16,7 @@ public interface CustomerReturnRepository
         @Query(value = """
                 SELECT COALESCE(SUM(c.total_refund), 0)
                 FROM customer_returns c
-                WHERE c.status = 'COMPLETED'
+                WHERE c.status = 'POSTED'
                   AND (:warehouseId IS NULL OR c.warehouse_id = :warehouseId)
                   AND c.created_at >= :fromTime
                   AND c.created_at <= :toTime

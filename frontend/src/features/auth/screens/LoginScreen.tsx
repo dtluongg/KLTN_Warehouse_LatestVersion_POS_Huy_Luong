@@ -54,7 +54,7 @@ const LoginScreen = () => {
                 <View style={[styles.iconBox, { borderRadius: metrics.borderRadius.medium }]}>
                   <MaterialCommunityIcons name="leaf" size={24} color="#34d399" />
                 </View>
-                <Typography variant="heading2" color="#ffffff" style={{ letterSpacing: -0.5 }}>Sáu Hiệp</Typography>
+                <Typography variant="heading2" color="#ffffff" style={{ letterSpacing: -0.5 }}>Warehouse POS</Typography>
               </View>
 
               <View style={styles.heroTextWrapper}>
@@ -66,7 +66,7 @@ const LoginScreen = () => {
               </View>
 
               <View style={styles.footerLinks}>
-                <Typography variant="caption" color="rgba(167, 243, 208, 0.6)">© 2024 Sáu Hiệp Store</Typography>
+                <Typography variant="caption" color="rgba(167, 243, 208, 0.6)">© 2024 WarehousePOS Store</Typography>
                 <View style={styles.dot} />
                 <Typography variant="caption" color="rgba(167, 243, 208, 0.6)">Privacy Policy</Typography>
                 <View style={styles.dot} />

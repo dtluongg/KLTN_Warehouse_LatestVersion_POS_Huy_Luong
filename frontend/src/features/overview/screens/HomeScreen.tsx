@@ -36,11 +36,6 @@ const HomeScreen = () => {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <ScreenHeader
-                title="Tổng quan"
-                subtitle="Hệ thống bán hàng và quản lý kho"
-            />
-
             <ScrollView contentContainerStyle={styles.content}>
                 <Card elevated style={{ ...styles.heroCard, backgroundColor: colors.primary }}>
                     <View style={styles.heroLeft}>

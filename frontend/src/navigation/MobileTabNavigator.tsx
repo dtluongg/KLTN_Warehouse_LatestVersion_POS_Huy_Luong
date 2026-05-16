@@ -50,9 +50,9 @@ export default function MobileTabNavigator() {
                 tabBarActiveTintColor: colors.primary,
                 tabBarInactiveTintColor: colors.textDisabled,
                 tabBarStyle: {
-                    height: 64,
+                    height: 72,
                     paddingTop: 6,
-                    paddingBottom: 8,
+                    paddingBottom: 14,
                     borderTopColor: colors.border,
                     backgroundColor: colors.surface,
                 },

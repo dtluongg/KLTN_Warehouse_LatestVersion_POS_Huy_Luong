@@ -52,10 +52,9 @@ export const ProductGrid = ({
     });
 
     return (
-        <View style={!isLargeScreen ? null : { flex: 6.5, padding: metrics.spacing.lg }}>
-            {/* Header & Search */}
-            <View style={[styles.headerArea, !isLargeScreen && { flexDirection: "column", alignItems: "flex-start", gap: 12, paddingHorizontal: 16, paddingTop: 16 }]}>
-                <Typography variant="heading2" color={colors.textPrimary}>Danh Sách Sản Phẩm</Typography>
+        <View style={!isLargeScreen ? { flex: 1 } : { flex: 6.5, padding: metrics.spacing.lg }}>
+            {/* Search Bar (không có title text) */}
+            <View style={[{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }, isLargeScreen && { paddingHorizontal: 0 }]}>
                 <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }, !isLargeScreen && { width: "100%" }]}>
                     <Feather name="search" size={20} color={colors.textDisabled} />
                     <TextInput
@@ -74,7 +73,7 @@ export const ProductGrid = ({
             </View>
 
             {/* Categories */}
-            <View style={{ marginBottom: metrics.spacing.lg, paddingHorizontal: isLargeScreen ? 0 : 16 }}>
+            <View style={{ marginBottom: 10, paddingHorizontal: isLargeScreen ? 0 : 16 }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                     {MOCK_CATEGORIES.map((cat) => (
                         <TouchableOpacity
@@ -94,64 +93,62 @@ export const ProductGrid = ({
                 </ScrollView>
             </View>
 
-            {/* Product Grid */}
+            {/* Product Grid — flex:1 để scroll đúng */}
             {loading ? (
                 <View style={[styles.loadingCenter, { padding: 40 }]}>
                     <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : (
-                <View style={{ paddingHorizontal: isLargeScreen ? 0 : 16 }}>
-                    <FlatList
-                        data={filteredProducts}
-                        keyExtractor={(item) => item.id.toString()}
-                        numColumns={isLargeScreen ? 4 : 2}
-                        key={isLargeScreen ? "cols-4" : "cols-2"}
-                        scrollEnabled={false} // Disable auto flatlist scroll because container scrolls
-                        columnWrapperStyle={{ gap: 16, marginBottom: 16, justifyContent: 'flex-start' }}
-                        showsVerticalScrollIndicator={false}
-                        ListEmptyComponent={
-                            <Typography style={{ textAlign: "center", marginTop: 40 }} color={colors.textDisabled}>
-                                Không tìm thấy sản phẩm nào.
-                            </Typography>
-                        }
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={[
-                                    styles.productCard,
-                                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: metrics.borderRadius.large },
-                                    item.onHand <= 0 && { opacity: 0.5 },
-                                    { maxWidth: isLargeScreen ? "23.5%" : "47.5%" },
-                                ]}
-                                activeOpacity={0.7}
-                                onPress={() => handleAddToCart(item)}
-                            >
-                                {item.imageUrl ? (
-                                    <Image source={{ uri: item.imageUrl }} style={[styles.productImagePlaceholder, { backgroundColor: colors.background }]} />
-                                ) : (
-                                    <View style={[styles.productImagePlaceholder, { backgroundColor: colors.background }]}>
-                                        <Feather name="box" size={32} color={colors.textDisabled} />
-                                    </View>
-                                )}
-                                <View style={styles.productInfo}>
-                                    <Typography variant="captionBold" color={colors.textPrimary} numberOfLines={2} style={{ height: 40 }}>
-                                        {item.name}
-                                    </Typography>
-                                    <Typography variant="micro" color={colors.textSecondary} style={{ marginTop: 4 }}>
-                                        {item.sku}
-                                    </Typography>
-                                    <View style={styles.productFooter}>
-                                        <Typography variant="bodyEmphasized" color={colors.primary}>
-                                            {item.salePrice.toLocaleString("vi-VN")} đ
-                                        </Typography>
-                                        <Typography variant="caption" color={item.onHand <= 0 ? colors.danger : colors.textPrimary} style={item.onHand <= 0 ? { fontWeight: '700' } : {}}>
-                                            SL: {item.onHand}
-                                        </Typography>
-                                    </View>
+                <FlatList
+                    data={filteredProducts}
+                    keyExtractor={(item) => item.id.toString()}
+                    numColumns={isLargeScreen ? 4 : 2}
+                    key={isLargeScreen ? "cols-4" : "cols-2"}
+                    columnWrapperStyle={{ gap: 16, marginBottom: 16, justifyContent: 'flex-start' }}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: isLargeScreen ? 0 : 16, paddingBottom: 100 }}
+                    ListEmptyComponent={
+                        <Typography style={{ textAlign: "center", marginTop: 40 }} color={colors.textDisabled}>
+                            Không tìm thấy sản phẩm nào.
+                        </Typography>
+                    }
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={[
+                                styles.productCard,
+                                { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: metrics.borderRadius.large },
+                                item.onHand <= 0 && { opacity: 0.5 },
+                                { maxWidth: isLargeScreen ? "23.5%" : "47.5%" },
+                            ]}
+                            activeOpacity={0.7}
+                            onPress={() => handleAddToCart(item)}
+                        >
+                            {item.imageUrl ? (
+                                <Image source={{ uri: item.imageUrl }} style={[styles.productImagePlaceholder, { backgroundColor: colors.background, height: isLargeScreen ? 140 : 90 }]} />
+                            ) : (
+                                <View style={[styles.productImagePlaceholder, { backgroundColor: colors.background, height: isLargeScreen ? 140 : 90 }]}>
+                                    <Feather name="box" size={isLargeScreen ? 32 : 24} color={colors.textDisabled} />
                                 </View>
-                            </TouchableOpacity>
-                        )}
-                    />
-                </View>
+                            )}
+                            <View style={[styles.productInfo, { padding: isLargeScreen ? 12 : 8 }]}>
+                                <Typography variant="captionBold" color={colors.textPrimary} numberOfLines={2}>
+                                    {item.name}
+                                </Typography>
+                                <Typography variant="micro" color={colors.textSecondary} style={{ marginTop: 4 }}>
+                                    {item.sku}
+                                </Typography>
+                                <View style={styles.productFooter}>
+                                    <Typography variant="bodyEmphasized" color={colors.primary}>
+                                        {item.salePrice.toLocaleString("vi-VN")} đ
+                                    </Typography>
+                                    <Typography variant="caption" color={item.onHand <= 0 ? colors.danger : colors.textPrimary} style={item.onHand <= 0 ? { fontWeight: '700' } : {}}>
+                                        SL: {item.onHand}
+                                    </Typography>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+                />
             )}
         </View>
     );
@@ -166,5 +163,5 @@ const styles = StyleSheet.create({
     productCard: { flex: 1, borderWidth: 1, overflow: "hidden", elevation: 1 },
     productImagePlaceholder: { height: 140, justifyContent: "center", alignItems: "center", width: "100%" },
     productInfo: { padding: 12 },
-    productFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 12 }
+    productFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 8 }
 });

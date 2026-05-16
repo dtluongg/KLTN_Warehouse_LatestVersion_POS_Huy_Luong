@@ -31,8 +31,9 @@ const InventoryMovementListScreen = () => {
             hideDefaultDetailAction
             renderFilters={(setFilters, currentFilters) => {
                 const movementTypes = [
-                    "PURCHASE_IN", "PURCHASE_RETURN_OUT", "SALE_OUT", "SALE_RETURN_IN",
-                    "TRANSFER_OUT", "TRANSFER_IN", "ADJUST_IN", "ADJUST_OUT"
+                    "PURCHASE_IN", "SALE_OUT",
+                    "RETURN_IN", "RETURN_OUT",
+                    "ADJUST_IN", "ADJUST_OUT"
                 ];
 
                 const datePresets = [
@@ -199,7 +200,22 @@ const InventoryMovementListScreen = () => {
                 { key: "productName", label: "Sản phẩm", flex: 2 },
                 { key: "warehouseName", label: "Kho", flex: 1 },
                 { key: "movementType", label: "Loại", flex: 1 },
-                { key: "qty", label: "SL", width: 70 },
+                { key: "qty", label: "SL", width: 80,
+                    render: (v: any, row: any) => {
+                        const isIn = String(row?.movementType || "").endsWith("_IN");
+                        const isOut = String(row?.movementType || "").endsWith("_OUT");
+                        const sign = isIn ? "+" : isOut ? "-" : "";
+                        const bg = isIn ? "#dcfce7" : isOut ? "#fee2e2" : "#f1f5f9";
+                        const color = isIn ? "#16a34a" : isOut ? "#dc2626" : "#475569";
+                        return (
+                            <View style={{ backgroundColor: bg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" }}>
+                                <Text style={{ color, fontWeight: "700", fontSize: 13 }}>
+                                    {sign}{Math.abs(Number(v))}
+                                </Text>
+                            </View>
+                        );
+                    }
+                },
                 { key: "refTable", label: "Nguồn", flex: 1 },
                 { key: "refId", label: "Mã chứng từ", flex: 1 },
                 { key: "createdBy", label: "Người tạo", flex: 1 },

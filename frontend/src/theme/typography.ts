@@ -1,54 +1,62 @@
-import { Platform } from 'react-native';
+import { Platform, Dimensions } from 'react-native';
 
 const isIOS = Platform.OS === 'ios';
 
-// Apple's font family logic:
-// At 20px or above -> Display text
-// At 19px or below -> Text
 const fonts = {
-  display: isIOS ? 'System' : 'System', // On iOS, System defaults to San Francisco (SF Pro)
+  display: isIOS ? 'System' : 'System',
   text: isIOS ? 'System' : 'System',
 };
 
+// --- Responsive Font Scale ---
+// Base width được thiết kế trên tablet/desktop ~1024px
+// Trên mobile (~390px), font sẽ thu nhỏ theo tỷ lệ
+const BASE_WIDTH = 1024;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Clamp scale trong khoảng 0.65 (rất nhỏ) - 1.0 (desktop)
+const scale = Math.min(1.0, Math.max(0.65, SCREEN_WIDTH / BASE_WIDTH));
+
+// Hàm tính fontSize responsive
+const rf = (desktopSize: number) => Math.round(desktopSize * scale);
+
 export const typography = {
-  // 56px (3.50rem)
+  // 56px → co nhỏ tối đa ~36px trên mobile
   displayHero: {
     fontFamily: fonts.display,
-    fontSize: 56,
+    fontSize: rf(56),
     fontWeight: '600' as const,
-    lineHeight: 60, // ~1.07 ratio
+    lineHeight: rf(60),
     letterSpacing: -0.28,
   },
-  // 40px (2.50rem)
+  // 40px → ~26px trên mobile
   heading1: {
     fontFamily: fonts.display,
-    fontSize: 40,
+    fontSize: rf(40),
     fontWeight: '600' as const,
-    lineHeight: 44, // ~1.10 ratio
+    lineHeight: rf(44),
     letterSpacing: 0,
   },
-  // 28px (1.75rem)
+  // 28px → ~18px trên mobile
   heading2: {
     fontFamily: fonts.display,
-    fontSize: 28,
+    fontSize: rf(28),
     fontWeight: '400' as const,
-    lineHeight: 32, // ~1.14 ratio
+    lineHeight: rf(32),
     letterSpacing: 0.196,
   },
-  // 21px
+  // 21px → ~14px trên mobile
   titleBox: {
     fontFamily: fonts.display,
-    fontSize: 21,
+    fontSize: rf(21),
     fontWeight: '700' as const,
-    lineHeight: 25, // ~1.19 ratio
+    lineHeight: rf(25),
     letterSpacing: 0.231,
   },
-  // 17px
+  // 17px — body text giữ nguyên để dễ đọc
   body: {
     fontFamily: fonts.text,
     fontSize: 17,
     fontWeight: '400' as const,
-    lineHeight: 25, // ~1.47 ratio
+    lineHeight: 25,
     letterSpacing: -0.374,
   },
   // 17px SemiBold
@@ -56,7 +64,7 @@ export const typography = {
     fontFamily: fonts.text,
     fontSize: 17,
     fontWeight: '600' as const,
-    lineHeight: 21, // ~1.24 ratio (tight)
+    lineHeight: 21,
     letterSpacing: -0.374,
   },
   // 14px
