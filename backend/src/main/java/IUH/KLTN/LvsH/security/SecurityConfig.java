@@ -2,16 +2,12 @@ package IUH.KLTN.LvsH.security;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -35,8 +31,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
-
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final CustomUserDetailsService userDetailsService;
 
@@ -51,17 +45,6 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Cho phÃ©p truy cáº­p tá»± do vÃ o cÃ¡c API auth (VD: Login)
                 .anyRequest().authenticated() // Báº¯t buá»™c Ä‘Äƒng nháº­p vá»›i cÃ¡c API cÃ²n láº¡i
-            )
-            .exceptionHandling(ex -> ex
-                .authenticationEntryPoint((request, response, authException) -> {
-                    log.warn("401 Unauthorized {} {} - {}", request.getMethod(), request.getRequestURI(), describeAuthIssue(request, authException));
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
-                })
-                .accessDeniedHandler((request, response, accessDeniedException) -> {
-                    String principal = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : "anonymous";
-                    log.warn("403 Forbidden {} {} - principal={} - {}", request.getMethod(), request.getRequestURI(), principal, accessDeniedException.getMessage());
-                    response.sendError(HttpServletResponse.SC_FORBIDDEN);
-                })
             )
             .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())
@@ -103,20 +86,5 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(); // Sá»­ dá»¥ng BCrypt Ä‘á»ƒ bÄƒm vÃ  kiá»ƒm tra máº­t kháº©u
-    }
-
-    private String describeAuthIssue(HttpServletRequest request, Exception authException) {
-        String authorizationHeader = request.getHeader("Authorization");
-        if (authorizationHeader == null || authorizationHeader.isBlank()) {
-            return "missing Authorization header";
-        }
-
-        if (!authorizationHeader.startsWith("Bearer ")) {
-            return "invalid Authorization scheme";
-        }
-
-        return authException.getMessage() != null && !authException.getMessage().isBlank()
-            ? authException.getMessage()
-            : "invalid or expired bearer token";
     }
 }
