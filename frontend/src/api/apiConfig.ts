@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
-const DEFAULT_WEB_API_BASE_URL = 'http://localhost:9999/api';
+// Web should call relative /api so reverse proxy (IIS/Nginx) can forward to backend.
+const DEFAULT_WEB_API_BASE_URL = '/api';
 const DEFAULT_MOBILE_API_BASE_URL = 'http://10.0.2.2:9999/api';
 
 const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
