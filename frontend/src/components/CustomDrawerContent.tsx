@@ -99,7 +99,7 @@ export const CustomDrawerContent = (props: any) => {
                         color={colors.buttonText}
                     />
                 </View>
-                <Typography variant="heading2" color={colors.buttonText}>Sáu Hiệp</Typography>
+                <Typography variant="heading2" color={colors.buttonText}>Warehouse POS</Typography>
             </View>
 
             <DrawerContentScrollView
